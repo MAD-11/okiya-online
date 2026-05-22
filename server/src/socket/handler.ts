@@ -1,12 +1,16 @@
 import { Server, Socket } from 'socket.io';
 import { Game } from '../game/Game';
 import { saveGame, deleteGame } from '../redis';
+import crypto from 'crypto';
 
-// games теперь передаётся извне (загруженная из Redis)
 let games: Map<string, Game>;
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
+}
+
+function generatePlayerToken(): string {
+  return crypto.randomBytes(8).toString('hex');
 }
 
 function getClientGameState(game: Game, playerSocketId?: string) {
@@ -43,6 +47,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   io.on('connection', (socket: Socket) => {
     console.log('User connected:', socket.id);
 
+    // Создание комнаты
     socket.on('create_room', (maxWins: number, callback) => {
       const validWins = [1, 3, 5];
       if (!validWins.includes(maxWins)) maxWins = 1;
@@ -50,24 +55,31 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const game = new Game(maxWins);
       game.addPlayer(socket.id);
 
+      const hostToken = generatePlayerToken();
+      game.hostToken = hostToken;
+      game.guestToken = null;
+
       game.setOnTimerExpired(() => {
         game.skipTurn();
         sendPersonalGameState(io, game);
         if (game.winner) {
           sendPersonalGameOver(io, game);
         }
-        saveGame(roomId, game); // сохраняем после автоматического хода
+        saveGame(roomId, game);
       });
 
       games.set(roomId, game);
       socket.join(roomId);
-
-      // Сохраняем игру в Redis
       saveGame(roomId, game);
 
-      callback({ roomId, state: getClientGameState(game, socket.id) });
+      callback({
+        roomId,
+        playerToken: hostToken,
+        state: getClientGameState(game, socket.id)
+      });
     });
 
+    // Присоединение к комнате
     socket.on('join_room', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game || game.status !== 'waiting') {
@@ -75,10 +87,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
       const added = game.addPlayer(socket.id);
       if (!added) return callback({ error: 'Комната полна' });
-      socket.join(roomId);
-      callback({ state: getClientGameState(game, socket.id) });
 
-      // После добавления второго игрока игра переходит в playing
+      const guestToken = generatePlayerToken();
+      game.guestToken = guestToken;
+
+      socket.join(roomId);
+      callback({
+        playerToken: guestToken,
+        state: getClientGameState(game, socket.id)
+      });
+
       saveGame(roomId, game);
 
       const redSocket = io.sockets.sockets.get(game.players.red!);
@@ -87,19 +105,59 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (blackSocket) blackSocket.emit('game_started', getClientGameState(game, game.players.black));
     });
 
+    // Переподключение
+    socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
+      const game = games.get(roomId);
+      if (!game) return callback({ error: 'Комната не найдена' });
+
+      let role: 'host' | 'guest' | null = null;
+      if (game.hostToken === playerToken) role = 'host';
+      else if (game.guestToken === playerToken) role = 'guest';
+      if (!role) return callback({ error: 'Неверный токен' });
+
+      // Обновляем сокет
+      if (role === 'host') {
+        // Меняем hostSocketId и, возможно, players.red/black
+        if (game.players.red === game.hostSocketId) {
+          game.players.red = socket.id;
+        } else if (game.players.black === game.hostSocketId) {
+          game.players.black = socket.id;
+        }
+        game.hostSocketId = socket.id;
+      } else {
+        if (game.players.red === game.guestSocketId) {
+          game.players.red = socket.id;
+        } else if (game.players.black === game.guestSocketId) {
+          game.players.black = socket.id;
+        }
+        game.guestSocketId = socket.id;
+      }
+
+      socket.join(roomId);
+      // Отправляем актуальное состояние ТОЛЬКО переподключившемуся
+      socket.emit('game_state', getClientGameState(game, socket.id));
+
+      if (game.status === 'playing' && game.players.red && game.players.black) {
+        // Для упрощения сбрасываем таймер при переподключении (можно доработать)
+        game.turnStartedAt = Date.now();
+      }
+      saveGame(roomId, game);
+      callback({ success: true });
+    });
+
+    // Ход
     socket.on('move', (roomId: string, row: number, col: number, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
       const success = game.makeMove(row, col, socket.id);
       if (!success) return callback({ error: 'Недопустимый ход' });
 
-      saveGame(roomId, game); // сохраняем после хода
+      saveGame(roomId, game);
 
       sendPersonalGameState(io, game);
 
       if (game.winner) {
         sendPersonalGameOver(io, game);
-        // Если серия завершена, удаляем игру из Redis
         if (game.seriesWinner || game.maxWins === 1) {
           deleteGame(roomId);
         }
@@ -107,12 +165,13 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
+    // Перезапуск раунда
     socket.on('restart_round', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
       const started = game.voteRestart(socket.id);
       if (started) {
-        saveGame(roomId, game); // новый раунд
+        saveGame(roomId, game);
         sendPersonalGameState(io, game);
       }
       callback({ success: true });
@@ -120,7 +179,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
-      // Здесь можно добавить логику: если оба игрока отключились, удалить игру из Redis и памяти.
     });
   });
 }

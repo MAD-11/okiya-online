@@ -16,9 +16,29 @@ const Game: React.FC = () => {
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
 
+    // Попытка переподключиться при старте
+  useEffect(() => {
+    if (!socket || !connected) return;
+    const savedRoomId = localStorage.getItem('okiya_roomId');
+    const savedToken = localStorage.getItem('okiya_playerToken');
+    if (savedRoomId && savedToken) {
+      socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
+        if (res.error) {
+          localStorage.removeItem('okiya_roomId');
+          localStorage.removeItem('okiya_playerToken');
+          setMessage(res.error);
+        } else {
+          setMessage('');
+        }
+      });
+    }
+  }, [socket, connected]);
+
   const createRoom = (maxWins: number) => {
     socket?.emit('create_room', maxWins, (res: any) => {
       if (res.roomId) {
+        localStorage.setItem('okiya_roomId', res.roomId);
+        localStorage.setItem('okiya_playerToken', res.playerToken);
         setRoomId(res.roomId);
         setGameState(res.state);
         setMessage('');
@@ -35,6 +55,8 @@ const Game: React.FC = () => {
       if (res.error) {
         setMessage(res.error);
       } else {
+        localStorage.setItem('okiya_roomId', id);
+        localStorage.setItem('okiya_playerToken', res.playerToken);
         setRoomId(id);
         setGameState(res.state);
         setMessage('');
@@ -42,6 +64,12 @@ const Game: React.FC = () => {
         setWaitingRestart(false);
       }
     });
+  };
+
+  // Очистка localStorage при завершении серии или одиночной игры
+  const clearSavedRoom = () => {
+    localStorage.removeItem('okiya_roomId');
+    localStorage.removeItem('okiya_playerToken');
   };
 
   const validMoves: ValidMoves = useMemo(() => {

@@ -3,19 +3,12 @@ import { Game } from './game/Game';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-// Клиент для pub/sub и хранения состояния
 export const pubClient = new Redis(redisUrl);
-export const subClient = pubClient.duplicate(); // дубликат для подписки
-
-// Клиент для хранения данных (можно использовать тот же pubClient, но для ясности отдельный)
+export const subClient = pubClient.duplicate();
 const dataClient = new Redis(redisUrl);
 
 const GAME_PREFIX = 'okiya:game:';
 
-/**
- * Сериализует объект Game в JSON-строку для сохранения в Redis.
- * Сохраняем только поля, необходимые для восстановления.
- */
 function serializeGame(game: Game): string {
   return JSON.stringify({
     board: game.board,
@@ -26,6 +19,8 @@ function serializeGame(game: Game): string {
     players: game.players,
     hostSocketId: game.hostSocketId,
     guestSocketId: game.guestSocketId,
+    hostToken: game.hostToken,
+    guestToken: game.guestToken,
     maxWins: game.maxWins,
     scores: game.scores,
     roundFinished: game.roundFinished,
@@ -36,13 +31,9 @@ function serializeGame(game: Game): string {
   });
 }
 
-/**
- * Восстанавливает объект Game из JSON-строки, полученной из Redis.
- */
 function deserializeGame(data: string): Game {
   const obj = JSON.parse(data);
   const game = new Game(obj.maxWins, obj.turnDuration);
-  // Восстанавливаем поля вручную, чтобы сохранить приватные методы и таймеры
   game.board = obj.board;
   game.currentPlayer = obj.currentPlayer;
   game.status = obj.status;
@@ -51,24 +42,22 @@ function deserializeGame(data: string): Game {
   game.players = obj.players;
   game.hostSocketId = obj.hostSocketId;
   game.guestSocketId = obj.guestSocketId;
+  game.hostToken = obj.hostToken;
+  game.guestToken = obj.guestToken;
   game.scores = obj.scores;
   game.roundFinished = obj.roundFinished;
   game.seriesWinner = obj.seriesWinner;
   game.turnStartedAt = obj.turnStartedAt;
   game.turnDuration = obj.turnDuration;
   game.lastMove = obj.lastMove;
-  // Примечание: таймер при восстановлении не запускается, он запустится после первого хода.
-  // Если игра была в статусе playing, нужно перезапустить таймер после восстановления (см. handler).
   return game;
 }
 
-// Сохранить игру
 export async function saveGame(roomId: string, game: Game): Promise<void> {
   const key = GAME_PREFIX + roomId;
   await dataClient.set(key, serializeGame(game));
 }
 
-// Загрузить игру (возвращает null, если не найдена)
 export async function loadGame(roomId: string): Promise<Game | null> {
   const key = GAME_PREFIX + roomId;
   const data = await dataClient.get(key);
@@ -81,12 +70,10 @@ export async function loadGame(roomId: string): Promise<Game | null> {
   }
 }
 
-// Удалить игру (при завершении серии или выходе игроков)
 export async function deleteGame(roomId: string): Promise<void> {
   await dataClient.del(GAME_PREFIX + roomId);
 }
 
-// Загрузить все активные игры (используется при старте сервера)
 export async function loadAllGames(): Promise<Map<string, Game>> {
   const games = new Map<string, Game>();
   const keys = await dataClient.keys(GAME_PREFIX + '*');

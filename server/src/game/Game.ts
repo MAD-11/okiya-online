@@ -11,6 +11,10 @@ export class Game {
   public hostSocketId: string | null = null;
   public guestSocketId: string | null = null;
 
+  // Токены для переподключения
+  public hostToken: string | null = null;
+  public guestToken: string | null = null;
+
   public maxWins: number;
   public scores: { host: number; guest: number };
   public roundFinished: boolean;
@@ -19,7 +23,7 @@ export class Game {
 
   // Таймер
   public turnStartedAt: number = Date.now();
-  public turnDuration: number = 30_000; // 30 секунд
+  public turnDuration: number = 30_000;
   private turnTimer: NodeJS.Timeout | null = null;
   private onTimerExpired: (() => void) | null = null;
 
@@ -80,7 +84,6 @@ export class Game {
   skipTurn() {
     if (this.status !== 'playing') return;
     const opponent = this.currentPlayer === 'red' ? 'black' : 'red';
-    // Проверяем, может ли противник вообще ходить
     if (!this.hasValidMove()) {
       this.winner = opponent;
       this.handleGameOver();
@@ -88,7 +91,6 @@ export class Game {
       this.currentPlayer = opponent;
       this.startTurnTimer();
     }
-    // lastMove не меняется, так как хода не было
   }
 
   makeMove(row: number, col: number, playerSocketId: string): boolean {
@@ -106,7 +108,7 @@ export class Game {
     const picked = this.board[row][col] as Tile;
     this.board[row][col] = playerColor;
     this.lastPickedTile = picked;
-    this.lastMove = { row, col };   // запомнили ход для анимации
+    this.lastMove = { row, col };
 
     this.clearTurnTimer();
 
