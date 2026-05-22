@@ -6,9 +6,12 @@ class Game {
     constructor(maxWins = 1, turnDuration = 30000) {
         this.hostSocketId = null;
         this.guestSocketId = null;
+        // Токены для переподключения
+        this.hostToken = null;
+        this.guestToken = null;
         // Таймер
         this.turnStartedAt = Date.now();
-        this.turnDuration = 30000; // 30 секунд
+        this.turnDuration = 30000;
         this.turnTimer = null;
         this.onTimerExpired = null;
         // Последний сделанный ход (для анимации)
@@ -63,7 +66,6 @@ class Game {
         if (this.status !== 'playing')
             return;
         const opponent = this.currentPlayer === 'red' ? 'black' : 'red';
-        // Проверяем, может ли противник вообще ходить
         if (!this.hasValidMove()) {
             this.winner = opponent;
             this.handleGameOver();
@@ -72,7 +74,6 @@ class Game {
             this.currentPlayer = opponent;
             this.startTurnTimer();
         }
-        // lastMove не меняется, так как хода не было
     }
     makeMove(row, col, playerSocketId) {
         if (this.status !== 'playing')
@@ -93,7 +94,7 @@ class Game {
         const picked = this.board[row][col];
         this.board[row][col] = playerColor;
         this.lastPickedTile = picked;
-        this.lastMove = { row, col }; // запомнили ход для анимации
+        this.lastMove = { row, col };
         this.clearTurnTimer();
         if ((0, Board_1.checkWin)(this.board, playerColor)) {
             this.winner = playerColor;

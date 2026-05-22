@@ -15,8 +15,25 @@ const Game: React.FC = () => {
   const [message, setMessage] = useState('');
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
+  const [waitingReset, setWaitingReset] = useState(false);
 
-    // Попытка переподключиться при старте
+  // Очистка сохранённой комнаты (выход в меню)
+  const clearSavedRoom = () => {
+    localStorage.removeItem('okiya_roomId');
+    localStorage.removeItem('okiya_playerToken');
+  };
+
+  const backToMenu = () => {
+    clearSavedRoom();
+    setGameState(null);
+    setRoomId(null);
+    setMessage('');
+    setPersonalGameOver(null);
+    setWaitingRestart(false);
+    setWaitingReset(false);
+  };
+
+  // Попытка переподключения
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -24,10 +41,10 @@ const Game: React.FC = () => {
     if (savedRoomId && savedToken) {
       socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
         if (res.error) {
-          localStorage.removeItem('okiya_roomId');
-          localStorage.removeItem('okiya_playerToken');
+          clearSavedRoom();
           setMessage(res.error);
         } else {
+          setRoomId(savedRoomId); // важно: восстановить отображение кода комнаты
           setMessage('');
         }
       });
@@ -44,6 +61,7 @@ const Game: React.FC = () => {
         setMessage('');
         setPersonalGameOver(null);
         setWaitingRestart(false);
+        setWaitingReset(false);
       }
     });
   };
@@ -62,14 +80,9 @@ const Game: React.FC = () => {
         setMessage('');
         setPersonalGameOver(null);
         setWaitingRestart(false);
+        setWaitingReset(false);
       }
     });
-  };
-
-  // Очистка localStorage при завершении серии или одиночной игры
-  const clearSavedRoom = () => {
-    localStorage.removeItem('okiya_roomId');
-    localStorage.removeItem('okiya_playerToken');
   };
 
   const validMoves: ValidMoves = useMemo(() => {
@@ -118,6 +131,19 @@ const Game: React.FC = () => {
     });
   };
 
+  const handleResetRoom = () => {
+    if (!socket || !roomId) return;
+    setWaitingReset(true);
+    socket.emit('reset_room', roomId, (res: any) => {
+      if (res?.error) {
+        setWaitingReset(false);
+        setMessage(res.error);
+      }
+      // Успешный сброс — состояние обновится через game_state
+    });
+  };
+
+  // Слушатели сокета
   useEffect(() => {
     if (!socket) return;
 
@@ -125,19 +151,20 @@ const Game: React.FC = () => {
       setGameState(state);
       setPersonalGameOver(null);
       setWaitingRestart(false);
+      setWaitingReset(false);
     });
 
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
         setWaitingRestart(false);
+        setWaitingReset(false);
         setMessage('');
       }
       setGameState(state);
     });
 
     socket.on('game_over', (data: { winner: string; yourResult: string; seriesWinner: string | null }) => {
-      // Воспроизводим звук в зависимости от результата
       if (data.yourResult === 'win') playWinSound();
       else if (data.yourResult === 'lose') playLoseSound();
       else if (data.yourResult === 'draw') playDrawSound();
@@ -154,6 +181,10 @@ const Game: React.FC = () => {
         } else {
           text += ' Серия проиграна.';
         }
+        clearSavedRoom(); // серия завершена, токен больше не нужен
+      } else if (gameState?.maxWins === 1) {
+        // Одиночная игра завершена — тоже очищаем
+        clearSavedRoom();
       }
       setPersonalGameOver(text);
     });
@@ -163,8 +194,9 @@ const Game: React.FC = () => {
       socket.off('game_state');
       socket.off('game_over');
     };
-  }, [socket, gameState?.isHost, gameState?.status]);
+  }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
+  // Анимации
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -196,9 +228,7 @@ const Game: React.FC = () => {
           <button onClick={() => createRoom(3)} style={styles.button}>До 3 побед</button>
           <button onClick={() => createRoom(5)} style={styles.button}>До 5 побед</button>
         </div>
-        <p style={{ marginTop: 30 }}>
-          или
-        </p>
+        <p style={{ marginTop: 30 }}>или</p>
         <button onClick={joinRoom} style={{ ...styles.button, background: '#b08b6c' }}>
           Присоединиться к комнате
         </button>
@@ -247,13 +277,17 @@ const Game: React.FC = () => {
           {waitingRestart && <p>Ожидание соперника...</p>}
         </div>
       )}
-      {gameState.seriesWinner && (
-        <div style={{ marginTop: 20 }}>
-          <button onClick={() => createRoom(gameState.maxWins)} style={styles.button}>
-            Начать новую серию
-          </button>
-        </div>
-      )}
+
+      {/* Кнопки управления комнатой */}
+      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <button onClick={backToMenu} style={{ ...styles.button, background: '#e74c3c' }}>
+          Выйти в главное меню
+        </button>
+        <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71' }}>
+          {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
+        </button>
+      </div>
+
       {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
         <div style={{ marginTop: 20 }}>
           <p>Ожидание новой игры...</p>
@@ -314,9 +348,9 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '10px 0',
   },
   button: {
-    margin: '0 12px',
-    padding: '12px 28px',
-    fontSize: 18,
+    margin: '4px',
+    padding: '10px 24px',
+    fontSize: 16,
     background: '#d4a373',
     border: 'none',
     borderRadius: '30px',
@@ -324,6 +358,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     transition: '0.2s',
+    whiteSpace: 'nowrap',
   },
   gameContainer: {
     textAlign: 'center',
@@ -332,6 +367,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     margin: 0,
     paddingTop: 10,
+    paddingBottom: 20,
   },
 };
 
