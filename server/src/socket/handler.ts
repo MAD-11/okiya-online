@@ -1,7 +1,9 @@
 import { Server, Socket } from 'socket.io';
 import { Game } from '../game/Game';
+import { saveGame, deleteGame } from '../redis';
 
-const games = new Map<string, Game>();
+// games теперь передаётся извне (загруженная из Redis)
+let games: Map<string, Game>;
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -35,7 +37,9 @@ function getClientGameState(game: Game, playerSocketId?: string) {
   };
 }
 
-export function setupSocket(io: Server) {
+export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
+  games = loadedGames;
+
   io.on('connection', (socket: Socket) => {
     console.log('User connected:', socket.id);
 
@@ -52,10 +56,15 @@ export function setupSocket(io: Server) {
         if (game.winner) {
           sendPersonalGameOver(io, game);
         }
+        saveGame(roomId, game); // сохраняем после автоматического хода
       });
 
       games.set(roomId, game);
       socket.join(roomId);
+
+      // Сохраняем игру в Redis
+      saveGame(roomId, game);
+
       callback({ roomId, state: getClientGameState(game, socket.id) });
     });
 
@@ -69,6 +78,9 @@ export function setupSocket(io: Server) {
       socket.join(roomId);
       callback({ state: getClientGameState(game, socket.id) });
 
+      // После добавления второго игрока игра переходит в playing
+      saveGame(roomId, game);
+
       const redSocket = io.sockets.sockets.get(game.players.red!);
       const blackSocket = io.sockets.sockets.get(game.players.black!);
       if (redSocket) redSocket.emit('game_started', getClientGameState(game, game.players.red));
@@ -81,10 +93,16 @@ export function setupSocket(io: Server) {
       const success = game.makeMove(row, col, socket.id);
       if (!success) return callback({ error: 'Недопустимый ход' });
 
+      saveGame(roomId, game); // сохраняем после хода
+
       sendPersonalGameState(io, game);
 
       if (game.winner) {
         sendPersonalGameOver(io, game);
+        // Если серия завершена, удаляем игру из Redis
+        if (game.seriesWinner || game.maxWins === 1) {
+          deleteGame(roomId);
+        }
       }
       callback({ success: true });
     });
@@ -94,6 +112,7 @@ export function setupSocket(io: Server) {
       if (!game) return callback({ error: 'Игра не найдена' });
       const started = game.voteRestart(socket.id);
       if (started) {
+        saveGame(roomId, game); // новый раунд
         sendPersonalGameState(io, game);
       }
       callback({ success: true });
@@ -101,6 +120,7 @@ export function setupSocket(io: Server) {
 
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
+      // Здесь можно добавить логику: если оба игрока отключились, удалить игру из Redis и памяти.
     });
   });
 }
