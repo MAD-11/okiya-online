@@ -1,7 +1,13 @@
-import Game from "./components/Game";
+import React from 'react';
+import { ThemeProvider } from './contexts/ThemeContext';
+import Game from './components/Game';
 
 function App() {
-  return <Game />;
+  return (
+    <ThemeProvider>
+      <Game />
+    </ThemeProvider>
+  );
 }
 
 export default App;

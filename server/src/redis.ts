@@ -8,6 +8,7 @@ export const subClient = pubClient.duplicate();
 const dataClient = new Redis(redisUrl);
 
 const GAME_PREFIX = 'okiya:game:';
+const GAME_TTL = 3600; // 1 час
 
 function serializeGame(game: Game): string {
   return JSON.stringify({
@@ -21,6 +22,8 @@ function serializeGame(game: Game): string {
     guestSocketId: game.guestSocketId,
     hostToken: game.hostToken,
     guestToken: game.guestToken,
+    nickRed: game.nickRed,
+    nickBlack: game.nickBlack,
     maxWins: game.maxWins,
     scores: game.scores,
     roundFinished: game.roundFinished,
@@ -44,6 +47,8 @@ function deserializeGame(data: string): Game {
   game.guestSocketId = obj.guestSocketId;
   game.hostToken = obj.hostToken;
   game.guestToken = obj.guestToken;
+  game.nickRed = obj.nickRed || 'Красные';
+  game.nickBlack = obj.nickBlack || 'Чёрные';
   game.scores = obj.scores;
   game.roundFinished = obj.roundFinished;
   game.seriesWinner = obj.seriesWinner;
@@ -56,6 +61,7 @@ function deserializeGame(data: string): Game {
 export async function saveGame(roomId: string, game: Game): Promise<void> {
   const key = GAME_PREFIX + roomId;
   await dataClient.set(key, serializeGame(game));
+  await dataClient.expire(key, GAME_TTL);
 }
 
 export async function loadGame(roomId: string): Promise<Game | null> {

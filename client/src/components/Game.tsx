@@ -5,6 +5,11 @@ import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import { useTheme } from '../contexts/ThemeContext';
+import RoomList from './RoomList';
+import Chat from './Chat';
+import Profile from './Profile';
+import Settings from './Settings';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -16,6 +21,12 @@ const Game: React.FC = () => {
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
+
+  // Модальные окна
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const { darkMode, skin } = useTheme();
 
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
@@ -55,7 +66,8 @@ const Game: React.FC = () => {
   }, [socket, connected]);
 
   const createRoom = (maxWins: number) => {
-    socket?.emit('create_room', maxWins, (res: any) => {
+    const nick = prompt('Введите ваш никнейм') || 'Игрок';
+    socket?.emit('create_room', { maxWins, nick }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
         localStorage.setItem('okiya_playerToken', res.playerToken);
@@ -69,10 +81,11 @@ const Game: React.FC = () => {
     });
   };
 
-  const joinRoom = () => {
-    const id = prompt('Введите код комнаты')?.toUpperCase();
+  const joinRoom = (code?: string) => {
+    const id = code || prompt('Введите код комнаты')?.toUpperCase();
     if (!id) return;
-    socket?.emit('join_room', id, (res: any) => {
+    const nick = prompt('Введите ваш никнейм') || 'Игрок';
+    socket?.emit('join_room', { roomId: id, nick }, (res: any) => {
       if (res.error) {
         setMessage(res.error);
       } else {
@@ -154,6 +167,13 @@ const Game: React.FC = () => {
     }
   };
 
+  const handleChatSend = (text: string) => {
+    if (socket && roomId) {
+      socket.emit('chat_message', roomId, text);
+    }
+  };
+
+  // Слушатели
   useEffect(() => {
     if (!socket) return;
 
@@ -205,6 +225,7 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
+  // Анимации
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -217,12 +238,7 @@ const Game: React.FC = () => {
         from { transform: scale(0); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
-      @media (max-width: 700px) {
-        .right-panel {
-          position: static !important;
-          margin-top: 16px;
-        }
-      }
+      .dark { background-color: #1e1e1e !important; color: #e0e0e0; }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
@@ -232,6 +248,7 @@ const Game: React.FC = () => {
     return <div style={styles.centered}>Подключение к серверу...</div>;
   }
 
+  // Главное меню
   if (!gameState) {
     return (
       <div style={styles.lobby}>
@@ -243,9 +260,16 @@ const Game: React.FC = () => {
           <button onClick={() => createRoom(5)} style={styles.button}>До 5 побед</button>
         </div>
         <p style={{ marginTop: 30 }}>или</p>
-        <button onClick={joinRoom} style={{ ...styles.button, background: '#b08b6c' }}>
-          Присоединиться к комнате
+        <button onClick={() => joinRoom()} style={{ ...styles.button, background: '#b08b6c' }}>
+          Присоединиться по коду
         </button>
+        <RoomList onJoin={(roomId) => joinRoom(roomId)} />
+        <div style={{ marginTop: 20 }}>
+          <button onClick={() => setShowProfile(true)} style={styles.button}>Профиль</button>
+          <button onClick={() => setShowSettings(true)} style={styles.button}>Настройки</button>
+        </div>
+        {showProfile && <Profile onClose={() => setShowProfile(false)} />}
+        {showSettings && <Settings onClose={() => setShowSettings(false)} />}
         {message && <p style={{ color: '#e74c3c', marginTop: 20 }}>{message}</p>}
       </div>
     );
@@ -258,16 +282,15 @@ const Game: React.FC = () => {
     <div style={styles.gameContainer}>
       <h2 style={styles.titleSmall}>Окийя</h2>
       {roomId && <p style={styles.roomCode}>Код комнаты: <strong>{roomId}</strong></p>}
-
-      {/* Индикатор подключения соперника */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: 8 }}>
         <span style={{
           width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
           backgroundColor: gameState.opponentConnected ? '#2ecc71' : '#e74c3c'
         }} />
-        <span style={{ fontSize: 14, color: '#4a3f35' }}>
+        <span style={{ fontSize: 14, color: 'var(--text-color, #4a3f35)' }}>
           {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
         </span>
+        <span style={{ marginLeft: 10 }}>Вы: {gameState.myNick} | Соперник: {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}</span>
       </div>
 
       {gameState.maxWins > 1 && (
@@ -284,9 +307,7 @@ const Game: React.FC = () => {
         </>
       )}
 
-      {/* Контейнер, в котором доска центрируется, а кнопки приклеены справа */}
-      <div style={{ position: 'relative', width: 'fit-content', margin: '20px auto 0' }}>
-        {/* Сама доска */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap', marginTop: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Board
             board={gameState.board}
@@ -295,27 +316,12 @@ const Game: React.FC = () => {
             currentPlayer={gameState.currentPlayer}
             myColor={gameState.myColor}
             lastMove={gameState.lastMove}
+            skin={skin}
           />
           <LastPickedTile tile={gameState.lastPickedTile} />
         </div>
 
-        {/* Правая панель кнопок (абсолютное позиционирование справа) */}
-        <div className="right-panel" style={{
-          position: 'absolute',
-          left: '100%',
-          top: 0,
-          marginLeft: '20px', // отступ от доски
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px',
-          minWidth: '160px',
-          padding: '10px',
-          backgroundColor: 'rgba(255, 255, 240, 0.85)',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          backdropFilter: 'blur(4px)',
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '200px' }}>
           {personalGameOver && (
             <div style={{ textAlign: 'center' }}>
               <p style={styles.message}>{personalGameOver}</p>
@@ -342,15 +348,14 @@ const Game: React.FC = () => {
             </button>
           )}
 
-          {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
-            <p style={{ color: '#4a3f35', whiteSpace: 'nowrap' }}>Ожидание новой игры...</p>
-          )}
+          <Chat messages={gameState.messages} onSend={handleChatSend} />
         </div>
       </div>
     </div>
   );
 };
 
+// Стили остаются как прежде, но можно добавить переменные для тёмной темы
 const styles: Record<string, React.CSSProperties> = {
   lobby: {
     textAlign: 'center',
@@ -366,27 +371,27 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: 'clamp(32px, 8vw, 48px)',
     margin: 0,
-    color: '#4a3f35',
+    color: 'var(--text-color, #4a3f35)',
     textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
   },
   subtitle: {
     fontSize: 'clamp(14px, 4vw, 18px)',
-    color: '#7f6e5d',
+    color: 'var(--text-color, #7f6e5d)',
     marginBottom: 20,
   },
   titleSmall: {
     fontSize: 'clamp(24px, 6vw, 32px)',
-    color: '#4a3f35',
+    color: 'var(--text-color, #4a3f35)',
     margin: '10px 0 0',
   },
   roomCode: {
     fontSize: 16,
-    color: '#5d4e37',
+    color: 'var(--text-color, #5d4e37)',
     margin: '5px 0',
   },
   score: {
     fontSize: 'clamp(16px, 4vw, 20px)',
-    color: '#4a3f35',
+    color: 'var(--text-color, #4a3f35)',
     fontWeight: 'bold',
     margin: '10px 0',
   },
@@ -419,13 +424,14 @@ const styles: Record<string, React.CSSProperties> = {
   gameContainer: {
     textAlign: 'center',
     fontFamily: '"Segoe UI", "Noto Serif JP", serif',
-    background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
+    background: 'var(--bg-gradient, linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%))',
     minHeight: '100vh',
     margin: 0,
     paddingTop: 10,
     paddingBottom: 20,
     paddingLeft: '8px',
     paddingRight: '8px',
+    color: 'var(--text-color, #4a3f35)',
   },
 };
 
