@@ -217,6 +217,11 @@ const Game: React.FC = () => {
         from { transform: scale(0); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
+      @media (max-width: 700px) {
+        .hide-on-mobile {
+          display: none !important;
+        }
+      }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
@@ -278,17 +283,25 @@ const Game: React.FC = () => {
         </>
       )}
 
-      {/* Основной блок: доска + правая панель */}
+      {/* Основной блок: доска по центру, кнопки справа */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-start',
-        gap: '20px',
-        flexWrap: 'wrap',
-        marginTop: 10
+        gap: 0,
+        marginTop: 10,
+        flexWrap: 'wrap'
       }}>
-        {/* Левая часть: доска и тайлы */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Пустой блок-разделитель слева (невидимый, равен ширине правой панели) */}
+        <div style={{
+          minWidth: '160px',
+          padding: '10px',
+          visibility: 'hidden',
+          flex: '0 0 auto',
+        }} className="hide-on-mobile" />
+
+        {/* Центральная доска */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
           <Board
             board={gameState.board}
             validMoves={validMoves}
@@ -307,7 +320,8 @@ const Game: React.FC = () => {
           alignItems: 'center',
           gap: '10px',
           minWidth: '160px',
-          padding: '10px'
+          padding: '10px',
+          flex: '0 0 auto',
         }}>
           {personalGameOver && (
             <div style={{ textAlign: 'center' }}>
