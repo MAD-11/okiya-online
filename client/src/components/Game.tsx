@@ -218,8 +218,9 @@ const Game: React.FC = () => {
         to { transform: scale(1); opacity: 1; }
       }
       @media (max-width: 700px) {
-        .hide-on-mobile {
-          display: none !important;
+        .right-panel {
+          position: static !important;
+          margin-top: 16px;
         }
       }
     `;
@@ -283,25 +284,10 @@ const Game: React.FC = () => {
         </>
       )}
 
-      {/* Основной блок: доска по центру, кнопки справа */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        gap: 0,
-        marginTop: 10,
-        flexWrap: 'wrap'
-      }}>
-        {/* Пустой блок-разделитель слева (невидимый, равен ширине правой панели) */}
-        <div style={{
-          minWidth: '160px',
-          padding: '10px',
-          visibility: 'hidden',
-          flex: '0 0 auto',
-        }} className="hide-on-mobile" />
-
-        {/* Центральная доска */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
+      {/* Контейнер, в котором доска центрируется, а кнопки приклеены справа */}
+      <div style={{ position: 'relative', width: 'fit-content', margin: '20px auto 0' }}>
+        {/* Сама доска */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Board
             board={gameState.board}
             validMoves={validMoves}
@@ -313,15 +299,22 @@ const Game: React.FC = () => {
           <LastPickedTile tile={gameState.lastPickedTile} />
         </div>
 
-        {/* Правая панель: кнопки управления и сообщения */}
-        <div style={{
+        {/* Правая панель кнопок (абсолютное позиционирование справа) */}
+        <div className="right-panel" style={{
+          position: 'absolute',
+          left: '100%',
+          top: 0,
+          marginLeft: '20px', // отступ от доски
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: '10px',
           minWidth: '160px',
           padding: '10px',
-          flex: '0 0 auto',
+          backgroundColor: 'rgba(255, 255, 240, 0.85)',
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          backdropFilter: 'blur(4px)',
         }}>
           {personalGameOver && (
             <div style={{ textAlign: 'center' }}>
@@ -350,7 +343,7 @@ const Game: React.FC = () => {
           )}
 
           {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
-            <p style={{ color: '#4a3f35' }}>Ожидание новой игры...</p>
+            <p style={{ color: '#4a3f35', whiteSpace: 'nowrap' }}>Ожидание новой игры...</p>
           )}
         </div>
       </div>
