@@ -90,14 +90,24 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       });
     });
 
-    // Присоединение к комнате
+        // Присоединение к комнате по коду
     socket.on('join_room', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) {
         return callback({ error: 'Комната не найдена' });
       }
 
-      // Разрешаем присоединение, если есть свободный слот (даже если игра уже идёт)
+      // Проверяем, жив ли старый сокет в слоте red
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
+        console.log(`Cleaning up dead red socket ${game.players.red} in room ${roomId}`);
+        game.players.red = undefined;
+      }
+      // Проверяем, жив ли старый сокет в слоте black
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
+        console.log(`Cleaning up dead black socket ${game.players.black} in room ${roomId}`);
+        game.players.black = undefined;
+      }
+
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
       if (!canJoinAsRed && !canJoinAsBlack) {
@@ -108,46 +118,40 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (canJoinAsRed) {
         role = 'red';
         game.players.red = socket.id;
-        if (game.hostSocketId === null) {
-          game.hostSocketId = socket.id;
-          game.hostToken = generatePlayerToken(); // новый токен для хоста
-        }
+        game.hostSocketId = socket.id;
+        game.hostToken = generatePlayerToken(); // новый токен
       } else {
         role = 'black';
         game.players.black = socket.id;
-        if (game.guestSocketId === null) {
-          game.guestSocketId = socket.id;
-          game.guestToken = generatePlayerToken(); // новый токен для гостя
-        }
+        game.guestSocketId = socket.id;
+        game.guestToken = generatePlayerToken(); // новый токен
       }
 
-      // Если это был первый игрок, статус мог быть waiting, теперь меняем на playing
-      if (game.players.red && game.players.black) {
-        if (game.status === 'waiting') {
-          game.status = 'playing';
-        }
-        // Игра возобновляется, запускаем таймер
+      // Если оба игрока на месте, запускаем игру
+      if (game.players.red && game.players.black && game.status === 'waiting') {
+        game.status = 'playing';
+        game.turnStartedAt = Date.now();
+      } else if (game.players.red && game.players.black && game.status !== 'playing') {
+        // Игра уже шла, просто обновляем состояние
         game.turnStartedAt = Date.now();
       }
 
       socket.join(roomId);
-      console.log(`Player joined room ${roomId} as ${role}`);
+      console.log(`Player ${socket.id} joined room ${roomId} as ${role}`);
 
-      // Выдаём токен вошедшему
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({
         playerToken,
         state: getClientGameState(game, socket.id, io)
       });
 
-      // Оповещаем всех игроков (если соперник в сети)
       saveGame(roomId, game);
       if (game.players.red && game.players.black) {
         sendPersonalGameState(io, game);
       }
     });
 
-    // Переподключение по токену
+    // Переподключение по токену (если есть сохранённый токен)
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Комната не найдена' });
@@ -155,9 +159,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       let role: 'host' | 'guest' | null = null;
       if (game.hostToken === playerToken) role = 'host';
       else if (game.guestToken === playerToken) role = 'guest';
-      if (!role) return callback({ error: 'Неверный токен' });
+      if (!role) return callback({ error: 'Неверный токен. Попробуйте присоединиться по коду комнаты.' });
 
-      // Обновляем сокеты
+      // Обновляем сокет
       if (role === 'host') {
         game.players.red = socket.id;
         game.hostSocketId = socket.id;
@@ -167,7 +171,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
 
       socket.join(roomId);
-      console.log(`Player reconnected to room ${roomId} as ${role}`);
+      console.log(`Player ${socket.id} reconnected to room ${roomId} as ${role}`);
 
       const timerKey = `${roomId}_${socket.id}`;
       if (disconnectTimers.has(timerKey)) {
