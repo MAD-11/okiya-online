@@ -25,8 +25,23 @@ const Game: React.FC = () => {
   // Модальные окна
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false); // ✅ добавлено
 
   const { darkMode, skin } = useTheme();
+
+  // ======== Постоянный никнейм ========
+  const [playerNick, setPlayerNick] = useState(() => {
+    return localStorage.getItem('okiya_nick') || '';
+  });
+
+  const ensureNick = (): string => {
+    if (playerNick) return playerNick;
+    const nick = prompt('Придумайте себе постоянный никнейм (не более 12 символов)') || 'Игрок';
+    const trimmed = nick.slice(0, 12);
+    localStorage.setItem('okiya_nick', trimmed);
+    setPlayerNick(trimmed);
+    return trimmed;
+  };
 
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
@@ -67,7 +82,7 @@ const Game: React.FC = () => {
   }, [socket, connected]);
 
   const createRoom = (maxWins: number) => {
-    const nick = prompt('Введите ваш никнейм') || 'Игрок';
+    const nick = ensureNick();
     socket?.emit('create_room', { maxWins, nick }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
@@ -83,9 +98,12 @@ const Game: React.FC = () => {
   };
 
   const joinRoom = (code?: string) => {
-    const id = code || prompt('Введите код комнаты')?.toUpperCase();
+    const id = code || (() => {
+      const input = prompt('Введите код комнаты')?.toUpperCase();
+      return input || '';
+    })();
     if (!id) return;
-    const nick = prompt('Введите ваш никнейм') || 'Игрок';
+    const nick = ensureNick();
     socket?.emit('join_room', { roomId: id, nick }, (res: any) => {
       if (res.error) {
         setMessage(res.error);
@@ -239,7 +257,6 @@ const Game: React.FC = () => {
         from { transform: scale(0); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
-      .dark { background-color: #1e1e1e !important; color: #e0e0e0; }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
@@ -254,12 +271,14 @@ const Game: React.FC = () => {
     );
   }
 
+  // ========== ГЛАВНОЕ МЕНЮ ==========
   if (!gameState) {
     return (
       <div style={styles.lobbyContainer}>
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
+          {playerNick && <p style={{ color: '#4a3f35', marginBottom: 20 }}>Ваш ник: <strong>{playerNick}</strong></p>}
 
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
@@ -271,7 +290,7 @@ const Game: React.FC = () => {
             <span style={styles.orText}>или</span>
           </div>
 
-          <button onClick={() => joinRoom()} style={styles.secondaryBtn}>
+          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>
             Присоединиться по коду
           </button>
 
@@ -284,6 +303,41 @@ const Game: React.FC = () => {
 
           {message && <p style={styles.error}>{message}</p>}
         </div>
+
+        {/* Модальное окно ввода кода */}
+        {showJoinModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <h3 style={{ color: '#4a3f35', marginBottom: 15 }}>Введите код комнаты</h3>
+              <input
+                type="text"
+                maxLength={4}
+                placeholder="Например: ABCD"
+                style={styles.codeInput}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (e.target as HTMLInputElement).value.toUpperCase();
+                    if (val) {
+                      setShowJoinModal(false);
+                      joinRoom(val);
+                    }
+                  }
+                }}
+              />
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button onClick={() => {
+                  const input = document.querySelector('input') as HTMLInputElement;
+                  const val = input?.value?.toUpperCase();
+                  if (val) {
+                    setShowJoinModal(false);
+                    joinRoom(val);
+                  }
+                }} style={styles.actionBtn}>Войти</button>
+                <button onClick={() => setShowJoinModal(false)} style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '14px' }}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showProfile && (
           <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
@@ -388,7 +442,6 @@ const Game: React.FC = () => {
 
 // ==================== СТИЛИ ====================
 const styles: Record<string, React.CSSProperties> = {
-  // Лобби
   lobbyContainer: {
     display: 'flex',
     justifyContent: 'center',
@@ -406,7 +459,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '500px',
     width: '100%',
     textAlign: 'center',
-    position: 'relative',
   },
   title: {
     fontSize: '48px',
@@ -417,7 +469,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: {
     fontSize: '18px',
     color: '#7f6e5d',
-    marginBottom: '30px',
+    marginBottom: '20px',
   },
   buttonGroup: {
     display: 'flex',
@@ -484,11 +536,10 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '15px',
     fontWeight: 500,
   },
-  // Игровой контейнер
   gameContainer: {
     textAlign: 'center',
     fontFamily: '"Segoe UI", "Noto Serif JP", serif',
-    background: 'var(--bg-gradient, linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%))',
+    background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
     minHeight: '100vh',
     margin: 0,
     padding: '20px',
@@ -566,6 +617,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     transition: '0.2s',
     width: '100%',
+    boxSizing: 'border-box',
   },
   modalOverlay: {
     position: 'fixed',
@@ -586,6 +638,17 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '400px',
     width: '90%',
     boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+  },
+  codeInput: {
+    padding: '10px',
+    fontSize: '20px',
+    textAlign: 'center',
+    width: '100%',
+    boxSizing: 'border-box',
+    borderRadius: '8px',
+    border: '1px solid #d4a373',
+    marginBottom: '15px',
+    fontFamily: 'monospace',
   },
   centered: {
     display: 'flex',
