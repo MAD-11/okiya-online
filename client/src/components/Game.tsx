@@ -348,7 +348,7 @@ const Game: React.FC = () => {
             </button>
           )}
 
-          <Chat messages={gameState.messages} onSend={handleChatSend} />
+          <Chat messages={gameState.messages ?? []} onSend={handleChatSend} />
         </div>
       </div>
     </div>
