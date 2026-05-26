@@ -11,9 +11,19 @@ interface BoardProps {
 }
 
 const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer, myColor, lastMove }) => {
+  // Уменьшенный размер клеток
+  const cellSize = Math.min(
+    Math.min(window.innerWidth, window.innerHeight) * 0.11,
+    100
+  );
+  const fontSize = cellSize * 0.35;
+
   return (
     <div style={styles.boardContainer}>
-      <div style={styles.grid}>
+      <div style={{
+        ...styles.grid,
+        gridTemplateColumns: `repeat(4, ${cellSize}px)`,
+      }}>
         {board.map((row, r) =>
           row.map((cell, c) => {
             const isValid = validMoves[r]?.[c];
@@ -34,6 +44,9 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer
                     : '#faf3e8',
                   cursor: isValid ? 'pointer' : 'default',
                   animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
+                  width: cellSize,
+                  height: cellSize,
+                  fontSize: fontSize,
                 }}
                 title={cell && typeof cell !== 'string' ? `${cell.plant} ${cell.symbol}` : ''}
               >
@@ -42,8 +55,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer
                     {getTileEmoji(cell.plant, cell.symbol)}
                   </span>
                 )}
-                {cell === 'red' && <span style={styles.stone}>🌸</span>}
-                {cell === 'black' && <span style={styles.stone}>🐦</span>}
+                {cell === 'red' && <span style={{ ...styles.stone, fontSize }}>🌸</span>}
+                {cell === 'black' && <span style={{ ...styles.stone, fontSize }}>🐦</span>}
               </div>
             );
           })
@@ -67,33 +80,25 @@ function getTileEmoji(plant: string, symbol: string): string {
   return `${map[plant] || plant}${map[symbol] || symbol}`;
 }
 
-// Адаптивные размеры клеток
-const cellSize = Math.min(window.innerWidth, window.innerHeight) * 0.18;
-const fontSize = cellSize * 0.4;
-
 const styles: Record<string, React.CSSProperties> = {
   boardContainer: {
     display: 'flex',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: `repeat(4, ${cellSize}px)`,
-    gap: '4px',
-    padding: '8px',
+    gap: '3px',
+    padding: '6px',
     background: 'rgba(0,0,0,0.05)',
     borderRadius: '12px',
     boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
   },
   cell: {
-    width: cellSize,
-    height: cellSize,
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: fontSize,
     transition: 'all 0.2s ease',
     position: 'relative' as const,
     boxSizing: 'border-box',
@@ -110,7 +115,6 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
   },
   stone: {
-    fontSize: fontSize,
     filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
   },
 };

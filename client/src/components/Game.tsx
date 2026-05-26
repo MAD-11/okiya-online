@@ -17,13 +17,11 @@ const Game: React.FC = () => {
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
 
-  // Очистка данных комнаты в localStorage
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
     localStorage.removeItem('okiya_playerToken');
   };
 
-  // Выход в главное меню с уведомлением сервера
   const backToMenu = () => {
     if (window.confirm('Вы уверены, что хотите выйти в главное меню? Текущая игра будет потеряна.')) {
       if (socket && roomId) {
@@ -39,7 +37,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Попытка автоматического переподключения при загрузке страницы
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -57,7 +54,6 @@ const Game: React.FC = () => {
     }
   }, [socket, connected]);
 
-  // Создание комнаты
   const createRoom = (maxWins: number) => {
     socket?.emit('create_room', maxWins, (res: any) => {
       if (res.roomId) {
@@ -73,7 +69,6 @@ const Game: React.FC = () => {
     });
   };
 
-  // Присоединение к комнате по коду
   const joinRoom = () => {
     const id = prompt('Введите код комнаты')?.toUpperCase();
     if (!id) return;
@@ -93,7 +88,6 @@ const Game: React.FC = () => {
     });
   };
 
-  // Подсветка допустимых ходов
   const validMoves: ValidMoves = useMemo(() => {
     if (!gameState || gameState.status !== 'playing' || gameState.myColor !== gameState.currentPlayer) {
       return Array(4).fill(null).map(() => Array(4).fill(false));
@@ -117,7 +111,6 @@ const Game: React.FC = () => {
     return moves;
   }, [gameState]);
 
-  // Обработка клика по клетке
   const handleCellClick = useCallback((row: number, col: number) => {
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (gameState.myColor !== gameState.currentPlayer) {
@@ -133,7 +126,6 @@ const Game: React.FC = () => {
     });
   }, [socket, roomId, gameState]);
 
-  // Кнопка "Ещё одна игра" (продолжение серии)
   const handleRestartRound = () => {
     if (!socket || !roomId) return;
     setWaitingRestart(true);
@@ -142,7 +134,6 @@ const Game: React.FC = () => {
     });
   };
 
-  // Кнопка "Новая игра в этой же комнате" (полный сброс)
   const handleResetRoom = () => {
     if (!socket || !roomId) return;
     setWaitingReset(true);
@@ -154,7 +145,6 @@ const Game: React.FC = () => {
     });
   };
 
-  // Кнопка "Сдаться"
   const handleForfeit = () => {
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (window.confirm('Вы уверены, что хотите сдаться? Вам будет засчитано поражение.')) {
@@ -164,7 +154,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Прослушивание событий от сервера
   useEffect(() => {
     if (!socket) return;
 
@@ -216,7 +205,6 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
-  // Внедрение CSS-анимаций
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -234,12 +222,10 @@ const Game: React.FC = () => {
     return () => { document.head.removeChild(style); };
   }, []);
 
-  // Подключение к серверу
   if (!connected) {
     return <div style={styles.centered}>Подключение к серверу...</div>;
   }
 
-  // Главное меню (нет активной игры)
   if (!gameState) {
     return (
       <div style={styles.lobby}>
@@ -291,55 +277,73 @@ const Game: React.FC = () => {
           <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
         </>
       )}
-      <Board
-        board={gameState.board}
-        validMoves={validMoves}
-        onClick={handleCellClick}
-        currentPlayer={gameState.currentPlayer}
-        myColor={gameState.myColor}
-        lastMove={gameState.lastMove}
-      />
-      <LastPickedTile tile={gameState.lastPickedTile} />
 
-      {personalGameOver && (
-        <div style={{ marginTop: 15 }}>
-          <p style={styles.message}>{personalGameOver}</p>
-          {canRestart && (
-            <button onClick={handleRestartRound} style={styles.button}>
-              Ещё одна игра
+      {/* Основной блок: доска + правая панель */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        gap: '20px',
+        flexWrap: 'wrap',
+        marginTop: 10
+      }}>
+        {/* Левая часть: доска и тайлы */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Board
+            board={gameState.board}
+            validMoves={validMoves}
+            onClick={handleCellClick}
+            currentPlayer={gameState.currentPlayer}
+            myColor={gameState.myColor}
+            lastMove={gameState.lastMove}
+          />
+          <LastPickedTile tile={gameState.lastPickedTile} />
+        </div>
+
+        {/* Правая панель: кнопки управления и сообщения */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '10px',
+          minWidth: '160px',
+          padding: '10px'
+        }}>
+          {personalGameOver && (
+            <div style={{ textAlign: 'center' }}>
+              <p style={styles.message}>{personalGameOver}</p>
+              {canRestart && (
+                <button onClick={handleRestartRound} style={styles.button}>
+                  Ещё одна игра
+                </button>
+              )}
+              {waitingRestart && <p>Ожидание соперника...</p>}
+            </div>
+          )}
+
+          <button onClick={backToMenu} style={{ ...styles.button, background: '#e74c3c', width: '100%' }}>
+            Выйти в главное меню
+          </button>
+          {(gameState.status === 'finished' || gameState.seriesWinner) && (
+            <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71', width: '100%' }}>
+              {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
             </button>
           )}
-          {waitingRestart && <p>Ожидание соперника...</p>}
-        </div>
-      )}
+          {gameState.status === 'playing' && !isSpectator && (
+            <button onClick={handleForfeit} style={{ ...styles.button, background: '#e67e22', width: '100%' }}>
+              Сдаться
+            </button>
+          )}
 
-      {/* Кнопки управления */}
-      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <button onClick={backToMenu} style={{ ...styles.button, background: '#e74c3c' }}>
-          Выйти в главное меню
-        </button>
-        {(gameState.status === 'finished' || gameState.seriesWinner) && (
-          <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71' }}>
-            {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
-          </button>
-        )}
-        {gameState.status === 'playing' && !isSpectator && (
-          <button onClick={handleForfeit} style={{ ...styles.button, background: '#e67e22' }}>
-            Сдаться
-          </button>
-        )}
+          {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
+            <p style={{ color: '#4a3f35' }}>Ожидание новой игры...</p>
+          )}
+        </div>
       </div>
-
-      {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
-        <div style={{ marginTop: 20 }}>
-          <p>Ожидание новой игры...</p>
-        </div>
-      )}
     </div>
   );
 };
 
-// Адаптивные стили
 const styles: Record<string, React.CSSProperties> = {
   lobby: {
     textAlign: 'center',
