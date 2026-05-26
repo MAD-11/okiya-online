@@ -17,13 +17,18 @@ const Game: React.FC = () => {
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
 
+  // Очистка данных комнаты в localStorage
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
     localStorage.removeItem('okiya_playerToken');
   };
 
+  // Выход в главное меню с уведомлением сервера
   const backToMenu = () => {
     if (window.confirm('Вы уверены, что хотите выйти в главное меню? Текущая игра будет потеряна.')) {
+      if (socket && roomId) {
+        socket.emit('leave_room', roomId);
+      }
       clearSavedRoom();
       setGameState(null);
       setRoomId(null);
@@ -34,7 +39,7 @@ const Game: React.FC = () => {
     }
   };
 
-  // Попытка переподключения
+  // Попытка автоматического переподключения при загрузке страницы
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -52,6 +57,7 @@ const Game: React.FC = () => {
     }
   }, [socket, connected]);
 
+  // Создание комнаты
   const createRoom = (maxWins: number) => {
     socket?.emit('create_room', maxWins, (res: any) => {
       if (res.roomId) {
@@ -67,6 +73,7 @@ const Game: React.FC = () => {
     });
   };
 
+  // Присоединение к комнате по коду
   const joinRoom = () => {
     const id = prompt('Введите код комнаты')?.toUpperCase();
     if (!id) return;
@@ -86,6 +93,7 @@ const Game: React.FC = () => {
     });
   };
 
+  // Подсветка допустимых ходов
   const validMoves: ValidMoves = useMemo(() => {
     if (!gameState || gameState.status !== 'playing' || gameState.myColor !== gameState.currentPlayer) {
       return Array(4).fill(null).map(() => Array(4).fill(false));
@@ -109,6 +117,7 @@ const Game: React.FC = () => {
     return moves;
   }, [gameState]);
 
+  // Обработка клика по клетке
   const handleCellClick = useCallback((row: number, col: number) => {
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (gameState.myColor !== gameState.currentPlayer) {
@@ -124,6 +133,7 @@ const Game: React.FC = () => {
     });
   }, [socket, roomId, gameState]);
 
+  // Кнопка "Ещё одна игра" (продолжение серии)
   const handleRestartRound = () => {
     if (!socket || !roomId) return;
     setWaitingRestart(true);
@@ -132,6 +142,7 @@ const Game: React.FC = () => {
     });
   };
 
+  // Кнопка "Новая игра в этой же комнате" (полный сброс)
   const handleResetRoom = () => {
     if (!socket || !roomId) return;
     setWaitingReset(true);
@@ -143,6 +154,7 @@ const Game: React.FC = () => {
     });
   };
 
+  // Кнопка "Сдаться"
   const handleForfeit = () => {
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (window.confirm('Вы уверены, что хотите сдаться? Вам будет засчитано поражение.')) {
@@ -152,6 +164,7 @@ const Game: React.FC = () => {
     }
   };
 
+  // Прослушивание событий от сервера
   useEffect(() => {
     if (!socket) return;
 
@@ -203,7 +216,7 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
-  // Анимации
+  // Внедрение CSS-анимаций
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -221,10 +234,12 @@ const Game: React.FC = () => {
     return () => { document.head.removeChild(style); };
   }, []);
 
+  // Подключение к серверу
   if (!connected) {
     return <div style={styles.centered}>Подключение к серверу...</div>;
   }
 
+  // Главное меню (нет активной игры)
   if (!gameState) {
     return (
       <div style={styles.lobby}>
@@ -285,6 +300,7 @@ const Game: React.FC = () => {
         lastMove={gameState.lastMove}
       />
       <LastPickedTile tile={gameState.lastPickedTile} />
+
       {personalGameOver && (
         <div style={{ marginTop: 15 }}>
           <p style={styles.message}>{personalGameOver}</p>
@@ -323,7 +339,7 @@ const Game: React.FC = () => {
   );
 };
 
-// Стили с адаптацией под мобильные
+// Адаптивные стили
 const styles: Record<string, React.CSSProperties> = {
   lobby: {
     textAlign: 'center',
@@ -387,7 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     transition: '0.2s',
     whiteSpace: 'nowrap',
-    touchAction: 'manipulation', // улучшает отклик на мобильных
+    touchAction: 'manipulation',
   },
   gameContainer: {
     textAlign: 'center',

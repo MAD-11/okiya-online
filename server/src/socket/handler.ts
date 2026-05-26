@@ -4,7 +4,6 @@ import { saveGame, deleteGame } from '../redis';
 import crypto from 'crypto';
 
 let games: Map<string, Game>;
-// Для автоматического завершения при длительном отключении
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 
 function generateRoomCode(): string {
@@ -20,7 +19,6 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   const myScore = isHost ? game.scores.host : game.scores.guest;
   const opponentScore = isHost ? game.scores.guest : game.scores.host;
 
-  // Проверяем, подключён ли соперник в данный момент
   let opponentConnected = false;
   if (io && playerSocketId) {
     const opponentId = isHost ? game.guestSocketId : game.hostSocketId;
@@ -49,7 +47,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     turnStartedAt: game.turnStartedAt,
     turnDuration: game.turnDuration,
     lastMove: game.lastMove,
-    opponentConnected, // новое поле
+    opponentConnected,
   };
 }
 
@@ -95,39 +93,61 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     // Присоединение к комнате
     socket.on('join_room', (roomId: string, callback) => {
       const game = games.get(roomId);
-      if (!game || game.status !== 'waiting') {
-        return callback({ error: 'Комната не найдена или игра уже началась' });
+      if (!game) {
+        return callback({ error: 'Комната не найдена' });
       }
-      const added = game.addPlayer(socket.id);
-      if (!added) return callback({ error: 'Комната полна' });
 
-      const guestToken = generatePlayerToken();
-      game.guestToken = guestToken;
+      // Разрешаем присоединение, если есть свободный слот (даже если игра уже идёт)
+      const canJoinAsRed = !game.players.red;
+      const canJoinAsBlack = !game.players.black;
+      if (!canJoinAsRed && !canJoinAsBlack) {
+        return callback({ error: 'Комната полна' });
+      }
+
+      let role: 'red' | 'black';
+      if (canJoinAsRed) {
+        role = 'red';
+        game.players.red = socket.id;
+        if (game.hostSocketId === null) {
+          game.hostSocketId = socket.id;
+          game.hostToken = generatePlayerToken(); // новый токен для хоста
+        }
+      } else {
+        role = 'black';
+        game.players.black = socket.id;
+        if (game.guestSocketId === null) {
+          game.guestSocketId = socket.id;
+          game.guestToken = generatePlayerToken(); // новый токен для гостя
+        }
+      }
+
+      // Если это был первый игрок, статус мог быть waiting, теперь меняем на playing
+      if (game.players.red && game.players.black) {
+        if (game.status === 'waiting') {
+          game.status = 'playing';
+        }
+        // Игра возобновляется, запускаем таймер
+        game.turnStartedAt = Date.now();
+      }
 
       socket.join(roomId);
-      console.log(`Guest ${socket.id} joined room ${roomId}`);
+      console.log(`Player joined room ${roomId} as ${role}`);
 
-      // Очищаем таймер авто-завершения, если соперник вернулся
-      const timerKey = `${roomId}_${socket.id}`;
-      if (disconnectTimers.has(timerKey)) {
-        clearTimeout(disconnectTimers.get(timerKey)!);
-        disconnectTimers.delete(timerKey);
-      }
-
+      // Выдаём токен вошедшему
+      const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({
-        playerToken: guestToken,
+        playerToken,
         state: getClientGameState(game, socket.id, io)
       });
 
+      // Оповещаем всех игроков (если соперник в сети)
       saveGame(roomId, game);
-
-      const redSocket = io.sockets.sockets.get(game.players.red!);
-      const blackSocket = io.sockets.sockets.get(game.players.black!);
-      if (redSocket) redSocket.emit('game_started', getClientGameState(game, game.players.red, io));
-      if (blackSocket) blackSocket.emit('game_started', getClientGameState(game, game.players.black, io));
+      if (game.players.red && game.players.black) {
+        sendPersonalGameState(io, game);
+      }
     });
 
-    // Переподключение
+    // Переподключение по токену
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Комната не найдена' });
@@ -139,19 +159,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
       // Обновляем сокеты
       if (role === 'host') {
-        if (game.players.red === game.hostSocketId) game.players.red = socket.id;
-        else if (game.players.black === game.hostSocketId) game.players.black = socket.id;
+        game.players.red = socket.id;
         game.hostSocketId = socket.id;
       } else {
-        if (game.players.red === game.guestSocketId) game.players.red = socket.id;
-        else if (game.players.black === game.guestSocketId) game.players.black = socket.id;
+        game.players.black = socket.id;
         game.guestSocketId = socket.id;
       }
 
       socket.join(roomId);
-      console.log(`Player ${role} reconnected to room ${roomId}`);
+      console.log(`Player reconnected to room ${roomId} as ${role}`);
 
-      // Очищаем таймер авто-завершения для этого игрока
       const timerKey = `${roomId}_${socket.id}`;
       if (disconnectTimers.has(timerKey)) {
         clearTimeout(disconnectTimers.get(timerKey)!);
@@ -159,12 +176,36 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
 
       socket.emit('game_state', getClientGameState(game, socket.id, io));
-
-      if (game.status === 'playing' && game.players.red && game.players.black) {
-        game.turnStartedAt = Date.now();
-      }
       saveGame(roomId, game);
       callback({ success: true });
+    });
+
+    // Явный выход из комнаты (кнопка "Выйти в главное меню")
+    socket.on('leave_room', (roomId: string) => {
+      const game = games.get(roomId);
+      if (!game) return;
+
+      const isRed = game.players.red === socket.id;
+      const isBlack = game.players.black === socket.id;
+      if (!isRed && !isBlack) return;
+
+      console.log(`Player ${socket.id} left room ${roomId}`);
+      if (isRed) {
+        game.players.red = undefined;
+      } else {
+        game.players.black = undefined;
+      }
+
+      // Если оба игрока вышли, удаляем комнату
+      if (!game.players.red && !game.players.black) {
+        games.delete(roomId);
+        deleteGame(roomId);
+        console.log(`Room ${roomId} deleted (both players left)`);
+      } else {
+        // Уведомляем оставшегося соперника
+        sendPersonalGameState(io, game);
+        saveGame(roomId, game);
+      }
     });
 
     // Ход
@@ -174,7 +215,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const success = game.makeMove(row, col, socket.id);
       if (!success) return callback({ error: 'Недопустимый ход' });
 
-      console.log(`Move in room ${roomId}: ${socket.id} placed at (${row}, ${col})`);
+      console.log(`Move in room ${roomId}: (${row}, ${col})`);
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
 
@@ -182,13 +223,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         sendPersonalGameOver(io, game);
         if (game.seriesWinner || game.maxWins === 1) {
           deleteGame(roomId);
-          console.log(`Game in room ${roomId} finished, removed from Redis`);
         }
       }
       callback({ success: true });
     });
 
-    // Продолжение серии (ещё одна игра)
+    // Продолжение серии
     socket.on('restart_round', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
@@ -201,11 +241,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Полный сброс комнаты (новая игра в той же комнате)
+    // Полный сброс комнаты
     socket.on('reset_room', (roomId: string, callback) => {
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Комната не найдена' });
-
+      if (!game) return callback({ error: 'Игра не найдена' });
       const success = game.voteReset(socket.id);
       if (success) {
         saveGame(roomId, game);
@@ -222,10 +261,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (game.status !== 'playing') return callback({ error: 'Игра не активна' });
 
       const playerColor = game.players.red === socket.id ? 'red' : 'black';
-      if (playerColor !== game.currentPlayer && game.currentPlayer !== undefined) {
-        // Можно сдаться только в свой ход, но для удобства разрешим в любой момент
-      }
-
       const opponent = playerColor === 'red' ? 'black' : 'red';
       game.winner = opponent;
       game.handleGameOver();
@@ -239,47 +274,35 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Отключение
+    // Отключение сокета
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
-      // Проверяем все игры, где участвовал этот сокет
       for (const [roomId, game] of games.entries()) {
-        if (game.hostSocketId === socket.id || game.guestSocketId === socket.id) {
-          const isHost = game.hostSocketId === socket.id;
-          const opponentSocketId = isHost ? game.guestSocketId : game.hostSocketId;
-
-          // Если оба отключены, удаляем игру
-          if (!opponentSocketId || !io.sockets.sockets.has(opponentSocketId)) {
-            // Второй игрок тоже не в сети - удаляем игру
-            games.delete(roomId);
-            deleteGame(roomId);
-            console.log(`Room ${roomId} deleted because both players disconnected`);
-          } else {
-            // Запускаем таймер на 60 секунд для автоматического завершения
-            const timerKey = `${roomId}_${socket.id}`;
-            const timer = setTimeout(() => {
-              const currentGame = games.get(roomId);
-              if (currentGame && currentGame.status === 'playing') {
-                // Проверяем, что отключившийся так и не вернулся
-                if (currentGame.hostSocketId === socket.id || currentGame.guestSocketId === socket.id) {
-                  const winner = isHost ? 'black' : 'red';
-                  currentGame.winner = winner;
-                  currentGame.handleGameOver();
-                  saveGame(roomId, currentGame);
-                  sendPersonalGameState(io, currentGame);
-                  sendPersonalGameOver(io, currentGame);
-                  console.log(`Room ${roomId}: auto-forfeit after timeout`);
-                  if (currentGame.seriesWinner || currentGame.maxWins === 1) {
-                    deleteGame(roomId);
-                  }
+        if (game.players.red === socket.id || game.players.black === socket.id) {
+          // Уведомляем оставшегося игрока, что соперник не в сети
+          sendPersonalGameState(io, game);
+          // Запускаем таймер на авто-форфейт
+          const timerKey = `${roomId}_${socket.id}`;
+          const timer = setTimeout(() => {
+            const currentGame = games.get(roomId);
+            if (currentGame && currentGame.status === 'playing') {
+              if (currentGame.players.red === socket.id || currentGame.players.black === socket.id) {
+                const winner = currentGame.players.red === socket.id ? 'black' : 'red';
+                currentGame.winner = winner;
+                currentGame.handleGameOver();
+                saveGame(roomId, currentGame);
+                sendPersonalGameState(io, currentGame);
+                sendPersonalGameOver(io, currentGame);
+                console.log(`Room ${roomId}: auto-forfeit after timeout`);
+                if (currentGame.seriesWinner || currentGame.maxWins === 1) {
+                  deleteGame(roomId);
                 }
               }
-              disconnectTimers.delete(timerKey);
-            }, 60000); // 60 секунд
+            }
+            disconnectTimers.delete(timerKey);
+          }, 60000);
 
-            disconnectTimers.set(timerKey, timer);
-            console.log(`Started auto-forfeit timer for room ${roomId}, player ${socket.id}`);
-          }
+          disconnectTimers.set(timerKey, timer);
           break;
         }
       }
@@ -301,16 +324,8 @@ function sendPersonalGameOver(io: Server, game: Game) {
   const resultForRed = game.winner === 'red' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
   const resultForBlack = game.winner === 'black' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
 
-  const dataRed = {
-    winner: game.winner,
-    yourResult: resultForRed,
-    seriesWinner: game.seriesWinner,
-  };
-  const dataBlack = {
-    winner: game.winner,
-    yourResult: resultForBlack,
-    seriesWinner: game.seriesWinner,
-  };
+  const dataRed = { winner: game.winner, yourResult: resultForRed, seriesWinner: game.seriesWinner };
+  const dataBlack = { winner: game.winner, yourResult: resultForBlack, seriesWinner: game.seriesWinner };
 
   if (redSocket) redSocket.emit('game_over', dataRed);
   if (blackSocket) blackSocket.emit('game_over', dataBlack);
