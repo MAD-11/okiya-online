@@ -4,6 +4,8 @@ import { saveGame, deleteGame } from '../redis';
 import crypto from 'crypto';
 
 let games: Map<string, Game>;
+// Для автоматического завершения при длительном отключении
+const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -13,10 +15,19 @@ function generatePlayerToken(): string {
   return crypto.randomBytes(8).toString('hex');
 }
 
-function getClientGameState(game: Game, playerSocketId?: string) {
+function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   const isHost = playerSocketId === game.hostSocketId;
   const myScore = isHost ? game.scores.host : game.scores.guest;
   const opponentScore = isHost ? game.scores.guest : game.scores.host;
+
+  // Проверяем, подключён ли соперник в данный момент
+  let opponentConnected = false;
+  if (io && playerSocketId) {
+    const opponentId = isHost ? game.guestSocketId : game.hostSocketId;
+    if (opponentId) {
+      opponentConnected = io.sockets.sockets.has(opponentId);
+    }
+  }
 
   return {
     board: game.board,
@@ -38,6 +49,7 @@ function getClientGameState(game: Game, playerSocketId?: string) {
     turnStartedAt: game.turnStartedAt,
     turnDuration: game.turnDuration,
     lastMove: game.lastMove,
+    opponentConnected, // новое поле
   };
 }
 
@@ -71,11 +83,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       games.set(roomId, game);
       socket.join(roomId);
       saveGame(roomId, game);
+      console.log(`Room ${roomId} created by host ${socket.id}`);
 
       callback({
         roomId,
         playerToken: hostToken,
-        state: getClientGameState(game, socket.id)
+        state: getClientGameState(game, socket.id, io)
       });
     });
 
@@ -92,17 +105,26 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       game.guestToken = guestToken;
 
       socket.join(roomId);
+      console.log(`Guest ${socket.id} joined room ${roomId}`);
+
+      // Очищаем таймер авто-завершения, если соперник вернулся
+      const timerKey = `${roomId}_${socket.id}`;
+      if (disconnectTimers.has(timerKey)) {
+        clearTimeout(disconnectTimers.get(timerKey)!);
+        disconnectTimers.delete(timerKey);
+      }
+
       callback({
         playerToken: guestToken,
-        state: getClientGameState(game, socket.id)
+        state: getClientGameState(game, socket.id, io)
       });
 
       saveGame(roomId, game);
 
       const redSocket = io.sockets.sockets.get(game.players.red!);
       const blackSocket = io.sockets.sockets.get(game.players.black!);
-      if (redSocket) redSocket.emit('game_started', getClientGameState(game, game.players.red));
-      if (blackSocket) blackSocket.emit('game_started', getClientGameState(game, game.players.black));
+      if (redSocket) redSocket.emit('game_started', getClientGameState(game, game.players.red, io));
+      if (blackSocket) blackSocket.emit('game_started', getClientGameState(game, game.players.black, io));
     });
 
     // Переподключение
@@ -115,6 +137,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       else if (game.guestToken === playerToken) role = 'guest';
       if (!role) return callback({ error: 'Неверный токен' });
 
+      // Обновляем сокеты
       if (role === 'host') {
         if (game.players.red === game.hostSocketId) game.players.red = socket.id;
         else if (game.players.black === game.hostSocketId) game.players.black = socket.id;
@@ -126,7 +149,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
 
       socket.join(roomId);
-      socket.emit('game_state', getClientGameState(game, socket.id));
+      console.log(`Player ${role} reconnected to room ${roomId}`);
+
+      // Очищаем таймер авто-завершения для этого игрока
+      const timerKey = `${roomId}_${socket.id}`;
+      if (disconnectTimers.has(timerKey)) {
+        clearTimeout(disconnectTimers.get(timerKey)!);
+        disconnectTimers.delete(timerKey);
+      }
+
+      socket.emit('game_state', getClientGameState(game, socket.id, io));
 
       if (game.status === 'playing' && game.players.red && game.players.black) {
         game.turnStartedAt = Date.now();
@@ -142,14 +174,15 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const success = game.makeMove(row, col, socket.id);
       if (!success) return callback({ error: 'Недопустимый ход' });
 
+      console.log(`Move in room ${roomId}: ${socket.id} placed at (${row}, ${col})`);
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
 
       if (game.winner) {
         sendPersonalGameOver(io, game);
         if (game.seriesWinner || game.maxWins === 1) {
-          // Серия завершена — удаляем из Redis
           deleteGame(roomId);
+          console.log(`Game in room ${roomId} finished, removed from Redis`);
         }
       }
       callback({ success: true });
@@ -163,60 +196,93 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (started) {
         saveGame(roomId, game);
         sendPersonalGameState(io, game);
+        console.log(`New round started in room ${roomId}`);
       }
       callback({ success: true });
     });
 
-        // Полный сброс комнаты (новая игра в той же комнате)
-    const resetVotes = new Map<string, Set<string>>();
+    // Полный сброс комнаты (новая игра в той же комнате)
     socket.on('reset_room', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Комната не найдена' });
 
-      // Только хост или гость могут инициировать сброс
-      if (socket.id !== game.hostSocketId && socket.id !== game.guestSocketId) {
-        return callback({ error: 'Вы не участник этой комнаты' });
+      const success = game.voteReset(socket.id);
+      if (success) {
+        saveGame(roomId, game);
+        sendPersonalGameState(io, game);
+        console.log(`Room ${roomId} fully reset`);
       }
-
-      if (!resetVotes.has(roomId)) {
-        resetVotes.set(roomId, new Set());
-      }
-      const votes = resetVotes.get(roomId)!;
-      votes.add(socket.id);
-
-      if (votes.size === 2) {
-        // Оба игрока согласны – создаём новую игру с теми же токенами и игроками
-        const newGame = new Game(game.maxWins, game.turnDuration);
-        newGame.hostSocketId = game.hostSocketId;
-        newGame.guestSocketId = game.guestSocketId;
-        // Приводим типы: players ожидает string | undefined, а у нас string | null
-        newGame.players.red = game.hostSocketId ?? undefined;
-        newGame.players.black = game.guestSocketId ?? undefined;
-        newGame.hostToken = game.hostToken;
-        newGame.guestToken = game.guestToken;
-        newGame.status = 'playing'; // оба игрока уже подключены
-        newGame.setOnTimerExpired(() => {
-          newGame.skipTurn();
-          sendPersonalGameState(io, newGame);
-          if (newGame.winner) {
-            sendPersonalGameOver(io, newGame);
-          }
-          saveGame(roomId, newGame);
-        });
-        games.set(roomId, newGame);
-        saveGame(roomId, newGame);
-        resetVotes.delete(roomId);
-
-        // Оповещаем обоих
-        sendPersonalGameState(io, newGame);
-        callback({ success: true });
-      } else {
-        callback({ success: true }); // голос принят, ждём второго
-      }
+      callback({ success: true });
     });
 
+    // Сдаться
+    socket.on('forfeit', (roomId: string, callback) => {
+      const game = games.get(roomId);
+      if (!game) return callback({ error: 'Игра не найдена' });
+      if (game.status !== 'playing') return callback({ error: 'Игра не активна' });
+
+      const playerColor = game.players.red === socket.id ? 'red' : 'black';
+      if (playerColor !== game.currentPlayer && game.currentPlayer !== undefined) {
+        // Можно сдаться только в свой ход, но для удобства разрешим в любой момент
+      }
+
+      const opponent = playerColor === 'red' ? 'black' : 'red';
+      game.winner = opponent;
+      game.handleGameOver();
+      saveGame(roomId, game);
+      sendPersonalGameState(io, game);
+      sendPersonalGameOver(io, game);
+      console.log(`Player ${socket.id} forfeited in room ${roomId}`);
+      if (game.seriesWinner || game.maxWins === 1) {
+        deleteGame(roomId);
+      }
+      callback({ success: true });
+    });
+
+    // Отключение
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
+      // Проверяем все игры, где участвовал этот сокет
+      for (const [roomId, game] of games.entries()) {
+        if (game.hostSocketId === socket.id || game.guestSocketId === socket.id) {
+          const isHost = game.hostSocketId === socket.id;
+          const opponentSocketId = isHost ? game.guestSocketId : game.hostSocketId;
+
+          // Если оба отключены, удаляем игру
+          if (!opponentSocketId || !io.sockets.sockets.has(opponentSocketId)) {
+            // Второй игрок тоже не в сети - удаляем игру
+            games.delete(roomId);
+            deleteGame(roomId);
+            console.log(`Room ${roomId} deleted because both players disconnected`);
+          } else {
+            // Запускаем таймер на 60 секунд для автоматического завершения
+            const timerKey = `${roomId}_${socket.id}`;
+            const timer = setTimeout(() => {
+              const currentGame = games.get(roomId);
+              if (currentGame && currentGame.status === 'playing') {
+                // Проверяем, что отключившийся так и не вернулся
+                if (currentGame.hostSocketId === socket.id || currentGame.guestSocketId === socket.id) {
+                  const winner = isHost ? 'black' : 'red';
+                  currentGame.winner = winner;
+                  currentGame.handleGameOver();
+                  saveGame(roomId, currentGame);
+                  sendPersonalGameState(io, currentGame);
+                  sendPersonalGameOver(io, currentGame);
+                  console.log(`Room ${roomId}: auto-forfeit after timeout`);
+                  if (currentGame.seriesWinner || currentGame.maxWins === 1) {
+                    deleteGame(roomId);
+                  }
+                }
+              }
+              disconnectTimers.delete(timerKey);
+            }, 60000); // 60 секунд
+
+            disconnectTimers.set(timerKey, timer);
+            console.log(`Started auto-forfeit timer for room ${roomId}, player ${socket.id}`);
+          }
+          break;
+        }
+      }
     });
   });
 }
@@ -224,8 +290,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 function sendPersonalGameState(io: Server, game: Game) {
   const redSocket = io.sockets.sockets.get(game.players.red!);
   const blackSocket = io.sockets.sockets.get(game.players.black!);
-  if (redSocket) redSocket.emit('game_state', getClientGameState(game, game.players.red));
-  if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, game.players.black));
+  if (redSocket) redSocket.emit('game_state', getClientGameState(game, game.players.red, io));
+  if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, game.players.black, io));
 }
 
 function sendPersonalGameOver(io: Server, game: Game) {

@@ -21,7 +21,10 @@ export class Game {
   public seriesWinner: 'host' | 'guest' | null;
   private restartVotes: Set<string>;
 
-  // Таймер
+  // Голоса за полный сброс комнаты
+  public resetVotes: Set<string> = new Set();
+
+  // Таймер хода
   public turnStartedAt: number = Date.now();
   public turnDuration: number = 30_000;
   private turnTimer: NodeJS.Timeout | null = null;
@@ -136,7 +139,8 @@ export class Game {
     return true;
   }
 
-  private handleGameOver() {
+  // Меняем private на public, чтобы вызывать извне при сдаче или авто-завершении
+  public handleGameOver() {
     this.clearTurnTimer();
     this.status = 'finished';
     if (this.winner === 'red' || this.winner === 'black') {
@@ -163,6 +167,7 @@ export class Game {
     }
   }
 
+  // Продолжение серии (ещё одна игра)
   voteRestart(socketId: string): boolean {
     if (!this.roundFinished || this.seriesWinner) return false;
     if (socketId !== this.players.red && socketId !== this.players.black) return false;
@@ -172,6 +177,49 @@ export class Game {
       return true;
     }
     return false;
+  }
+
+  // Полный сброс комнаты (новая игра с теми же игроками)
+  voteReset(socketId: string): boolean {
+    if (this.status !== 'finished' && !this.roundFinished && !this.seriesWinner) return false;
+    if (socketId !== this.hostSocketId && socketId !== this.guestSocketId) return false;
+    this.resetVotes.add(socketId);
+    if (this.resetVotes.size === 2) {
+      this.fullReset();
+      return true;
+    }
+    return false;
+  }
+
+  private fullReset() {
+    const maxWins = this.maxWins;
+    const turnDuration = this.turnDuration;
+    const hostSocket = this.hostSocketId;
+    const guestSocket = this.guestSocketId;
+    const hostToken = this.hostToken;
+    const guestToken = this.guestToken;
+
+    this.board = initBoard();
+    this.currentPlayer = 'red';
+    this.status = 'playing';
+    this.winner = null;
+    this.lastPickedTile = null;
+    this.players.red = hostSocket ?? undefined;
+    this.players.black = guestSocket ?? undefined;
+    this.hostSocketId = hostSocket;
+    this.guestSocketId = guestSocket;
+    this.hostToken = hostToken;
+    this.guestToken = guestToken;
+    this.maxWins = maxWins;
+    this.turnDuration = turnDuration;
+    this.scores = { host: 0, guest: 0 };
+    this.roundFinished = false;
+    this.seriesWinner = null;
+    this.restartVotes.clear();
+    this.resetVotes.clear();
+    this.lastMove = null;
+    this.clearTurnTimer();
+    this.startTurnTimer();
   }
 
   startNewRound() {

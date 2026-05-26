@@ -17,20 +17,21 @@ const Game: React.FC = () => {
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
 
-  // Очистка сохранённой комнаты (выход в меню)
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
     localStorage.removeItem('okiya_playerToken');
   };
 
   const backToMenu = () => {
-    clearSavedRoom();
-    setGameState(null);
-    setRoomId(null);
-    setMessage('');
-    setPersonalGameOver(null);
-    setWaitingRestart(false);
-    setWaitingReset(false);
+    if (window.confirm('Вы уверены, что хотите выйти в главное меню? Текущая игра будет потеряна.')) {
+      clearSavedRoom();
+      setGameState(null);
+      setRoomId(null);
+      setMessage('');
+      setPersonalGameOver(null);
+      setWaitingRestart(false);
+      setWaitingReset(false);
+    }
   };
 
   // Попытка переподключения
@@ -44,7 +45,7 @@ const Game: React.FC = () => {
           clearSavedRoom();
           setMessage(res.error);
         } else {
-          setRoomId(savedRoomId); // важно: восстановить отображение кода комнаты
+          setRoomId(savedRoomId);
           setMessage('');
         }
       });
@@ -139,11 +140,18 @@ const Game: React.FC = () => {
         setWaitingReset(false);
         setMessage(res.error);
       }
-      // Успешный сброс — состояние обновится через game_state
     });
   };
 
-  // Слушатели сокета
+  const handleForfeit = () => {
+    if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
+    if (window.confirm('Вы уверены, что хотите сдаться? Вам будет засчитано поражение.')) {
+      socket.emit('forfeit', roomId, (res: any) => {
+        if (res?.error) setMessage(res.error);
+      });
+    }
+  };
+
   useEffect(() => {
     if (!socket) return;
 
@@ -181,9 +189,8 @@ const Game: React.FC = () => {
         } else {
           text += ' Серия проиграна.';
         }
-        clearSavedRoom(); // серия завершена, токен больше не нужен
+        clearSavedRoom();
       } else if (gameState?.maxWins === 1) {
-        // Одиночная игра завершена — тоже очищаем
         clearSavedRoom();
       }
       setPersonalGameOver(text);
@@ -223,7 +230,7 @@ const Game: React.FC = () => {
       <div style={styles.lobby}>
         <h1 style={styles.title}>Окийя</h1>
         <p style={styles.subtitle}>Выберите формат игры</p>
-        <div style={{ marginTop: 30 }}>
+        <div style={{ marginTop: 30, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
           <button onClick={() => createRoom(1)} style={styles.button}>Одна игра</button>
           <button onClick={() => createRoom(3)} style={styles.button}>До 3 побед</button>
           <button onClick={() => createRoom(5)} style={styles.button}>До 5 побед</button>
@@ -244,6 +251,18 @@ const Game: React.FC = () => {
     <div style={styles.gameContainer}>
       <h2 style={styles.titleSmall}>Окийя</h2>
       {roomId && <p style={styles.roomCode}>Код комнаты: <strong>{roomId}</strong></p>}
+
+      {/* Индикатор подключения соперника */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: 8 }}>
+        <span style={{
+          width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
+          backgroundColor: gameState.opponentConnected ? '#2ecc71' : '#e74c3c'
+        }} />
+        <span style={{ fontSize: 14, color: '#4a3f35' }}>
+          {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
+        </span>
+      </div>
+
       {gameState.maxWins > 1 && (
         <p style={styles.score}>
           Вы: {gameState.myScore} — Соперник: {gameState.opponentScore}
@@ -278,14 +297,21 @@ const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Кнопки управления комнатой */}
+      {/* Кнопки управления */}
       <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <button onClick={backToMenu} style={{ ...styles.button, background: '#e74c3c' }}>
           Выйти в главное меню
         </button>
-        <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71' }}>
-          {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
-        </button>
+        {(gameState.status === 'finished' || gameState.seriesWinner) && (
+          <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71' }}>
+            {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
+          </button>
+        )}
+        {gameState.status === 'playing' && !isSpectator && (
+          <button onClick={handleForfeit} style={{ ...styles.button, background: '#e67e22' }}>
+            Сдаться
+          </button>
+        )}
       </div>
 
       {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
@@ -297,11 +323,13 @@ const Game: React.FC = () => {
   );
 };
 
+// Стили с адаптацией под мобильные
 const styles: Record<string, React.CSSProperties> = {
   lobby: {
     textAlign: 'center',
     marginTop: 80,
     fontFamily: '"Segoe UI", "Noto Serif JP", serif',
+    padding: '0 16px',
   },
   centered: {
     textAlign: 'center',
@@ -309,18 +337,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 24,
   },
   title: {
-    fontSize: 48,
+    fontSize: 'clamp(32px, 8vw, 48px)',
     margin: 0,
     color: '#4a3f35',
     textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 'clamp(14px, 4vw, 18px)',
     color: '#7f6e5d',
     marginBottom: 20,
   },
   titleSmall: {
-    fontSize: 32,
+    fontSize: 'clamp(24px, 6vw, 32px)',
     color: '#4a3f35',
     margin: '10px 0 0',
   },
@@ -330,13 +358,13 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '5px 0',
   },
   score: {
-    fontSize: 20,
+    fontSize: 'clamp(16px, 4vw, 20px)',
     color: '#4a3f35',
     fontWeight: 'bold',
     margin: '10px 0',
   },
   turnIndicator: {
-    fontSize: 20,
+    fontSize: 'clamp(16px, 4vw, 20px)',
     margin: '10px 0 5px',
     color: '#b8860b',
     fontWeight: 'bold',
@@ -344,13 +372,13 @@ const styles: Record<string, React.CSSProperties> = {
   message: {
     fontWeight: 'bold',
     color: '#2c3e50',
-    fontSize: 20,
+    fontSize: 'clamp(16px, 4vw, 20px)',
     margin: '10px 0',
   },
   button: {
     margin: '4px',
     padding: '10px 24px',
-    fontSize: 16,
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     background: '#d4a373',
     border: 'none',
     borderRadius: '30px',
@@ -359,6 +387,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     transition: '0.2s',
     whiteSpace: 'nowrap',
+    touchAction: 'manipulation', // улучшает отклик на мобильных
   },
   gameContainer: {
     textAlign: 'center',
@@ -368,6 +397,8 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     paddingTop: 10,
     paddingBottom: 20,
+    paddingLeft: '8px',
+    paddingRight: '8px',
   },
 };
 

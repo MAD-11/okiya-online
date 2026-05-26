@@ -67,6 +67,10 @@ function getTileEmoji(plant: string, symbol: string): string {
   return `${map[plant] || plant}${map[symbol] || symbol}`;
 }
 
+// Адаптивные размеры клеток
+const cellSize = Math.min(window.innerWidth, window.innerHeight) * 0.18;
+const fontSize = cellSize * 0.4;
+
 const styles: Record<string, React.CSSProperties> = {
   boardContainer: {
     display: 'flex',
@@ -75,21 +79,21 @@ const styles: Record<string, React.CSSProperties> = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 90px)',
-    gap: '8px',
-    padding: '16px',
+    gridTemplateColumns: `repeat(4, ${cellSize}px)`,
+    gap: '4px',
+    padding: '8px',
     background: 'rgba(0,0,0,0.05)',
     borderRadius: '12px',
     boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
   },
   cell: {
-    width: 90,
-    height: 90,
+    width: cellSize,
+    height: cellSize,
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '36px',
+    fontSize: fontSize,
     transition: 'all 0.2s ease',
     position: 'relative' as const,
     boxSizing: 'border-box',
@@ -106,7 +110,7 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
   },
   stone: {
-    fontSize: '40px',
+    fontSize: fontSize,
     filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
   },
 };

@@ -25,9 +25,10 @@ export interface GameState {
   roundFinished: boolean;
   seriesWinner: 'host' | 'guest' | null;
   isHost: boolean;
-  turnStartedAt: number;       // время начала хода (timestamp)
-  turnDuration: number;        // длительность хода в мс
+  turnStartedAt: number;
+  turnDuration: number;
   lastMove: { row: number; col: number } | null;
+  opponentConnected: boolean; // новое
 }
 
 export type ValidMoves = boolean[][];
