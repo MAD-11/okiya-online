@@ -60,17 +60,9 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
 }
 
 export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
-  // Санация загруженных игр: удаляем мёртвые сокеты и полностью пустые комнаты
-  for (const [roomId, game] of loadedGames.entries()) {
-    if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
-    if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
-    if (!game.players.red && !game.players.black) {
-      loadedGames.delete(roomId);
-      deleteGame(roomId);
-      logger.info(`Removed empty room ${roomId} during startup`);
-    }
-  }
+  // Просто используем загруженные игры, без удаления
   games = loadedGames;
+  logger.info(`Loaded ${games.size} games from Redis`);
 
   io.on('connection', (socket: Socket) => {
     logger.info('User connected: ' + socket.id);
@@ -111,7 +103,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       });
     });
 
-    // Присоединение к комнате (теперь можно входить в любую, где есть свободный слот)
+    // Присоединение к комнате
     socket.on('join_room', (data: { roomId: string, nick: string }, callback) => {
       const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
@@ -120,7 +112,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return callback({ error: 'Комната не найдена' });
       }
 
-      // Автоматически чистим отключённые сокеты
+      // Чистим мёртвые сокеты перед входом
       if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
       if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
@@ -145,7 +137,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.nickBlack = data.nick || 'Чёрные';
       }
 
-      // Если комната была в ожидании и теперь двое — начинаем
       if (game.players.red && game.players.black && game.status === 'waiting') {
         game.status = 'playing';
         game.turnStartedAt = Date.now();
@@ -196,10 +187,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Список комнат (показываем все, где есть свободный слот)
+    // Список комнат (теперь чистит мёртвые слоты на лету)
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
+        // Очищаем мёртвые сокеты при просмотре
+        if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
+        if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
+
         if (!game.players.red || !game.players.black) {
           rooms.push({
             roomId,
@@ -229,13 +224,27 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       sendPersonalGameState(io, game);
     });
 
-    // Профиль (теперь принимает любой идентификатор, чтобы показать хотя бы нули)
+    // Профиль (с таймаутом)
     socket.on('get_profile', (playerId: string, callback) => {
       if (!playerId) {
         callback({ games: 0, wins: 0, draws: 0, history: [] });
         return;
       }
-      getPlayerStats(playerId).then(stats => callback(stats));
+      // Устанавливаем таймаут на случай, если Redis зависнет
+      const timeout = setTimeout(() => {
+        callback({ games: 0, wins: 0, draws: 0, history: [] });
+      }, 2000);
+
+      getPlayerStats(playerId)
+        .then(stats => {
+          clearTimeout(timeout);
+          callback(stats);
+        })
+        .catch(err => {
+          logger.error('get_profile error', err);
+          clearTimeout(timeout);
+          callback({ games: 0, wins: 0, draws: 0, history: [] });
+        });
     });
 
     // Ход
