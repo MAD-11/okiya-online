@@ -28,7 +28,11 @@ export interface GameState {
   turnStartedAt: number;
   turnDuration: number;
   lastMove: { row: number; col: number } | null;
-  opponentConnected: boolean; // новое
+  opponentConnected: boolean;
+  nickRed: string;
+  nickBlack: string;
+  myNick: string;
+  messages: { sender: string; text: string; timestamp: number }[];
 }
 
 export type ValidMoves = boolean[][];

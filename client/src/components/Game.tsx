@@ -5,6 +5,11 @@ import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import { useTheme } from '../contexts/ThemeContext';
+import RoomList from './RoomList';
+import Chat from './Chat';
+import Profile from './Profile';
+import Settings from './Settings';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -16,6 +21,27 @@ const Game: React.FC = () => {
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
+
+  // Модальные окна
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false); // ✅ добавлено
+
+  const { darkMode, skin } = useTheme();
+
+  // ======== Постоянный никнейм ========
+  const [playerNick, setPlayerNick] = useState(() => {
+    return localStorage.getItem('okiya_nick') || '';
+  });
+
+  const ensureNick = (): string => {
+    if (playerNick) return playerNick;
+    const nick = prompt('Придумайте себе постоянный никнейм (не более 12 символов)') || 'Игрок';
+    const trimmed = nick.slice(0, 12);
+    localStorage.setItem('okiya_nick', trimmed);
+    setPlayerNick(trimmed);
+    return trimmed;
+  };
 
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
@@ -37,6 +63,7 @@ const Game: React.FC = () => {
     }
   };
 
+  // Автоподключение
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -55,7 +82,8 @@ const Game: React.FC = () => {
   }, [socket, connected]);
 
   const createRoom = (maxWins: number) => {
-    socket?.emit('create_room', maxWins, (res: any) => {
+    const nick = ensureNick();
+    socket?.emit('create_room', { maxWins, nick }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
         localStorage.setItem('okiya_playerToken', res.playerToken);
@@ -69,10 +97,14 @@ const Game: React.FC = () => {
     });
   };
 
-  const joinRoom = () => {
-    const id = prompt('Введите код комнаты')?.toUpperCase();
+  const joinRoom = (code?: string) => {
+    const id = code || (() => {
+      const input = prompt('Введите код комнаты')?.toUpperCase();
+      return input || '';
+    })();
     if (!id) return;
-    socket?.emit('join_room', id, (res: any) => {
+    const nick = ensureNick();
+    socket?.emit('join_room', { roomId: id, nick }, (res: any) => {
       if (res.error) {
         setMessage(res.error);
       } else {
@@ -154,6 +186,13 @@ const Game: React.FC = () => {
     }
   };
 
+  const handleChatSend = (text: string) => {
+    if (socket && roomId) {
+      socket.emit('chat_message', roomId, text);
+    }
+  };
+
+  // Слушатели событий
   useEffect(() => {
     if (!socket) return;
 
@@ -205,6 +244,7 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
+  // Анимации
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -217,40 +257,107 @@ const Game: React.FC = () => {
         from { transform: scale(0); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
-      @media (max-width: 700px) {
-        .right-panel {
-          position: static !important;
-          margin-top: 16px;
-        }
-      }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
   }, []);
 
   if (!connected) {
-    return <div style={styles.centered}>Подключение к серверу...</div>;
-  }
-
-  if (!gameState) {
     return (
-      <div style={styles.lobby}>
-        <h1 style={styles.title}>Окийя</h1>
-        <p style={styles.subtitle}>Выберите формат игры</p>
-        <div style={{ marginTop: 30, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
-          <button onClick={() => createRoom(1)} style={styles.button}>Одна игра</button>
-          <button onClick={() => createRoom(3)} style={styles.button}>До 3 побед</button>
-          <button onClick={() => createRoom(5)} style={styles.button}>До 5 побед</button>
-        </div>
-        <p style={{ marginTop: 30 }}>или</p>
-        <button onClick={joinRoom} style={{ ...styles.button, background: '#b08b6c' }}>
-          Присоединиться к комнате
-        </button>
-        {message && <p style={{ color: '#e74c3c', marginTop: 20 }}>{message}</p>}
+      <div style={styles.centered}>
+        <div className="spinner" />
+        <p>Подключение к серверу...</p>
       </div>
     );
   }
 
+  // ========== ГЛАВНОЕ МЕНЮ ==========
+  if (!gameState) {
+    return (
+      <div style={styles.lobbyContainer}>
+        <div style={styles.lobbyCard}>
+          <h1 style={styles.title}>Окийя</h1>
+          <p style={styles.subtitle}>изящная дуэльная игра</p>
+          {playerNick && <p style={{ color: '#4a3f35', marginBottom: 20 }}>Ваш ник: <strong>{playerNick}</strong></p>}
+
+          <div style={styles.buttonGroup}>
+            <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
+            <button onClick={() => createRoom(3)} style={styles.primaryBtn}>Серия до 3</button>
+            <button onClick={() => createRoom(5)} style={styles.primaryBtn}>Серия до 5</button>
+          </div>
+
+          <div style={styles.orDivider}>
+            <span style={styles.orText}>или</span>
+          </div>
+
+          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>
+            Присоединиться по коду
+          </button>
+
+          <RoomList onJoin={(roomId) => joinRoom(roomId)} socket={socket} />
+
+          <div style={styles.bottomButtons}>
+            <button onClick={() => setShowProfile(true)} style={styles.iconBtn}>👤 Профиль</button>
+            <button onClick={() => setShowSettings(true)} style={styles.iconBtn}>⚙️ Настройки</button>
+          </div>
+
+          {message && <p style={styles.error}>{message}</p>}
+        </div>
+
+        {/* Модальное окно ввода кода */}
+        {showJoinModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <h3 style={{ color: '#4a3f35', marginBottom: 15 }}>Введите код комнаты</h3>
+              <input
+                type="text"
+                maxLength={4}
+                placeholder="Например: ABCD"
+                style={styles.codeInput}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (e.target as HTMLInputElement).value.toUpperCase();
+                    if (val) {
+                      setShowJoinModal(false);
+                      joinRoom(val);
+                    }
+                  }
+                }}
+              />
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button onClick={() => {
+                  const input = document.querySelector('input') as HTMLInputElement;
+                  const val = input?.value?.toUpperCase();
+                  if (val) {
+                    setShowJoinModal(false);
+                    joinRoom(val);
+                  }
+                }} style={styles.actionBtn}>Войти</button>
+                <button onClick={() => setShowJoinModal(false)} style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '14px' }}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showProfile && (
+          <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <Profile onClose={() => setShowProfile(false)} socket={socket} />
+            </div>
+          </div>
+        )}
+        {showSettings && (
+          <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <Settings onClose={() => setShowSettings(false)} />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ========== ИГРОВОЕ ПОЛЕ ==========
   const isSpectator = !gameState.myColor;
   const canRestart = gameState.roundFinished && !waitingRestart;
 
@@ -258,15 +365,16 @@ const Game: React.FC = () => {
     <div style={styles.gameContainer}>
       <h2 style={styles.titleSmall}>Окийя</h2>
       {roomId && <p style={styles.roomCode}>Код комнаты: <strong>{roomId}</strong></p>}
-
-      {/* Индикатор подключения соперника */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: 8 }}>
+      <div style={styles.statusBar}>
         <span style={{
           width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
           backgroundColor: gameState.opponentConnected ? '#2ecc71' : '#e74c3c'
         }} />
-        <span style={{ fontSize: 14, color: '#4a3f35' }}>
+        <span style={{ fontSize: 14, marginLeft: 6 }}>
           {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
+        </span>
+        <span style={{ marginLeft: 12, fontSize: 14 }}>
+          Вы: {gameState.myNick} | Соперник: {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
         </span>
       </div>
 
@@ -284,10 +392,8 @@ const Game: React.FC = () => {
         </>
       )}
 
-      {/* Контейнер, в котором доска центрируется, а кнопки приклеены справа */}
-      <div style={{ position: 'relative', width: 'fit-content', margin: '20px auto 0' }}>
-        {/* Сама доска */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={styles.gameLayout}>
+        <div style={styles.boardArea}>
           <Board
             board={gameState.board}
             validMoves={validMoves}
@@ -295,32 +401,17 @@ const Game: React.FC = () => {
             currentPlayer={gameState.currentPlayer}
             myColor={gameState.myColor}
             lastMove={gameState.lastMove}
+            skin={skin}
           />
           <LastPickedTile tile={gameState.lastPickedTile} />
         </div>
 
-        {/* Правая панель кнопок (абсолютное позиционирование справа) */}
-        <div className="right-panel" style={{
-          position: 'absolute',
-          left: '100%',
-          top: 0,
-          marginLeft: '20px', // отступ от доски
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px',
-          minWidth: '160px',
-          padding: '10px',
-          backgroundColor: 'rgba(255, 255, 240, 0.85)',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          backdropFilter: 'blur(4px)',
-        }}>
+        <div style={styles.sidePanel}>
           {personalGameOver && (
-            <div style={{ textAlign: 'center' }}>
+            <div style={styles.gameOverBlock}>
               <p style={styles.message}>{personalGameOver}</p>
               {canRestart && (
-                <button onClick={handleRestartRound} style={styles.button}>
+                <button onClick={handleRestartRound} style={styles.actionBtn}>
                   Ещё одна игра
                 </button>
               )}
@@ -328,93 +419,122 @@ const Game: React.FC = () => {
             </div>
           )}
 
-          <button onClick={backToMenu} style={{ ...styles.button, background: '#e74c3c', width: '100%' }}>
+          <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#e74c3c' }}>
             Выйти в главное меню
           </button>
           {(gameState.status === 'finished' || gameState.seriesWinner) && (
-            <button onClick={handleResetRoom} style={{ ...styles.button, background: '#2ecc71', width: '100%' }}>
+            <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#2ecc71' }}>
               {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
             </button>
           )}
           {gameState.status === 'playing' && !isSpectator && (
-            <button onClick={handleForfeit} style={{ ...styles.button, background: '#e67e22', width: '100%' }}>
+            <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#e67e22' }}>
               Сдаться
             </button>
           )}
 
-          {!gameState.roundFinished && gameState.status === 'finished' && !gameState.seriesWinner && (
-            <p style={{ color: '#4a3f35', whiteSpace: 'nowrap' }}>Ожидание новой игры...</p>
-          )}
+          <Chat messages={gameState.messages ?? []} onSend={handleChatSend} />
         </div>
       </div>
     </div>
   );
 };
 
+// ==================== СТИЛИ ====================
 const styles: Record<string, React.CSSProperties> = {
-  lobby: {
-    textAlign: 'center',
-    marginTop: 80,
+  lobbyContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
     fontFamily: '"Segoe UI", "Noto Serif JP", serif',
-    padding: '0 16px',
+    padding: '20px',
   },
-  centered: {
+  lobbyCard: {
+    background: 'white',
+    borderRadius: '20px',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+    padding: '40px 30px',
+    maxWidth: '500px',
+    width: '100%',
     textAlign: 'center',
-    marginTop: 100,
-    fontSize: 24,
   },
   title: {
-    fontSize: 'clamp(32px, 8vw, 48px)',
-    margin: 0,
+    fontSize: '48px',
+    margin: '0 0 10px',
     color: '#4a3f35',
-    textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
+    fontWeight: 700,
   },
   subtitle: {
-    fontSize: 'clamp(14px, 4vw, 18px)',
+    fontSize: '18px',
     color: '#7f6e5d',
-    marginBottom: 20,
+    marginBottom: '20px',
   },
-  titleSmall: {
-    fontSize: 'clamp(24px, 6vw, 32px)',
-    color: '#4a3f35',
-    margin: '10px 0 0',
+  buttonGroup: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: '20px',
   },
-  roomCode: {
-    fontSize: 16,
-    color: '#5d4e37',
-    margin: '5px 0',
-  },
-  score: {
-    fontSize: 'clamp(16px, 4vw, 20px)',
-    color: '#4a3f35',
-    fontWeight: 'bold',
-    margin: '10px 0',
-  },
-  turnIndicator: {
-    fontSize: 'clamp(16px, 4vw, 20px)',
-    margin: '10px 0 5px',
-    color: '#b8860b',
-    fontWeight: 'bold',
-  },
-  message: {
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    fontSize: 'clamp(16px, 4vw, 20px)',
-    margin: '10px 0',
-  },
-  button: {
-    margin: '4px',
-    padding: '10px 24px',
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    background: '#d4a373',
+  primaryBtn: {
+    padding: '12px 24px',
+    fontSize: '16px',
+    fontWeight: 600,
     border: 'none',
-    borderRadius: '30px',
+    borderRadius: '12px',
+    backgroundColor: '#d4a373',
     color: 'white',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    boxShadow: '0 4px 12px rgba(212, 163, 115, 0.4)',
     transition: '0.2s',
-    whiteSpace: 'nowrap',
-    touchAction: 'manipulation',
+    minWidth: '100px',
+  },
+  secondaryBtn: {
+    padding: '12px 24px',
+    fontSize: '16px',
+    fontWeight: 600,
+    border: '2px solid #d4a373',
+    borderRadius: '12px',
+    backgroundColor: 'transparent',
+    color: '#4a3f35',
+    cursor: 'pointer',
+    marginBottom: '20px',
+    width: '100%',
+    boxSizing: 'border-box',
+    transition: '0.2s',
+  },
+  orDivider: {
+    display: 'flex',
+    alignItems: 'center',
+    margin: '20px 0',
+  },
+  orText: {
+    margin: '0 auto',
+    color: '#b0a090',
+    fontSize: '14px',
+    textTransform: 'uppercase',
+  },
+  bottomButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    marginTop: '20px',
+  },
+  iconBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '16px',
+    color: '#4a3f35',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: '5px',
+  },
+  error: {
+    color: '#e74c3c',
+    marginTop: '15px',
+    fontWeight: 500,
   },
   gameContainer: {
     textAlign: 'center',
@@ -422,10 +542,122 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
     minHeight: '100vh',
     margin: 0,
-    paddingTop: 10,
-    paddingBottom: 20,
-    paddingLeft: '8px',
-    paddingRight: '8px',
+    padding: '20px',
+  },
+  titleSmall: {
+    fontSize: '32px',
+    color: '#4a3f35',
+    margin: '0 0 10px',
+  },
+  roomCode: {
+    fontSize: '16px',
+    color: '#5d4e37',
+    margin: '0 0 10px',
+  },
+  statusBar: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: '10px',
+    fontSize: '14px',
+    color: '#4a3f35',
+  },
+  score: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#4a3f35',
+    margin: '10px 0',
+  },
+  turnIndicator: {
+    fontSize: '20px',
+    margin: '5px 0',
+    color: '#b8860b',
+    fontWeight: 'bold',
+  },
+  gameLayout: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '30px',
+    flexWrap: 'wrap',
+    marginTop: '20px',
+  },
+  boardArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  sidePanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    minWidth: '220px',
+    maxWidth: '260px',
+  },
+  gameOverBlock: {
+    background: 'rgba(255,255,240,0.9)',
+    borderRadius: '12px',
+    padding: '15px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  message: {
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    fontSize: '18px',
+    margin: '0 0 10px',
+  },
+  actionBtn: {
+    padding: '10px 20px',
+    fontSize: '16px',
+    fontWeight: 600,
+    border: 'none',
+    borderRadius: '12px',
+    backgroundColor: '#d4a373',
+    color: 'white',
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    transition: '0.2s',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '20px',
+    maxWidth: '400px',
+    width: '90%',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+  },
+  codeInput: {
+    padding: '10px',
+    fontSize: '20px',
+    textAlign: 'center',
+    width: '100%',
+    boxSizing: 'border-box',
+    borderRadius: '8px',
+    border: '1px solid #d4a373',
+    marginBottom: '15px',
+    fontFamily: 'monospace',
+  },
+  centered: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+    fontSize: '20px',
+    color: '#4a3f35',
   },
 };
 
