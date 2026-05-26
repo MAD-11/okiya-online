@@ -3,8 +3,8 @@ import { Game } from '../game/Game';
 import { saveGame, deleteGame } from '../redis';
 import { saveGameResult, getPlayerStats } from '../stats';
 import { logger } from '../logger';
-import { Winner } from '../game/types';
 import crypto from 'crypto';
+import { Winner } from '../game/types';
 
 let games: Map<string, Game>;
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -103,10 +103,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Присоединение к комнате
     socket.on('join_room', (data: { roomId: string, nick: string }, callback) => {
-      const roomId = data.roomId;
+      const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Комната не найдена' });
+      if (!game) {
+        logger.warn(`Join attempt to non-existent room ${roomId}`);
+        return callback({ error: 'Комната не найдена' });
+      }
 
+      // Чистим мёртвые сокеты
       if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
         game.players.red = undefined;
       }
@@ -194,11 +198,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
             roomId,
             players: `${game.players.red ? 1 : 0}/2`,
             status: game.status,
-            nickRed: game.nickRed,
-            nickBlack: game.nickBlack,
+            nickRed: game.nickRed || '???',
+            nickBlack: game.nickBlack || '???',
           });
         }
       }
+      logger.info(`Returning ${rooms.length} public rooms`);
       callback(rooms);
     });
 
@@ -219,6 +224,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Профиль
     socket.on('get_profile', (playerId: string, callback) => {
+      if (!playerId) {
+        callback({ games: 0, wins: 0, draws: 0, history: [] });
+        return;
+      }
       getPlayerStats(playerId).then(stats => callback(stats));
     });
 
@@ -283,7 +292,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-        // Сдаться
+    // Сдаться
     socket.on('forfeit', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
@@ -298,7 +307,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       sendPersonalGameOver(io, game);
       logger.info(`Player ${socket.id} forfeited in room ${roomId}`);
       if (game.seriesWinner || game.maxWins === 1) {
-        const finalWinner: Winner = game.winner as Winner;   // ← снимаем сужение
+        const finalWinner: Winner = game.winner as Winner;
         let winner: 'host' | 'guest' | 'draw';
         if (game.seriesWinner) {
           winner = game.seriesWinner;

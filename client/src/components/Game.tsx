@@ -254,7 +254,6 @@ const Game: React.FC = () => {
     );
   }
 
-  // ========== ГЛАВНОЕ МЕНЮ ==========
   if (!gameState) {
     return (
       <div style={styles.lobbyContainer}>

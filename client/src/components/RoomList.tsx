@@ -29,6 +29,8 @@ const RoomList: React.FC<RoomListProps> = ({ onJoin, socket }) => {
 
   useEffect(() => {
     fetchRooms();
+    const interval = setInterval(fetchRooms, 5000); // обновлять каждые 5 секунд
+    return () => clearInterval(interval);
   }, [socket]);
 
   return (

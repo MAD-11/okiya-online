@@ -12,10 +12,12 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null }> = ({ onC
   const playerId = localStorage.getItem('okiya_playerToken') || '';
 
   useEffect(() => {
-    if (socket && playerId) {
+    if (socket) {
       socket.emit('get_profile', playerId, (data: Stats) => {
-        setStats(data);
+        setStats(data || { games: 0, wins: 0, draws: 0 });
       });
+    } else {
+      setStats({ games: 0, wins: 0, draws: 0 });
     }
   }, [socket, playerId]);
 
@@ -44,6 +46,7 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null }> = ({ onC
     </div>
   );
 };
+
 
 const styles: Record<string, React.CSSProperties> = {
   statsGrid: {
