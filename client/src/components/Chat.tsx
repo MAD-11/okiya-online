@@ -11,7 +11,7 @@ interface ChatProps {
   onSend: (text: string) => void;
 }
 
-const Chat: React.FC<ChatProps> = ({ messages, onSend }) => {
+const Chat: React.FC<ChatProps> = ({ messages = [], onSend }) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +38,7 @@ const Chat: React.FC<ChatProps> = ({ messages, onSend }) => {
       background: 'var(--bg-color, white)',
     }}>
       <div style={{ flex: 1, overflowY: 'auto', marginBottom: 8 }}>
-        {messages.map((msg, i) => (
+        {(messages || []).map((msg, i) => (
           <div key={i} style={{ fontSize: 12, marginBottom: 4, wordBreak: 'break-word' }}>
             <strong>{msg.sender}</strong>: {msg.text}
           </div>
