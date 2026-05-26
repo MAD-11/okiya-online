@@ -15,10 +15,6 @@ export class Game {
   public hostToken: string | null = null;
   public guestToken: string | null = null;
 
-  // Никнеймы
-  public nickRed: string = 'Красные';
-  public nickBlack: string = 'Чёрные';
-
   public maxWins: number;
   public scores: { host: number; guest: number };
   public roundFinished: boolean;
@@ -202,8 +198,6 @@ export class Game {
     const guestSocket = this.guestSocketId;
     const hostToken = this.hostToken;
     const guestToken = this.guestToken;
-    const nickRed = this.nickRed;
-    const nickBlack = this.nickBlack;
 
     this.board = initBoard();
     this.currentPlayer = 'red';
@@ -216,8 +210,6 @@ export class Game {
     this.guestSocketId = guestSocket;
     this.hostToken = hostToken;
     this.guestToken = guestToken;
-    this.nickRed = nickRed;
-    this.nickBlack = nickBlack;
     this.maxWins = maxWins;
     this.turnDuration = turnDuration;
     this.scores = { host: 0, guest: 0 };
