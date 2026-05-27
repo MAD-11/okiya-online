@@ -276,7 +276,10 @@ const Game: React.FC = () => {
             Присоединиться по коду
           </button>
           <div style={styles.bottomButtons}>
-            <button onClick={() => setShowProfile(true)} style={styles.iconBtn}>👤 Профиль</button>
+            <button onClick={() => {
+              console.log('[Game] opening profile, playerId:', playerId, 'socket connected:', socket?.connected);
+              setShowProfile(true);
+            }} style={styles.iconBtn}>👤 Профиль</button>
           </div>
           {message && <p style={{ color: '#e74c3c', marginTop: 15 }}>{message}</p>}
         </div>

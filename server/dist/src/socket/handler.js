@@ -340,13 +340,18 @@ function setupSocket(io, loadedGames) {
             }
         });
         // Профиль
+        // Профиль
         socket.on('get_profile', (playerId, callback) => {
+            logger_1.logger.info(`get_profile from ${socket.id} for playerId: ${playerId}`);
             if (!playerId) {
                 callback({ games: 0, wins: 0, draws: 0, history: [] });
                 return;
             }
             (0, stats_1.getPlayerStats)(playerId)
-                .then((stats) => callback(stats))
+                .then((stats) => {
+                logger_1.logger.info(`get_profile success for ${playerId}`);
+                callback(stats);
+            })
                 .catch((err) => {
                 logger_1.logger.error('get_profile error', err);
                 callback({ games: 0, wins: 0, draws: 0, history: [] });

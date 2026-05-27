@@ -9,15 +9,32 @@ interface Stats {
 
 const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: string }> = ({ onClose, socket, playerId }) => {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (socket && playerId) {
-      socket.emit('get_profile', playerId, (data: Stats) => {
-        setStats(data || { games: 0, wins: 0, draws: 0 });
-      });
-    } else {
+    console.log('[Profile] socket:', !!socket, 'playerId:', playerId);
+    if (!socket || !playerId) {
       setStats({ games: 0, wins: 0, draws: 0 });
+      return;
     }
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const handler = (data: Stats) => {
+      console.log('[Profile] received stats:', data);
+      clearTimeout(timeoutId);
+      setStats(data || { games: 0, wins: 0, draws: 0 });
+    };
+
+    console.log('[Profile] emitting get_profile');
+    socket.emit('get_profile', playerId, handler);
+
+    timeoutId = setTimeout(() => {
+      console.log('[Profile] timeout');
+      setError(true);
+      setStats({ games: 0, wins: 0, draws: 0 });
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
   }, [socket, playerId]);
 
   return (
@@ -29,6 +46,8 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
           <div style={{ textAlign: 'center' }}><strong>{stats.wins}</strong><br />побед</div>
           <div style={{ textAlign: 'center' }}><strong>{stats.draws}</strong><br />ничьих</div>
         </div>
+      ) : error ? (
+        <p style={{ color: 'red' }}>Не удалось загрузить профиль. Попробуйте позже.</p>
       ) : (
         <p>Загрузка...</p>
       )}

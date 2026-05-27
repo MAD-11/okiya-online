@@ -363,13 +363,18 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Профиль
+        // Профиль
     socket.on('get_profile', (playerId: string, callback) => {
+      logger.info(`get_profile from ${socket.id} for playerId: ${playerId}`);
       if (!playerId) {
         callback({ games: 0, wins: 0, draws: 0, history: [] });
         return;
       }
       getPlayerStats(playerId)
-        .then((stats: any) => callback(stats))
+        .then((stats: any) => {
+          logger.info(`get_profile success for ${playerId}`);
+          callback(stats);
+        })
         .catch((err: any) => {
           logger.error('get_profile error', err);
           callback({ games: 0, wins: 0, draws: 0, history: [] });
