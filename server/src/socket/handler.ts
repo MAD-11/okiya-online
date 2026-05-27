@@ -73,6 +73,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       game.nickRed = data.nick || 'Красные';
       game.nickBlack = 'Чёрные';
       game.hostPlayerId = data.playerId;
+      game.guestPlayerId = ''; // будет заполнен при входе гостя
 
       const hostToken = generatePlayerToken();
       game.hostToken = hostToken;
@@ -110,14 +111,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return callback({ error: 'Комната не найдена' });
       }
 
-      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
-        logger.info(`Cleaning dead red socket ${game.players.red}`);
-        game.players.red = undefined;
-      }
-      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
-        logger.info(`Cleaning dead black socket ${game.players.black}`);
-        game.players.black = undefined;
-      }
+      // Чистим мёртвые сокеты
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
@@ -221,13 +217,21 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (game.winner) {
         sendPersonalGameOver(io, game);
         if (game.seriesWinner || game.maxWins === 1) {
+          // Сохраняем статистику
+          saveGameResult({
+            roomId,
+            winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
+            players: { host: game.hostPlayerId, guest: game.guestPlayerId },
+            timestamp: Date.now(),
+            maxWins: game.maxWins,
+          });
           deleteGame(roomId);
         }
       }
       callback({ success: true });
     });
 
-    // Продолжение серии
+    // Продолжение серии (ещё одна игра)
     socket.on('restart_round', (roomId: string, callback) => {
       logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -287,7 +291,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         saveGameResult({
           roomId,
           winner: game.seriesWinner || (game.winner === 'red' ? 'host' : 'guest'),
-          players: { host: game.hostPlayerId!, guest: game.guestPlayerId! },
+          players: { host: game.hostPlayerId, guest: game.guestPlayerId },
           timestamp: Date.now(),
           maxWins: game.maxWins,
         });
@@ -346,7 +350,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                   saveGameResult({
                     roomId,
                     winner: currentGame.seriesWinner || (currentGame.winner === 'red' ? 'host' : 'guest'),
-                    players: { host: currentGame.hostPlayerId!, guest: currentGame.guestPlayerId! },
+                    players: { host: currentGame.hostPlayerId, guest: currentGame.guestPlayerId },
                     timestamp: Date.now(),
                     maxWins: currentGame.maxWins,
                   });
@@ -363,7 +367,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Профиль
-        // Профиль
     socket.on('get_profile', (playerId: string, callback) => {
       logger.info(`get_profile from ${socket.id} for playerId: ${playerId}`);
       if (!playerId) {
@@ -371,10 +374,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return;
       }
       getPlayerStats(playerId)
-        .then((stats: any) => {
-          logger.info(`get_profile success for ${playerId}`);
-          callback(stats);
-        })
+        .then((stats: any) => callback(stats))
         .catch((err: any) => {
           logger.error('get_profile error', err);
           callback({ games: 0, wins: 0, draws: 0, history: [] });
@@ -388,17 +388,11 @@ function sendPersonalGameState(io: Server, game: Game) {
   const blackId = game.players.black;
   if (redId) {
     const redSocket = io.sockets.sockets.get(redId);
-    if (redSocket) {
-      logger.info(`Sending game_state to red ${redId}`);
-      redSocket.emit('game_state', getClientGameState(game, redId, io));
-    }
+    if (redSocket) redSocket.emit('game_state', getClientGameState(game, redId, io));
   }
   if (blackId) {
     const blackSocket = io.sockets.sockets.get(blackId);
-    if (blackSocket) {
-      logger.info(`Sending game_state to black ${blackId}`);
-      blackSocket.emit('game_state', getClientGameState(game, blackId, io));
-    }
+    if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, blackId, io));
   }
 }
 
