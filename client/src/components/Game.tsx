@@ -40,7 +40,7 @@ const Game: React.FC = () => {
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
-  const { skin } = useTheme();
+  const { skin: localSkin } = useTheme();
 
   const ensureNick = (): string => {
     if (nick) return nick;
@@ -90,7 +90,7 @@ const Game: React.FC = () => {
 
   const createRoom = (maxWins: number) => {
     const n = ensureNick();
-    socket?.emit('create_room', { maxWins, playerId, nick: n }, (res: any) => {
+    socket?.emit('create_room', { maxWins, playerId, nick: n, skin: localSkin }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
         localStorage.setItem('okiya_playerToken', res.playerToken);
@@ -278,7 +278,7 @@ const Game: React.FC = () => {
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && <p style={{ color: '#4a3f35', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
+          {nick && <p style={{ color: 'var(--text)', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
@@ -363,7 +363,8 @@ const Game: React.FC = () => {
       )}
 
       <div style={{ position: 'relative', width: 'fit-content', margin: '0 auto' }}>
-        {gameState.status === 'playing' && !isSpectator && (
+        {/* Чат всегда, если есть комната и игрок не зритель */}
+        {!isSpectator && (
           <div style={{
             position: 'absolute',
             right: '100%',
@@ -390,7 +391,7 @@ const Game: React.FC = () => {
               currentPlayer={gameState.currentPlayer}
               myColor={gameState.myColor}
               lastMove={gameState.lastMove}
-              skin={skin}
+              skin={gameState.hostSkin || 'sakura'}
             />
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
@@ -402,30 +403,29 @@ const Game: React.FC = () => {
                   Ещё одна игра
                 </button>
               )}
-              {waitingRestart && <p style={{ fontSize: 13, color: '#7f6e5d' }}>Ожидание соперника…</p>}
+              {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
             </div>
           )}
           <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#6b5b4f' }}>
+            <button onClick={backToMenu} style={styles.actionBtn}>
               Выйти в меню
             </button>
             {(gameState.status === 'finished' || gameState.seriesWinner) && (
-              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#4a6741' }}>
+              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: '#4a6741' }}>
                 {waitingReset ? 'Ожидание…' : 'Новая игра'}
               </button>
             )}
             {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#b5651d' }}>
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, background: '#5e503a' }}>
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: '#5e503a' }}>
               Настройки
             </button>
           </div>
         </div>
       </div>
-      {/* Модальное окно настроек (во время игры) */}
       {showSettings && (
         <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
@@ -443,12 +443,12 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    background: '#f7f3eb',
+    background: 'var(--bg)',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
     padding: '20px',
   },
   lobbyCard: {
-    background: '#ffffff',
+    background: 'var(--card-bg)',
     borderRadius: '24px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
     padding: '48px 40px',
@@ -459,14 +459,14 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '52px',
     margin: '0 0 8px',
-    color: '#3e362e',
+    color: 'var(--text)',
     fontWeight: 400,
     letterSpacing: '2px',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
   },
   subtitle: {
     fontSize: '16px',
-    color: '#8b7a6b',
+    color: 'var(--secondary-text)',
     marginBottom: '32px',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
     fontWeight: 300,
@@ -484,45 +484,41 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     border: 'none',
     borderRadius: '40px',
-    backgroundColor: '#3e362e',
-    color: '#fff',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     cursor: 'pointer',
-    transition: 'background-color 0.3s',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
-    letterSpacing: '0.5px',
-  },
-  separator: {
-    height: '1px',
-    backgroundColor: '#e0d6c8',
-    margin: '20px 0',
-    width: '60%',
-    marginLeft: 'auto',
-    marginRight: 'auto',
   },
   secondaryBtn: {
     padding: '12px 28px',
     fontSize: '15px',
     fontWeight: 500,
-    border: '1px solid #3e362e',
+    border: '1px solid var(--btn-bg)',
     borderRadius: '40px',
     backgroundColor: 'transparent',
-    color: '#3e362e',
+    color: 'var(--btn-bg)',
     cursor: 'pointer',
-    transition: 'all 0.3s',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
-    letterSpacing: '0.5px',
     width: '100%',
     boxSizing: 'border-box',
+    marginTop: '12px',
+  },
+  separator: {
+    height: '1px',
+    backgroundColor: 'var(--border)',
+    margin: '20px 0',
+    width: '60%',
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
   textBtn: {
     background: 'none',
     border: 'none',
     fontSize: '14px',
-    color: '#8b7a6b',
+    color: 'var(--secondary-text)',
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
     textDecoration: 'underline',
-    textUnderlineOffset: '4px',
   },
   centered: {
     display: 'flex',
@@ -531,17 +527,17 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     height: '100vh',
     fontSize: '18px',
-    color: '#3e362e',
+    color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
   },
   gameContainer: {
     textAlign: 'center',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
-    background: '#f7f3eb',
     minHeight: '100vh',
     margin: 0,
     padding: '24px 16px',
-    color: '#3e362e',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text)',
   },
   gameHeader: {
     display: 'flex',
@@ -555,11 +551,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 400,
     margin: 0,
     fontFamily: '"Cormorant Garamond", serif',
-    letterSpacing: '1px',
+    color: 'var(--text)',
   },
   roomCode: {
     fontSize: '14px',
-    color: '#8b7a6b',
+    color: 'var(--secondary-text)',
     fontFamily: '"Inter", sans-serif',
   },
   statusBar: {
@@ -568,13 +564,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     marginBottom: '12px',
     fontSize: '13px',
-    color: '#5e503a',
   },
   score: {
     fontSize: '16px',
     fontWeight: 500,
     marginBottom: '8px',
-    color: '#3e362e',
   },
   turnIndicator: {
     fontSize: '16px',
@@ -594,7 +588,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   gameOverBlock: {
-    background: 'rgba(255,255,245,0.9)',
+    background: 'var(--card-bg)',
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -602,7 +596,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   message: {
     fontWeight: 500,
-    color: '#3e362e',
+    color: 'var(--text)',
     fontSize: '16px',
     margin: '0 0 12px',
   },
@@ -618,11 +612,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     border: 'none',
     borderRadius: '40px',
-    color: '#fff',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     cursor: 'pointer',
-    transition: 'opacity 0.3s',
-    fontFamily: '"Inter", sans-serif',
-    letterSpacing: '0.3px',
   },
   modalOverlay: {
     position: 'fixed',
@@ -630,14 +622,14 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'var(--overlay)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modal: {
-    background: '#fff',
+    background: 'var(--modal-bg)',
     borderRadius: '24px',
     maxWidth: '440px',
     width: '90%',

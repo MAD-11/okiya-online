@@ -8,7 +8,7 @@ interface BoardProps {
   currentPlayer: string;
   myColor: string | null;
   lastMove: { row: number; col: number } | null;
-  skin: string; // новый пропс
+  skin: string;
 }
 
 const skinEmoji: Record<string, { red: string; black: string }> = {
@@ -41,8 +41,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'rgba(180,130,110,0.2)' : 'rgba(80,70,60,0.2)'
-                    : '#fdfaf5',
-                  border: isValid ? '2px solid #c9a96e' : '1px solid #e0d6c8',
+                    : 'var(--cell-bg)',
+                  border: isValid ? '2px solid #c9a96e' : '1px solid var(--border)',
                   animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
                 }}
               >
@@ -75,7 +75,7 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: 'repeat(4, 88px)',
     gap: '8px',
     padding: '16px',
-    background: '#f7f3eb',
+    backgroundColor: 'var(--bg)',
     borderRadius: '16px',
     boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
   },

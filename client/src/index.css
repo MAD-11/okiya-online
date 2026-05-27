@@ -1,19 +1,38 @@
 :root {
-  --bg-color: #f7f3eb;
-  --text-color: #3e362e;
+  --bg: #f7f3eb;
+  --text: #3e362e;
   --card-bg: #ffffff;
   --cell-bg: #fdfaf5;
+  --border: #e0d6c8;
+  --btn-bg: #3e362e;
+  --btn-text: #fff;
+  --secondary-text: #8b7a6b;
+  --modal-bg: #ffffff;
+  --chat-bg: #fdfaf5;
+  --chat-bubble-mine: #3e362e;
+  --chat-bubble-other: #f0e8db;
+  --overlay: rgba(0,0,0,0.4);
 }
 
 .dark {
-  --bg-color: #1e1e1e;
-  --text-color: #e0d6c8;
+  --bg: #1e1e1e;
+  --text: #e0d6c8;
   --card-bg: #2c2c2c;
   --cell-bg: #3a3a3a;
+  --border: #444;
+  --btn-bg: #5a4a3a;
+  --btn-text: #e0d6c8;
+  --secondary-text: #a09080;
+  --modal-bg: #2c2c2c;
+  --chat-bg: #2c2c2c;
+  --chat-bubble-mine: #5a4a3a;
+  --chat-bubble-other: #3a3a3a;
+  --overlay: rgba(0,0,0,0.7);
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
   transition: background-color 0.3s, color 0.3s;
 }

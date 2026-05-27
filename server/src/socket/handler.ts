@@ -56,6 +56,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     nickBlack: game.nickBlack,
     myNick: playerSocketId === game.hostSocketId ? game.nickRed : (playerSocketId === game.guestSocketId ? game.nickBlack : ''),
     messages: chatMessages.get(roomId) || [],
+    hostSkin: game.hostSkin,
   };
 }
 
@@ -66,8 +67,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     logger.info('User connected: ' + socket.id);
 
     // Создание комнаты
-    socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string }, callback) => {
-      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${data.nick}`);
+    socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string; skin?: string }, callback) => {
+      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${data.nick}, skin: ${data.skin}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
@@ -78,6 +79,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       game.nickBlack = 'Чёрные';
       game.hostPlayerId = data.playerId;
       game.guestPlayerId = '';
+      game.hostSkin = data.skin || 'sakura';
 
       const hostToken = generatePlayerToken();
       game.hostToken = hostToken;
@@ -221,8 +223,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Продолжение серии
+    // Продолжение серии (ещё одна игра)
     socket.on('restart_round', (roomId: string, callback) => {
+      logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
       const started = game.voteRestart(socket.id);
@@ -236,6 +239,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Полный сброс комнаты
     socket.on('reset_room', (roomId: string, callback) => {
+      logger.info(`reset_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
       const success = game.voteReset(socket.id);
@@ -249,6 +253,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Сдаться
     socket.on('forfeit', (roomId: string, callback) => {
+      logger.info(`forfeit from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
       if (game.status !== 'playing') return callback({ error: 'Игра не активна' });
@@ -276,12 +281,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Явный выход
     socket.on('leave_room', (roomId: string) => {
+      logger.info(`leave_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
       if (!game) return;
       const isRed = game.players.red === socket.id;
       const isBlack = game.players.black === socket.id;
       if (!isRed && !isBlack) return;
-      logger.info(`Player ${socket.id} left room ${roomId}`);
       if (isRed) game.players.red = undefined;
       else game.players.black = undefined;
 
@@ -357,11 +362,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
-        // Очищаем мёртвые сокеты при просмотре
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем только комнаты, где есть свободный слот
         if (!game.players.red || !game.players.black) {
           rooms.push({
             roomId,

@@ -10,14 +10,17 @@ export class Game {
   public players: { red?: string; black?: string };
   public hostSocketId: string | null = null;
   public guestSocketId: string | null = null;
+
+  public hostToken: string | null = null;
+  public guestToken: string | null = null;
+
   public nickRed: string = 'Красные';
   public nickBlack: string = 'Чёрные';
+
   public hostPlayerId: string = '';
   public guestPlayerId: string = '';
 
-  // Токены для переподключения
-  public hostToken: string | null = null;
-  public guestToken: string | null = null;
+  public hostSkin: string = 'sakura'; // новое поле
 
   public maxWins: number;
   public scores: { host: number; guest: number };
@@ -25,16 +28,13 @@ export class Game {
   public seriesWinner: 'host' | 'guest' | null;
   private restartVotes: Set<string>;
 
-  // Голоса за полный сброс комнаты
   public resetVotes: Set<string> = new Set();
 
-  // Таймер хода
   public turnStartedAt: number = Date.now();
   public turnDuration: number = 30_000;
   private turnTimer: NodeJS.Timeout | null = null;
   private onTimerExpired: (() => void) | null = null;
 
-  // Последний сделанный ход (для анимации)
   public lastMove: { row: number; col: number } | null = null;
 
   constructor(maxWins = 1, turnDuration = 30_000) {
@@ -87,7 +87,6 @@ export class Game {
     return true;
   }
 
-  // Пропуск хода (по таймеру)
   skipTurn() {
     if (this.status !== 'playing') return;
     const opponent = this.currentPlayer === 'red' ? 'black' : 'red';
@@ -143,7 +142,6 @@ export class Game {
     return true;
   }
 
-  // Меняем private на public, чтобы вызывать извне при сдаче или авто-завершении
   public handleGameOver() {
     this.clearTurnTimer();
     this.status = 'finished';
@@ -171,7 +169,6 @@ export class Game {
     }
   }
 
-  // Продолжение серии (ещё одна игра)
   voteRestart(socketId: string): boolean {
     if (!this.roundFinished || this.seriesWinner) return false;
     if (socketId !== this.players.red && socketId !== this.players.black) return false;
@@ -183,7 +180,6 @@ export class Game {
     return false;
   }
 
-  // Полный сброс комнаты (новая игра с теми же игроками)
   voteReset(socketId: string): boolean {
     if (this.status !== 'finished' && !this.roundFinished && !this.seriesWinner) return false;
     if (socketId !== this.hostSocketId && socketId !== this.guestSocketId) return false;
@@ -202,6 +198,9 @@ export class Game {
     const guestSocket = this.guestSocketId;
     const hostToken = this.hostToken;
     const guestToken = this.guestToken;
+    const nickRed = this.nickRed;
+    const nickBlack = this.nickBlack;
+    const hostSkin = this.hostSkin;
 
     this.board = initBoard();
     this.currentPlayer = 'red';
@@ -214,6 +213,9 @@ export class Game {
     this.guestSocketId = guestSocket;
     this.hostToken = hostToken;
     this.guestToken = guestToken;
+    this.nickRed = nickRed;
+    this.nickBlack = nickBlack;
+    this.hostSkin = hostSkin;
     this.maxWins = maxWins;
     this.turnDuration = turnDuration;
     this.scores = { host: 0, guest: 0 };

@@ -27,8 +27,9 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               onClick={() => setSkin(s.value)}
               style={{
                 ...styles.skinBtn,
-                backgroundColor: skin === s.value ? '#3e362e' : 'transparent',
-                color: skin === s.value ? '#fff' : '#3e362e',
+                backgroundColor: skin === s.value ? 'var(--btn-bg)' : 'transparent',
+                color: skin === s.value ? 'var(--btn-text)' : 'var(--text)',
+                borderColor: 'var(--btn-bg)',
               }}
             >
               {s.label}
@@ -49,7 +50,7 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '20px',
     fontWeight: 400,
-    color: '#3e362e',
+    color: 'var(--text)',
     margin: '0 0 20px',
     fontFamily: '"Cormorant Garamond", serif',
   },
@@ -58,7 +59,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   label: {
     fontSize: '14px',
-    color: '#3e362e',
+    color: 'var(--text)',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -72,7 +73,7 @@ const styles: Record<string, React.CSSProperties> = {
   skinBtn: {
     padding: '8px 16px',
     borderRadius: '20px',
-    border: '1px solid #3e362e',
+    border: '1px solid',
     cursor: 'pointer',
     fontWeight: 500,
     fontSize: '13px',
@@ -84,8 +85,8 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 24px',
     borderRadius: '20px',
     border: 'none',
-    backgroundColor: '#3e362e',
-    color: '#fff',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     fontWeight: 500,
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',

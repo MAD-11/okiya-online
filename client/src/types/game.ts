@@ -33,6 +33,7 @@ export interface GameState {
   nickBlack: string;
   myNick: string;
   messages: { sender: string; text: string; timestamp: number }[];
+  hostSkin: string;
 }
 
 export type ValidMoves = boolean[][];
