@@ -7,7 +7,9 @@ import LastPickedTile from './LastPickedTile';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
 import Chat from './Chat';
 import Profile from './Profile';
-import RoomList from './RoomList'; // новый импорт
+import RoomList from './RoomList';
+import Settings from './Settings';
+import { useTheme } from '../contexts/ThemeContext';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -33,10 +35,12 @@ const Game: React.FC = () => {
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showRoomList, setShowRoomList] = useState(false); // новое состояние
+  const [showRoomList, setShowRoomList] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
+  const { skin } = useTheme();
 
   const ensureNick = (): string => {
     if (nick) return nick;
@@ -120,7 +124,6 @@ const Game: React.FC = () => {
     });
   };
 
-  // ... (validMoves, handleCellClick и другие функции без изменений)
   const validMoves: ValidMoves = useMemo(() => {
     if (!gameState || gameState.status !== 'playing' || gameState.myColor !== gameState.currentPlayer) {
       return Array(4).fill(null).map(() => Array(4).fill(false));
@@ -285,16 +288,15 @@ const Game: React.FC = () => {
           <button onClick={() => joinRoom()} style={styles.secondaryBtn}>
             Войти по коду
           </button>
-          {/* Новая кнопка "Открытые комнаты" */}
           <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>
             Открытые комнаты
           </button>
-          <div style={{ marginTop: 32 }}>
+          <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
             <button onClick={() => setShowProfile(true)} style={styles.textBtn}>👤 Профиль</button>
+            <button onClick={() => setShowSettings(true)} style={styles.textBtn}>⚙️ Настройки</button>
           </div>
           {message && <p style={{ color: '#c0392b', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
-        {/* Модальное окно профиля */}
         {showProfile && (
           <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
@@ -302,7 +304,6 @@ const Game: React.FC = () => {
             </div>
           </div>
         )}
-        {/* Модальное окно списка комнат */}
         {showRoomList && (
           <div style={styles.modalOverlay} onClick={() => setShowRoomList(false)}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
@@ -311,6 +312,13 @@ const Game: React.FC = () => {
                 socket={socket}
                 onClose={() => setShowRoomList(false)}
               />
+            </div>
+          </div>
+        )}
+        {showSettings && (
+          <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <Settings onClose={() => setShowSettings(false)} />
             </div>
           </div>
         )}
@@ -382,6 +390,7 @@ const Game: React.FC = () => {
               currentPlayer={gameState.currentPlayer}
               myColor={gameState.myColor}
               lastMove={gameState.lastMove}
+              skin={skin}
             />
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
@@ -410,9 +419,20 @@ const Game: React.FC = () => {
                 Сдаться
               </button>
             )}
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, background: '#5e503a' }}>
+              Настройки
+            </button>
           </div>
         </div>
       </div>
+      {/* Модальное окно настроек (во время игры) */}
+      {showSettings && (
+        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <Settings onClose={() => setShowSettings(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -619,7 +639,6 @@ const styles: Record<string, React.CSSProperties> = {
   modal: {
     background: '#fff',
     borderRadius: '24px',
-    padding: '0', // чтобы RoomList сам управлял отступами
     maxWidth: '440px',
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',

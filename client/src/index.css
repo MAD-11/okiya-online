@@ -1,0 +1,19 @@
+:root {
+  --bg-color: #f7f3eb;
+  --text-color: #3e362e;
+  --card-bg: #ffffff;
+  --cell-bg: #fdfaf5;
+}
+
+.dark {
+  --bg-color: #1e1e1e;
+  --text-color: #e0d6c8;
+  --card-bg: #2c2c2c;
+  --cell-bg: #3a3a3a;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}

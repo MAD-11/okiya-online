@@ -8,9 +8,16 @@ interface BoardProps {
   currentPlayer: string;
   myColor: string | null;
   lastMove: { row: number; col: number } | null;
+  skin: string; // новый пропс
 }
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove }) => {
+const skinEmoji: Record<string, { red: string; black: string }> = {
+  sakura: { red: '🌸', black: '⚫' },
+  bird: { red: '🐦', black: '⚫' },
+  maple: { red: '🍁', black: '⚫' },
+};
+
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, skin }) => {
   const cellSize = 88;
   const fontSize = 32;
 
@@ -42,8 +49,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove }) =
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && <span style={styles.stone}>🌸</span>}
-                {cell === 'black' && <span style={styles.stone}>⚫</span>}
+                {cell === 'red' && <span style={styles.stone}>{skinEmoji[skin]?.red || '🌸'}</span>}
+                {cell === 'black' && <span style={styles.stone}>{skinEmoji[skin]?.black || '⚫'}</span>}
               </div>
             );
           })
