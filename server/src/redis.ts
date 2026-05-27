@@ -8,7 +8,7 @@ export const subClient = pubClient.duplicate();
 const dataClient = new Redis(redisUrl);
 
 const GAME_PREFIX = 'okiya:game:';
-const GAME_TTL = 3600; // 1 час (в секундах)
+const GAME_TTL = 3600; // 1 час
 
 function serializeGame(game: Game): string {
   return JSON.stringify({
@@ -22,6 +22,10 @@ function serializeGame(game: Game): string {
     guestSocketId: game.guestSocketId,
     hostToken: game.hostToken,
     guestToken: game.guestToken,
+    nickRed: game.nickRed,
+    nickBlack: game.nickBlack,
+    hostPlayerId: game.hostPlayerId,
+    guestPlayerId: game.guestPlayerId,
     maxWins: game.maxWins,
     scores: game.scores,
     roundFinished: game.roundFinished,
@@ -45,6 +49,10 @@ function deserializeGame(data: string): Game {
   game.guestSocketId = obj.guestSocketId;
   game.hostToken = obj.hostToken;
   game.guestToken = obj.guestToken;
+  game.nickRed = obj.nickRed || 'Красные';
+  game.nickBlack = obj.nickBlack || 'Чёрные';
+  game.hostPlayerId = obj.hostPlayerId || '';
+  game.guestPlayerId = obj.guestPlayerId || '';
   game.scores = obj.scores;
   game.roundFinished = obj.roundFinished;
   game.seriesWinner = obj.seriesWinner;
@@ -57,7 +65,6 @@ function deserializeGame(data: string): Game {
 export async function saveGame(roomId: string, game: Game): Promise<void> {
   const key = GAME_PREFIX + roomId;
   await dataClient.set(key, serializeGame(game));
-  // Продлеваем TTL каждый раз при сохранении
   await dataClient.expire(key, GAME_TTL);
 }
 
