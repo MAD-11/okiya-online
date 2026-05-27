@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Game } from '../game/Game';
 import { saveGame, deleteGame } from '../redis';
+import { logger } from '../logger';
 import crypto from 'crypto';
 
 let games: Map<string, Game>;
@@ -55,7 +56,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
 
   io.on('connection', (socket: Socket) => {
-    console.log('User connected:', socket.id);
+    logger.info('User connected:', socket.id);
 
     // Создание комнаты
     socket.on('create_room', (maxWins: number, callback) => {
@@ -81,7 +82,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       games.set(roomId, game);
       socket.join(roomId);
       saveGame(roomId, game);
-      console.log(`Room ${roomId} created by host ${socket.id}`);
+      logger.info(`Room ${roomId} created by host ${socket.id}`);
 
       callback({
         roomId,
@@ -99,12 +100,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
       // Проверяем, жив ли старый сокет в слоте red
       if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
-        console.log(`Cleaning up dead red socket ${game.players.red} in room ${roomId}`);
+        logger.info(`Cleaning up dead red socket ${game.players.red} in room ${roomId}`);
         game.players.red = undefined;
       }
       // Проверяем, жив ли старый сокет в слоте black
       if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
-        console.log(`Cleaning up dead black socket ${game.players.black} in room ${roomId}`);
+        logger.info(`Cleaning up dead black socket ${game.players.black} in room ${roomId}`);
         game.players.black = undefined;
       }
 
@@ -137,7 +138,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
 
       socket.join(roomId);
-      console.log(`Player ${socket.id} joined room ${roomId} as ${role}`);
+      logger.info(`Player ${socket.id} joined room ${roomId} as ${role}`);
 
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({
@@ -171,7 +172,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
 
       socket.join(roomId);
-      console.log(`Player ${socket.id} reconnected to room ${roomId} as ${role}`);
+      logger.info(`Player ${socket.id} reconnected to room ${roomId} as ${role}`);
 
       const timerKey = `${roomId}_${socket.id}`;
       if (disconnectTimers.has(timerKey)) {
@@ -193,7 +194,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const isBlack = game.players.black === socket.id;
       if (!isRed && !isBlack) return;
 
-      console.log(`Player ${socket.id} left room ${roomId}`);
+      logger.info(`Player ${socket.id} left room ${roomId}`);
       if (isRed) {
         game.players.red = undefined;
       } else {
@@ -204,7 +205,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (!game.players.red && !game.players.black) {
         games.delete(roomId);
         deleteGame(roomId);
-        console.log(`Room ${roomId} deleted (both players left)`);
+        logger.info(`Room ${roomId} deleted (both players left)`);
       } else {
         // Уведомляем оставшегося соперника
         sendPersonalGameState(io, game);
@@ -219,7 +220,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const success = game.makeMove(row, col, socket.id);
       if (!success) return callback({ error: 'Недопустимый ход' });
 
-      console.log(`Move in room ${roomId}: (${row}, ${col})`);
+      logger.info(`Move in room ${roomId}: (${row}, ${col})`);
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
 
@@ -240,7 +241,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (started) {
         saveGame(roomId, game);
         sendPersonalGameState(io, game);
-        console.log(`New round started in room ${roomId}`);
+        logger.info(`New round started in room ${roomId}`);
       }
       callback({ success: true });
     });
@@ -253,7 +254,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (success) {
         saveGame(roomId, game);
         sendPersonalGameState(io, game);
-        console.log(`Room ${roomId} fully reset`);
+        logger.info(`Room ${roomId} fully reset`);
       }
       callback({ success: true });
     });
@@ -271,7 +272,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
       sendPersonalGameOver(io, game);
-      console.log(`Player ${socket.id} forfeited in room ${roomId}`);
+      logger.info(`Player ${socket.id} forfeited in room ${roomId}`);
       if (game.seriesWinner || game.maxWins === 1) {
         deleteGame(roomId);
       }
@@ -280,7 +281,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Отключение сокета
     socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+      logger.info('User disconnected:', socket.id);
       for (const [roomId, game] of games.entries()) {
         if (game.players.red === socket.id || game.players.black === socket.id) {
           // Уведомляем оставшегося игрока, что соперник не в сети
@@ -297,7 +298,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                 saveGame(roomId, currentGame);
                 sendPersonalGameState(io, currentGame);
                 sendPersonalGameOver(io, currentGame);
-                console.log(`Room ${roomId}: auto-forfeit after timeout`);
+                logger.info(`Room ${roomId}: auto-forfeit after timeout`);
                 if (currentGame.seriesWinner || currentGame.maxWins === 1) {
                   deleteGame(roomId);
                 }

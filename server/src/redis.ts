@@ -8,6 +8,7 @@ export const subClient = pubClient.duplicate();
 const dataClient = new Redis(redisUrl);
 
 const GAME_PREFIX = 'okiya:game:';
+const GAME_TTL = 3600; // 1 час (в секундах)
 
 function serializeGame(game: Game): string {
   return JSON.stringify({
@@ -56,6 +57,8 @@ function deserializeGame(data: string): Game {
 export async function saveGame(roomId: string, game: Game): Promise<void> {
   const key = GAME_PREFIX + roomId;
   await dataClient.set(key, serializeGame(game));
+  // Продлеваем TTL каждый раз при сохранении
+  await dataClient.expire(key, GAME_TTL);
 }
 
 export async function loadGame(roomId: string): Promise<Game | null> {
