@@ -22,7 +22,6 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
 
   let opponentConnected = false;
   if (io && playerSocketId) {
-    // Определяем соперника по players, а не по hostSocketId/guestSocketId
     const isRed = game.players.red === playerSocketId;
     const opponentId = isRed ? game.players.black : game.players.red;
     if (opponentId) {
@@ -56,10 +55,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
 
   io.on('connection', (socket: Socket) => {
-    logger.info('User connected: ' + socket.id);
+    logger.info(`User connected: ${socket.id}`);
 
-    // Создание комнаты
     socket.on('create_room', (data: { maxWins: number }, callback) => {
+      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
@@ -72,6 +71,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       game.guestToken = null;
 
       game.setOnTimerExpired(() => {
+        logger.info(`Timer expired in room ${roomId}`);
         game.skipTurn();
         sendPersonalGameState(io, game);
         if (game.winner) {
@@ -92,19 +92,28 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       });
     });
 
-    // Присоединение к комнате
     socket.on('join_room', (data: { roomId: string }, callback) => {
+      logger.info(`join_room from ${socket.id} for room ${data.roomId}`);
       const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Комната не найдена' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found`);
+        return callback({ error: 'Комната не найдена' });
+      }
 
-      // Чистим мёртвые сокеты
-      if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
-      if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
+        logger.info(`Cleaning dead red socket ${game.players.red}`);
+        game.players.red = undefined;
+      }
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
+        logger.info(`Cleaning dead black socket ${game.players.black}`);
+        game.players.black = undefined;
+      }
 
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
       if (!canJoinAsRed && !canJoinAsBlack) {
+        logger.warn(`Room ${roomId} full`);
         return callback({ error: 'Комната полна' });
       }
 
@@ -134,21 +143,28 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
-      // Отправляем состояние обоим игрокам, чтобы у хоста обновился статус соперника
+
       if (game.players.red && game.players.black) {
+        logger.info(`Sending game_state to both in room ${roomId}`);
         sendPersonalGameState(io, game);
       }
     });
 
-    // Переподключение
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
+      logger.info(`reconnect_room from ${socket.id} to ${roomId}`);
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Комната не найдена' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for reconnect`);
+        return callback({ error: 'Комната не найдена' });
+      }
 
       let role: 'host' | 'guest' | null = null;
       if (game.hostToken === playerToken) role = 'host';
       else if (game.guestToken === playerToken) role = 'guest';
-      if (!role) return callback({ error: 'Неверный токен' });
+      if (!role) {
+        logger.warn(`Invalid token ${playerToken} for room ${roomId}`);
+        return callback({ error: 'Неверный токен' });
+      }
 
       if (role === 'host') {
         game.players.red = socket.id;
@@ -172,14 +188,19 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Ход
     socket.on('move', (roomId: string, row: number, col: number, callback) => {
+      logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for move`);
+        return callback({ error: 'Игра не найдена' });
+      }
       const success = game.makeMove(row, col, socket.id);
-      if (!success) return callback({ error: 'Недопустимый ход' });
+      if (!success) {
+        logger.warn(`Invalid move by ${socket.id}`);
+        return callback({ error: 'Недопустимый ход' });
+      }
 
-      logger.info(`Move in room ${roomId}: (${row}, ${col})`);
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
 
@@ -192,23 +213,29 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Продолжение серии (ещё одна игра)
     socket.on('restart_round', (roomId: string, callback) => {
+      logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for restart`);
+        return callback({ error: 'Игра не найдена' });
+      }
       const started = game.voteRestart(socket.id);
       if (started) {
         saveGame(roomId, game);
         sendPersonalGameState(io, game);
-        logger.info(`New round started in room ${roomId}`);
+        logger.info(`New round in ${roomId}`);
       }
       callback({ success: true });
     });
 
-    // Полный сброс комнаты
     socket.on('reset_room', (roomId: string, callback) => {
+      logger.info(`reset_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for reset`);
+        return callback({ error: 'Игра не найдена' });
+      }
       const success = game.voteReset(socket.id);
       if (success) {
         saveGame(roomId, game);
@@ -218,11 +245,17 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Сдаться
     socket.on('forfeit', (roomId: string, callback) => {
+      logger.info(`forfeit from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
-      if (game.status !== 'playing') return callback({ error: 'Игра не активна' });
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for forfeit`);
+        return callback({ error: 'Игра не найдена' });
+      }
+      if (game.status !== 'playing') {
+        logger.warn(`Game not active in ${roomId}`);
+        return callback({ error: 'Игра не активна' });
+      }
 
       const playerColor = game.players.red === socket.id ? 'red' : 'black';
       const opponent = playerColor === 'red' ? 'black' : 'red';
@@ -231,38 +264,41 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
       sendPersonalGameOver(io, game);
-      logger.info(`Player ${socket.id} forfeited in room ${roomId}`);
+      logger.info(`Player ${socket.id} forfeited, winner: ${opponent}`);
       if (game.seriesWinner || game.maxWins === 1) {
         deleteGame(roomId);
       }
       callback({ success: true });
     });
 
-    // Явный выход
     socket.on('leave_room', (roomId: string) => {
+      logger.info(`leave_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) return;
+      if (!game) {
+        logger.warn(`Room ${roomId} not found for leave`);
+        return;
+      }
       const isRed = game.players.red === socket.id;
       const isBlack = game.players.black === socket.id;
-      if (!isRed && !isBlack) return;
-      logger.info(`Player ${socket.id} left room ${roomId}`);
-      if (isRed) {
-        game.players.red = undefined;
-      } else {
-        game.players.black = undefined;
+      if (!isRed && !isBlack) {
+        logger.warn(`Socket ${socket.id} not in room ${roomId}`);
+        return;
       }
+      if (isRed) game.players.red = undefined;
+      else game.players.black = undefined;
+
       if (!game.players.red && !game.players.black) {
         games.delete(roomId);
         deleteGame(roomId);
+        logger.info(`Room ${roomId} deleted (empty)`);
       } else {
         sendPersonalGameState(io, game);
         saveGame(roomId, game);
       }
     });
 
-    // Отключение
     socket.on('disconnect', () => {
-      logger.info('User disconnected: ' + socket.id);
+      logger.info(`User disconnected: ${socket.id}`);
       for (const [roomId, game] of games.entries()) {
         if (game.players.red === socket.id || game.players.black === socket.id) {
           sendPersonalGameState(io, game);
@@ -277,7 +313,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                 saveGame(roomId, currentGame);
                 sendPersonalGameState(io, currentGame);
                 sendPersonalGameOver(io, currentGame);
-                logger.info(`Room ${roomId}: auto-forfeit after timeout`);
+                logger.info(`Room ${roomId}: auto-forfeit, winner: ${winner}`);
                 if (currentGame.seriesWinner || currentGame.maxWins === 1) {
                   deleteGame(roomId);
                 }
@@ -290,6 +326,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         }
       }
     });
+
+    socket.on('error', (err) => {
+      logger.error(`Socket error from ${socket.id}: ${err.message}`);
+    });
   });
 }
 
@@ -298,11 +338,17 @@ function sendPersonalGameState(io: Server, game: Game) {
   const blackId = game.players.black;
   if (redId) {
     const redSocket = io.sockets.sockets.get(redId);
-    if (redSocket) redSocket.emit('game_state', getClientGameState(game, redId, io));
+    if (redSocket) {
+      logger.info(`Sending game_state to red ${redId}`);
+      redSocket.emit('game_state', getClientGameState(game, redId, io));
+    }
   }
   if (blackId) {
     const blackSocket = io.sockets.sockets.get(blackId);
-    if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, blackId, io));
+    if (blackSocket) {
+      logger.info(`Sending game_state to black ${blackId}`);
+      blackSocket.emit('game_state', getClientGameState(game, blackId, io));
+    }
   }
 }
 
