@@ -115,14 +115,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return callback({ error: 'Комната не найдена' });
       }
 
-      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
-        logger.info(`Cleaning dead red socket ${game.players.red}`);
-        game.players.red = undefined;
-      }
-      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
-        logger.info(`Cleaning dead black socket ${game.players.black}`);
-        game.players.black = undefined;
-      }
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
@@ -171,18 +165,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
       logger.info(`reconnect_room from ${socket.id} to ${roomId}`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for reconnect`);
-        return callback({ error: 'Комната не найдена' });
-      }
+      if (!game) return callback({ error: 'Комната не найдена' });
 
       let role: 'host' | 'guest' | null = null;
       if (game.hostToken === playerToken) role = 'host';
       else if (game.guestToken === playerToken) role = 'guest';
-      if (!role) {
-        logger.warn(`Invalid token ${playerToken} for room ${roomId}`);
-        return callback({ error: 'Неверный токен' });
-      }
+      if (!role) return callback({ error: 'Неверный токен' });
 
       if (role === 'host') {
         game.players.red = socket.id;
@@ -210,15 +198,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('move', (roomId: string, row: number, col: number, callback) => {
       logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for move`);
-        return callback({ error: 'Игра не найдена' });
-      }
+      if (!game) return callback({ error: 'Игра не найдена' });
       const success = game.makeMove(row, col, socket.id);
-      if (!success) {
-        logger.warn(`Invalid move by ${socket.id}`);
-        return callback({ error: 'Недопустимый ход' });
-      }
+      if (!success) return callback({ error: 'Недопустимый ход' });
 
       saveGame(roomId, game);
       sendPersonalGameState(io, game);
@@ -239,14 +221,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Продолжение серии (ещё одна игра)
+    // Продолжение серии
     socket.on('restart_round', (roomId: string, callback) => {
-      logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for restart`);
-        return callback({ error: 'Игра не найдена' });
-      }
+      if (!game) return callback({ error: 'Игра не найдена' });
       const started = game.voteRestart(socket.id);
       if (started) {
         saveGame(roomId, game);
@@ -258,12 +236,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Полный сброс комнаты
     socket.on('reset_room', (roomId: string, callback) => {
-      logger.info(`reset_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for reset`);
-        return callback({ error: 'Игра не найдена' });
-      }
+      if (!game) return callback({ error: 'Игра не найдена' });
       const success = game.voteReset(socket.id);
       if (success) {
         saveGame(roomId, game);
@@ -275,16 +249,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Сдаться
     socket.on('forfeit', (roomId: string, callback) => {
-      logger.info(`forfeit from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for forfeit`);
-        return callback({ error: 'Игра не найдена' });
-      }
-      if (game.status !== 'playing') {
-        logger.warn(`Game not active in ${roomId}`);
-        return callback({ error: 'Игра не активна' });
-      }
+      if (!game) return callback({ error: 'Игра не найдена' });
+      if (game.status !== 'playing') return callback({ error: 'Игра не активна' });
 
       const playerColor = game.players.red === socket.id ? 'red' : 'black';
       const opponent = playerColor === 'red' ? 'black' : 'red';
@@ -309,18 +276,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Явный выход
     socket.on('leave_room', (roomId: string) => {
-      logger.info(`leave_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
-      if (!game) {
-        logger.warn(`Room ${roomId} not found for leave`);
-        return;
-      }
+      if (!game) return;
       const isRed = game.players.red === socket.id;
       const isBlack = game.players.black === socket.id;
-      if (!isRed && !isBlack) {
-        logger.warn(`Socket ${socket.id} not in room ${roomId}`);
-        return;
-      }
+      if (!isRed && !isBlack) return;
+      logger.info(`Player ${socket.id} left room ${roomId}`);
       if (isRed) game.players.red = undefined;
       else game.players.black = undefined;
 
@@ -373,10 +334,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Чат
-        socket.on('chat_message', (roomId: string, text: string) => {
+    socket.on('chat_message', (roomId: string, text: string) => {
       const game = games.get(roomId);
       if (!game) return;
-      // Определяем ник по socket.id, а не по players.red/black
       let sender = 'Игрок';
       if (socket.id === game.hostSocketId) {
         sender = game.nickRed;
@@ -391,6 +351,29 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
       }
       sendPersonalGameState(io, game);
+    });
+
+    // Список открытых комнат
+    socket.on('list_rooms', (callback) => {
+      const rooms: any[] = [];
+      for (const [roomId, game] of games.entries()) {
+        // Очищаем мёртвые сокеты при просмотре
+        if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
+        if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
+
+        // Показываем только комнаты, где есть свободный слот
+        if (!game.players.red || !game.players.black) {
+          rooms.push({
+            roomId,
+            players: `${game.players.red ? 1 : 0}/2`,
+            status: game.status,
+            nickRed: game.nickRed || '???',
+            nickBlack: game.nickBlack || '???',
+          });
+        }
+      }
+      logger.info(`Returning ${rooms.length} public rooms`);
+      callback(rooms);
     });
 
     // Профиль
