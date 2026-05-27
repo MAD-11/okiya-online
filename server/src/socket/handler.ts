@@ -7,6 +7,7 @@ import crypto from 'crypto';
 
 let games: Map<string, Game>;
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+const chatMessages: Map<string, { sender: string; text: string; timestamp: number }[]> = new Map();
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -30,6 +31,8 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     }
   }
 
+  const roomId = [...games.entries()].find(([, g]) => g === game)?.[0] || '';
+
   return {
     board: game.board,
     currentPlayer: game.currentPlayer,
@@ -52,6 +55,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     nickRed: game.nickRed,
     nickBlack: game.nickBlack,
     myNick: playerSocketId === game.hostSocketId ? game.nickRed : (playerSocketId === game.guestSocketId ? game.nickBlack : ''),
+    messages: chatMessages.get(roomId) || [],
   };
 }
 
@@ -73,7 +77,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       game.nickRed = data.nick || 'Красные';
       game.nickBlack = 'Чёрные';
       game.hostPlayerId = data.playerId;
-      game.guestPlayerId = ''; // будет заполнен при входе гостя
+      game.guestPlayerId = '';
 
       const hostToken = generatePlayerToken();
       game.hostToken = hostToken;
@@ -111,9 +115,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return callback({ error: 'Комната не найдена' });
       }
 
-      // Чистим мёртвые сокеты
-      if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
-      if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
+        logger.info(`Cleaning dead red socket ${game.players.red}`);
+        game.players.red = undefined;
+      }
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
+        logger.info(`Cleaning dead black socket ${game.players.black}`);
+        game.players.black = undefined;
+      }
 
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
@@ -217,7 +226,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (game.winner) {
         sendPersonalGameOver(io, game);
         if (game.seriesWinner || game.maxWins === 1) {
-          // Сохраняем статистику
           saveGameResult({
             roomId,
             winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
@@ -287,7 +295,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       sendPersonalGameOver(io, game);
       logger.info(`Player ${socket.id} forfeited, winner: ${opponent}`);
       if (game.seriesWinner || game.maxWins === 1) {
-        // Сохраняем статистику
         saveGameResult({
           roomId,
           winner: game.seriesWinner || (game.winner === 'red' ? 'host' : 'guest'),
@@ -346,7 +353,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                 sendPersonalGameOver(io, currentGame);
                 logger.info(`Room ${roomId}: auto-forfeit, winner: ${winner}`);
                 if (currentGame.seriesWinner || currentGame.maxWins === 1) {
-                  // Сохраняем статистику
                   saveGameResult({
                     roomId,
                     winner: currentGame.seriesWinner || (currentGame.winner === 'red' ? 'host' : 'guest'),
@@ -364,6 +370,21 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           break;
         }
       }
+    });
+
+    // Чат
+    socket.on('chat_message', (roomId: string, text: string) => {
+      const game = games.get(roomId);
+      if (!game) return;
+      const sender = game.players.red === socket.id ? game.nickRed : game.nickBlack;
+      if (!chatMessages.has(roomId)) {
+        chatMessages.set(roomId, []);
+      }
+      chatMessages.get(roomId)!.push({ sender, text, timestamp: Date.now() });
+      if (chatMessages.get(roomId)!.length > 50) {
+        chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
+      }
+      sendPersonalGameState(io, game);
     });
 
     // Профиль

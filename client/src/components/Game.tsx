@@ -5,11 +5,11 @@ import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import Chat from './Chat';
 import Profile from './Profile';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
-// Генерация или загрузка playerId
 function getOrCreatePlayerId(): string {
   let id = localStorage.getItem('okiya_playerId');
   if (!id) {
@@ -19,7 +19,6 @@ function getOrCreatePlayerId(): string {
   return id;
 }
 
-// Загрузка ника
 function getSavedNick(): string | null {
   return localStorage.getItem('okiya_nick');
 }
@@ -185,6 +184,12 @@ const Game: React.FC = () => {
     }
   };
 
+  const handleChatSend = (text: string) => {
+    if (socket && roomId) {
+      socket.emit('chat_message', roomId, text);
+    }
+  };
+
   useEffect(() => {
     if (!socket) return;
 
@@ -276,10 +281,7 @@ const Game: React.FC = () => {
             Присоединиться по коду
           </button>
           <div style={styles.bottomButtons}>
-            <button onClick={() => {
-              console.log('[Game] opening profile, playerId:', playerId, 'socket connected:', socket?.connected);
-              setShowProfile(true);
-            }} style={styles.iconBtn}>👤 Профиль</button>
+            <button onClick={() => setShowProfile(true)} style={styles.iconBtn}>👤 Профиль</button>
           </div>
           {message && <p style={{ color: '#e74c3c', marginTop: 15 }}>{message}</p>}
         </div>
@@ -364,12 +366,21 @@ const Game: React.FC = () => {
               Сдаться
             </button>
           )}
+
+          {gameState.status === 'playing' && !isSpectator && (
+            <Chat
+              messages={gameState.messages ?? []}
+              onSend={handleChatSend}
+              myNick={gameState.myNick}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 };
 
+// Стили (оставлены те же, что в последней рабочей версии)
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
