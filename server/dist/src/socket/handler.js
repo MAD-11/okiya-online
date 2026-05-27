@@ -70,6 +70,7 @@ function setupSocket(io, loadedGames) {
             game.nickRed = data.nick || 'Красные';
             game.nickBlack = 'Чёрные';
             game.hostPlayerId = data.playerId;
+            game.guestPlayerId = ''; // будет заполнен при входе гостя
             const hostToken = generatePlayerToken();
             game.hostToken = hostToken;
             game.guestToken = null;
@@ -101,14 +102,11 @@ function setupSocket(io, loadedGames) {
                 logger_1.logger.warn(`Room ${roomId} not found`);
                 return callback({ error: 'Комната не найдена' });
             }
-            if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
-                logger_1.logger.info(`Cleaning dead red socket ${game.players.red}`);
+            // Чистим мёртвые сокеты
+            if (game.players.red && !io.sockets.sockets.has(game.players.red))
                 game.players.red = undefined;
-            }
-            if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
-                logger_1.logger.info(`Cleaning dead black socket ${game.players.black}`);
+            if (game.players.black && !io.sockets.sockets.has(game.players.black))
                 game.players.black = undefined;
-            }
             const canJoinAsRed = !game.players.red;
             const canJoinAsBlack = !game.players.black;
             if (!canJoinAsRed && !canJoinAsBlack) {
@@ -203,12 +201,20 @@ function setupSocket(io, loadedGames) {
             if (game.winner) {
                 sendPersonalGameOver(io, game);
                 if (game.seriesWinner || game.maxWins === 1) {
+                    // Сохраняем статистику
+                    (0, stats_1.saveGameResult)({
+                        roomId,
+                        winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
+                        players: { host: game.hostPlayerId, guest: game.guestPlayerId },
+                        timestamp: Date.now(),
+                        maxWins: game.maxWins,
+                    });
                     (0, redis_1.deleteGame)(roomId);
                 }
             }
             callback({ success: true });
         });
-        // Продолжение серии
+        // Продолжение серии (ещё одна игра)
         socket.on('restart_round', (roomId, callback) => {
             logger_1.logger.info(`restart_round from ${socket.id} in ${roomId}`);
             const game = games.get(roomId);
@@ -340,7 +346,6 @@ function setupSocket(io, loadedGames) {
             }
         });
         // Профиль
-        // Профиль
         socket.on('get_profile', (playerId, callback) => {
             logger_1.logger.info(`get_profile from ${socket.id} for playerId: ${playerId}`);
             if (!playerId) {
@@ -348,10 +353,7 @@ function setupSocket(io, loadedGames) {
                 return;
             }
             (0, stats_1.getPlayerStats)(playerId)
-                .then((stats) => {
-                logger_1.logger.info(`get_profile success for ${playerId}`);
-                callback(stats);
-            })
+                .then((stats) => callback(stats))
                 .catch((err) => {
                 logger_1.logger.error('get_profile error', err);
                 callback({ games: 0, wins: 0, draws: 0, history: [] });
@@ -364,17 +366,13 @@ function sendPersonalGameState(io, game) {
     const blackId = game.players.black;
     if (redId) {
         const redSocket = io.sockets.sockets.get(redId);
-        if (redSocket) {
-            logger_1.logger.info(`Sending game_state to red ${redId}`);
+        if (redSocket)
             redSocket.emit('game_state', getClientGameState(game, redId, io));
-        }
     }
     if (blackId) {
         const blackSocket = io.sockets.sockets.get(blackId);
-        if (blackSocket) {
-            logger_1.logger.info(`Sending game_state to black ${blackId}`);
+        if (blackSocket)
             blackSocket.emit('game_state', getClientGameState(game, blackId, io));
-        }
     }
 }
 function sendPersonalGameOver(io, game) {
