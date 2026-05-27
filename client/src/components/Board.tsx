@@ -10,20 +10,13 @@ interface BoardProps {
   lastMove: { row: number; col: number } | null;
 }
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer, myColor, lastMove }) => {
-  // Уменьшенный размер клеток
-  const cellSize = Math.min(
-    Math.min(window.innerWidth, window.innerHeight) * 0.11,
-    100
-  );
-  const fontSize = cellSize * 0.35;
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove }) => {
+  const cellSize = 88;
+  const fontSize = 32;
 
   return (
     <div style={styles.boardContainer}>
-      <div style={{
-        ...styles.grid,
-        gridTemplateColumns: `repeat(4, ${cellSize}px)`,
-      }}>
+      <div style={styles.grid}>
         {board.map((row, r) =>
           row.map((cell, c) => {
             const isValid = validMoves[r]?.[c];
@@ -35,28 +28,22 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer
                 onClick={() => isValid && onClick(r, c)}
                 style={{
                   ...styles.cell,
-                  ...(isValid ? styles.validMove : {}),
-                  ...(isPlayerCell ? styles.occupied : {}),
-                  backgroundColor: isPlayerCell
-                    ? cell === 'red'
-                      ? 'rgba(231, 76, 60, 0.25)'
-                      : 'rgba(44, 62, 80, 0.25)'
-                    : '#faf3e8',
-                  cursor: isValid ? 'pointer' : 'default',
-                  animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
                   width: cellSize,
                   height: cellSize,
                   fontSize: fontSize,
+                  cursor: isValid ? 'pointer' : 'default',
+                  backgroundColor: isPlayerCell
+                    ? cell === 'red' ? 'rgba(180,130,110,0.2)' : 'rgba(80,70,60,0.2)'
+                    : '#fdfaf5',
+                  border: isValid ? '2px solid #c9a96e' : '1px solid #e0d6c8',
+                  animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
                 }}
-                title={cell && typeof cell !== 'string' ? `${cell.plant} ${cell.symbol}` : ''}
               >
                 {cell && typeof cell !== 'string' && (
-                  <span style={styles.tileEmoji}>
-                    {getTileEmoji(cell.plant, cell.symbol)}
-                  </span>
+                  <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && <span style={{ ...styles.stone, fontSize }}>🌸</span>}
-                {cell === 'black' && <span style={{ ...styles.stone, fontSize }}>🐦</span>}
+                {cell === 'red' && <span style={styles.stone}>🌸</span>}
+                {cell === 'black' && <span style={styles.stone}>⚫</span>}
               </div>
             );
           })
@@ -68,55 +55,32 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, currentPlayer
 
 function getTileEmoji(plant: string, symbol: string): string {
   const map: Record<string, string> = {
-    sakura: '🌸',
-    iris: '🌺',
-    pine: '🌲',
-    maple: '🍁',
-    sun: '☀️',
-    bird: '🐦',
-    rain: '🌧️',
-    tanzaku: '📜',
+    sakura: '🌸', iris: '🌺', pine: '🌲', maple: '🍁',
+    sun: '☀️', bird: '🐦', rain: '🌧️', tanzaku: '📜',
   };
-  return `${map[plant] || plant}${map[symbol] || symbol}`;
+  return `${map[plant] || ' '}${map[symbol] || ' '}`;
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  boardContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
+  boardContainer: { display: 'flex', justifyContent: 'center' },
   grid: {
     display: 'grid',
-    gap: '3px',
-    padding: '6px',
-    background: 'rgba(0,0,0,0.05)',
-    borderRadius: '12px',
-    boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
+    gridTemplateColumns: 'repeat(4, 88px)',
+    gap: '8px',
+    padding: '16px',
+    background: '#f7f3eb',
+    borderRadius: '16px',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
   },
   cell: {
-    borderRadius: '8px',
+    borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s ease',
-    position: 'relative' as const,
-    boxSizing: 'border-box',
+    transition: 'all 0.2s',
   },
-  validMove: {
-    border: '3px solid #f1c40f',
-    boxShadow: '0 0 12px #f1c40f88',
-    animation: 'pulse 1.5s infinite',
-  },
-  occupied: {
-    backdropFilter: 'blur(2px)',
-  },
-  tileEmoji: {
-    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
-  },
-  stone: {
-    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
-  },
+  tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
+  stone: { fontSize: '34px', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.2))' },
 };
 
 export default Board;

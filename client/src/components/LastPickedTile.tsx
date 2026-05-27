@@ -6,52 +6,30 @@ interface LastPickedTileProps {
 }
 
 const tileEmojiMap: Record<string, string> = {
-  sakura: '🌸',
-  iris: '🌺',
-  pine: '🌲',
-  maple: '🍁',
-  sun: '☀️',
-  bird: '🐦',
-  rain: '🌧️',
-  tanzaku: '📜',
+  sakura: '🌸', iris: '🌺', pine: '🌲', maple: '🍁',
+  sun: '☀️', bird: '🐦', rain: '🌧️', tanzaku: '📜',
 };
 
 const LastPickedTile: React.FC<LastPickedTileProps> = ({ tile }) => {
   if (!tile) return null;
   return (
-    <div style={styles.container}>
-      <span style={styles.emoji}>
-        {tileEmojiMap[tile.plant]}{tileEmojiMap[tile.symbol]}
-      </span>
-      <span style={styles.label}>
-        {tile.plant} {tile.symbol}
-      </span>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginTop: '12px',
+      fontSize: '15px',
+      color: '#5e503a',
+      fontFamily: '"Inter", sans-serif',
+      background: 'rgba(255,255,245,0.8)',
+      padding: '6px 16px',
+      borderRadius: '20px',
+      border: '1px solid #e0d6c8',
+    }}>
+      <span style={{ fontSize: '22px' }}>{tileEmojiMap[tile.plant]}{tileEmojiMap[tile.symbol]}</span>
+      <span style={{ textTransform: 'capitalize' }}>{tile.plant} · {tile.symbol}</span>
     </div>
   );
-};
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    margin: '10px auto',
-    padding: '8px 16px',
-    background: 'rgba(255,255,255,0.6)',
-    borderRadius: '12px',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-    width: 'fit-content',
-    fontFamily: '"Segoe UI", "Noto Serif JP", serif',
-  },
-  emoji: {
-    fontSize: '28px',
-  },
-  label: {
-    fontSize: '18px',
-    color: '#4a3f35',
-    textTransform: 'capitalize',
-  },
 };
 
 export default LastPickedTile;

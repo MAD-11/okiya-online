@@ -259,7 +259,12 @@ const Game: React.FC = () => {
   }, []);
 
   if (!connected) {
-    return <div style={styles.centered}>Подключение к серверу...</div>;
+    return (
+      <div style={styles.centered}>
+        <div className="spinner" />
+        <p>Подключение к серверу...</p>
+      </div>
+    );
   }
 
   if (!gameState) {
@@ -268,22 +273,20 @@ const Game: React.FC = () => {
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && <p style={{ color: '#4a3f35', marginBottom: 20 }}>Ваш ник: <strong>{nick}</strong></p>}
+          {nick && <p style={{ color: '#4a3f35', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
-            <button onClick={() => createRoom(3)} style={styles.primaryBtn}>Серия до 3</button>
-            <button onClick={() => createRoom(5)} style={styles.primaryBtn}>Серия до 5</button>
+            <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
+            <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
           </div>
-          <div style={styles.orDivider}>
-            <span style={styles.orText}>или</span>
-          </div>
+          <div style={styles.separator} />
           <button onClick={joinRoom} style={styles.secondaryBtn}>
-            Присоединиться по коду
+            Войти по коду
           </button>
-          <div style={styles.bottomButtons}>
-            <button onClick={() => setShowProfile(true)} style={styles.iconBtn}>👤 Профиль</button>
+          <div style={{ marginTop: 32 }}>
+            <button onClick={() => setShowProfile(true)} style={styles.textBtn}>👤 Профиль</button>
           </div>
-          {message && <p style={{ color: '#e74c3c', marginTop: 15 }}>{message}</p>}
+          {message && <p style={{ color: '#c0392b', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
         {showProfile && (
           <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
@@ -301,30 +304,35 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
-      <h2 style={styles.titleSmall}>Окийя</h2>
-      {roomId && <p style={styles.roomCode}>Код комнаты: <strong>{roomId}</strong></p>}
+      <header style={styles.gameHeader}>
+        <h2 style={styles.titleSmall}>Окийя</h2>
+        {roomId && <span style={styles.roomCode}>Комната <strong>{roomId}</strong></span>}
+      </header>
       <div style={styles.statusBar}>
         <span style={{
-          width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
-          backgroundColor: gameState.opponentConnected ? '#2ecc71' : '#e74c3c'
+          width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+          backgroundColor: gameState.opponentConnected ? '#27ae60' : '#c0392b'
         }} />
-        <span style={{ fontSize: 14, marginLeft: 6 }}>
+        <span style={{ marginLeft: 6, fontSize: 13 }}>
           {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
+        </span>
+        <span style={{ marginLeft: 16, fontSize: 13 }}>
+          {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
         </span>
       </div>
 
       {gameState.maxWins > 1 && (
-        <p style={styles.score}>
-          Вы: {gameState.myScore} — Соперник: {gameState.opponentScore}
-        </p>
+        <div style={styles.score}>
+          Счёт: {gameState.myScore} — {gameState.opponentScore}
+        </div>
       )}
       {gameState.status === 'playing' && !isSpectator && (
-        <>
+        <div style={{ marginBottom: 8 }}>
           <p style={styles.turnIndicator}>
             {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
           </p>
           <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
-        </>
+        </div>
       )}
 
       <div style={styles.gameLayout}>
@@ -349,20 +357,20 @@ const Game: React.FC = () => {
                   Ещё одна игра
                 </button>
               )}
-              {waitingRestart && <p>Ожидание соперника...</p>}
+              {waitingRestart && <p style={{ fontSize: 13, color: '#7f6e5d' }}>Ожидание соперника…</p>}
             </div>
           )}
 
-          <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#e74c3c' }}>
-            Выйти в главное меню
+          <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#6b5b4f' }}>
+            Выйти в меню
           </button>
           {(gameState.status === 'finished' || gameState.seriesWinner) && (
-            <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#2ecc71' }}>
-              {waitingReset ? 'Ожидание соперника...' : 'Новая игра в этой же комнате'}
+            <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#4a6741' }}>
+              {waitingReset ? 'Ожидание…' : 'Новая игра'}
             </button>
           )}
           {gameState.status === 'playing' && !isSpectator && (
-            <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#e67e22' }}>
+            <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#b5651d' }}>
               Сдаться
             </button>
           )}
@@ -380,95 +388,90 @@ const Game: React.FC = () => {
   );
 };
 
-// Стили (оставлены те же, что в последней рабочей версии)
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
-    fontFamily: '"Segoe UI", "Noto Serif JP", serif',
+    background: '#f7f3eb',
+    fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
     padding: '20px',
   },
   lobbyCard: {
-    background: 'white',
-    borderRadius: '20px',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-    padding: '40px 30px',
-    maxWidth: '500px',
+    background: '#ffffff',
+    borderRadius: '24px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
+    padding: '48px 40px',
+    maxWidth: '440px',
     width: '100%',
     textAlign: 'center',
   },
   title: {
-    fontSize: '48px',
-    margin: '0 0 10px',
-    color: '#4a3f35',
-    fontWeight: 700,
+    fontSize: '52px',
+    margin: '0 0 8px',
+    color: '#3e362e',
+    fontWeight: 400,
+    letterSpacing: '2px',
+    fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
   },
   subtitle: {
-    fontSize: '18px',
-    color: '#7f6e5d',
-    marginBottom: '30px',
+    fontSize: '16px',
+    color: '#8b7a6b',
+    marginBottom: '32px',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    fontWeight: 300,
   },
   buttonGroup: {
     display: 'flex',
-    gap: '10px',
+    gap: '12px',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    marginBottom: '20px',
+    marginBottom: '24px',
   },
   primaryBtn: {
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 600,
+    padding: '12px 28px',
+    fontSize: '15px',
+    fontWeight: 500,
     border: 'none',
-    borderRadius: '12px',
-    backgroundColor: '#d4a373',
-    color: 'white',
+    borderRadius: '40px',
+    backgroundColor: '#3e362e',
+    color: '#fff',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(212, 163, 115, 0.4)',
-    transition: '0.2s',
-    minWidth: '100px',
+    transition: 'background-color 0.3s',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    letterSpacing: '0.5px',
+  },
+  separator: {
+    height: '1px',
+    backgroundColor: '#e0d6c8',
+    margin: '20px 0',
+    width: '60%',
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
   secondaryBtn: {
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 600,
-    border: '2px solid #d4a373',
-    borderRadius: '12px',
+    padding: '12px 28px',
+    fontSize: '15px',
+    fontWeight: 500,
+    border: '1px solid #3e362e',
+    borderRadius: '40px',
     backgroundColor: 'transparent',
-    color: '#4a3f35',
+    color: '#3e362e',
     cursor: 'pointer',
-    marginBottom: '20px',
-    width: '100%',
-    boxSizing: 'border-box',
-    transition: '0.2s',
+    transition: 'all 0.3s',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    letterSpacing: '0.5px',
   },
-  orDivider: {
-    display: 'flex',
-    alignItems: 'center',
-    margin: '20px 0',
-  },
-  orText: {
-    margin: '0 auto',
-    color: '#b0a090',
-    fontSize: '14px',
-    textTransform: 'uppercase',
-  },
-  bottomButtons: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '20px',
-  },
-  iconBtn: {
+  textBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '16px',
-    color: '#4a3f35',
+    fontSize: '14px',
+    color: '#8b7a6b',
     cursor: 'pointer',
+    fontFamily: '"Inter", sans-serif',
     textDecoration: 'underline',
-    padding: '5px',
+    textUnderlineOffset: '4px',
   },
   centered: {
     display: 'flex',
@@ -476,53 +479,64 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'center',
     height: '100vh',
-    fontSize: '20px',
-    color: '#4a3f35',
+    fontSize: '18px',
+    color: '#3e362e',
+    fontFamily: '"Inter", sans-serif',
   },
   gameContainer: {
     textAlign: 'center',
-    fontFamily: '"Segoe UI", "Noto Serif JP", serif',
-    background: 'linear-gradient(135deg, #f5efe0 0%, #e8d9c5 100%)',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    background: '#f7f3eb',
     minHeight: '100vh',
     margin: 0,
-    padding: '20px',
+    padding: '32px 20px',
+    color: '#3e362e',
+  },
+  gameHeader: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: '20px',
+    marginBottom: '16px',
   },
   titleSmall: {
-    fontSize: '32px',
-    color: '#4a3f35',
-    margin: '0 0 10px',
+    fontSize: '36px',
+    fontWeight: 400,
+    margin: 0,
+    fontFamily: '"Cormorant Garamond", serif',
+    letterSpacing: '1px',
   },
   roomCode: {
-    fontSize: '16px',
-    color: '#5d4e37',
-    margin: '0 0 10px',
+    fontSize: '14px',
+    color: '#8b7a6b',
+    fontFamily: '"Inter", sans-serif',
   },
   statusBar: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: '10px',
-    fontSize: '14px',
-    color: '#4a3f35',
+    marginBottom: '16px',
+    fontSize: '13px',
+    color: '#5e503a',
   },
   score: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#4a3f35',
-    margin: '10px 0',
+    fontSize: '16px',
+    fontWeight: 500,
+    marginBottom: '8px',
+    color: '#3e362e',
   },
   turnIndicator: {
-    fontSize: '20px',
-    margin: '5px 0',
+    fontSize: '16px',
+    marginBottom: '4px',
+    fontWeight: 500,
     color: '#b8860b',
-    fontWeight: 'bold',
   },
   gameLayout: {
     display: 'flex',
     justifyContent: 'center',
-    gap: '30px',
+    gap: '40px',
     flexWrap: 'wrap',
-    marginTop: '20px',
+    marginTop: '16px',
   },
   boardArea: {
     display: 'flex',
@@ -533,34 +547,31 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    minWidth: '220px',
-    maxWidth: '260px',
+    width: '260px',
   },
   gameOverBlock: {
-    background: 'rgba(255,255,240,0.9)',
-    borderRadius: '12px',
-    padding: '15px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    background: 'rgba(255,255,245,0.9)',
+    borderRadius: '16px',
+    padding: '16px',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
   },
   message: {
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    fontSize: '18px',
-    margin: '0 0 10px',
+    fontWeight: 500,
+    color: '#3e362e',
+    fontSize: '16px',
+    margin: '0 0 12px',
   },
   actionBtn: {
     padding: '10px 20px',
-    fontSize: '16px',
-    fontWeight: 600,
+    fontSize: '14px',
+    fontWeight: 500,
     border: 'none',
-    borderRadius: '12px',
-    backgroundColor: '#d4a373',
-    color: 'white',
+    borderRadius: '40px',
+    color: '#fff',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    transition: '0.2s',
-    width: '100%',
-    boxSizing: 'border-box',
+    transition: 'opacity 0.3s',
+    fontFamily: '"Inter", sans-serif',
+    letterSpacing: '0.3px',
   },
   modalOverlay: {
     position: 'fixed',
@@ -568,19 +579,19 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modal: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '20px',
-    maxWidth: '400px',
+    background: '#fff',
+    borderRadius: '24px',
+    padding: '32px',
+    maxWidth: '380px',
     width: '90%',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
   },
 };
 

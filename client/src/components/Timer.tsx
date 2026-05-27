@@ -6,13 +6,12 @@ interface TimerProps {
 }
 
 const Timer: React.FC<TimerProps> = ({ turnStartedAt, turnDuration }) => {
-  const [remaining, setRemaining] = useState<number>(0);
+  const [remaining, setRemaining] = useState(0);
 
   useEffect(() => {
     const update = () => {
       const elapsed = Date.now() - turnStartedAt;
-      const left = Math.max(0, turnDuration - elapsed);
-      setRemaining(left);
+      setRemaining(Math.max(0, turnDuration - elapsed));
     };
     update();
     const interval = setInterval(update, 200);
@@ -24,11 +23,10 @@ const Timer: React.FC<TimerProps> = ({ turnStartedAt, turnDuration }) => {
 
   return (
     <div style={{
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: isLow ? '#e74c3c' : '#4a3f35',
-      margin: '5px 0',
-      transition: 'color 0.3s',
+      fontSize: 20,
+      fontWeight: 500,
+      color: isLow ? '#c0392b' : '#3e362e',
+      fontFamily: '"Inter", sans-serif',
     }}>
       {seconds}s
     </div>
