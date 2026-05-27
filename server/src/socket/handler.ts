@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Game } from '../game/Game';
 import { saveGame, deleteGame } from '../redis';
+import { saveGameResult, getPlayerStats } from '../stats';
 import { logger } from '../logger';
 import crypto from 'crypto';
 
@@ -48,6 +49,9 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     turnDuration: game.turnDuration,
     lastMove: game.lastMove,
     opponentConnected,
+    nickRed: game.nickRed,
+    nickBlack: game.nickBlack,
+    myNick: playerSocketId === game.hostSocketId ? game.nickRed : (playerSocketId === game.guestSocketId ? game.nickBlack : ''),
   };
 }
 
@@ -55,16 +59,20 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
 
   io.on('connection', (socket: Socket) => {
-    logger.info(`User connected: ${socket.id}`);
+    logger.info('User connected: ' + socket.id);
 
-    socket.on('create_room', (data: { maxWins: number }, callback) => {
-      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}`);
+    // Создание комнаты
+    socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string }, callback) => {
+      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${data.nick}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
       const roomId = generateRoomCode();
       const game = new Game(maxWins);
       game.addPlayer(socket.id);
+      game.nickRed = data.nick || 'Красные';
+      game.nickBlack = 'Чёрные';
+      game.hostPlayerId = data.playerId;
 
       const hostToken = generatePlayerToken();
       game.hostToken = hostToken;
@@ -92,8 +100,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       });
     });
 
-    socket.on('join_room', (data: { roomId: string }, callback) => {
-      logger.info(`join_room from ${socket.id} for room ${data.roomId}`);
+    // Присоединение к комнате
+    socket.on('join_room', (data: { roomId: string; playerId: string; nick: string }, callback) => {
+      logger.info(`join_room from ${socket.id} for room ${data.roomId}, playerId: ${data.playerId}, nick: ${data.nick}`);
       const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
       if (!game) {
@@ -123,11 +132,15 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.players.red = socket.id;
         game.hostSocketId = socket.id;
         game.hostToken = generatePlayerToken();
+        game.nickRed = data.nick || 'Красные';
+        game.hostPlayerId = data.playerId;
       } else {
         role = 'black';
         game.players.black = socket.id;
         game.guestSocketId = socket.id;
         game.guestToken = generatePlayerToken();
+        game.nickBlack = data.nick || 'Чёрные';
+        game.guestPlayerId = data.playerId;
       }
 
       if (game.players.red && game.players.black && game.status === 'waiting') {
@@ -143,13 +156,13 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
-
       if (game.players.red && game.players.black) {
         logger.info(`Sending game_state to both in room ${roomId}`);
         sendPersonalGameState(io, game);
       }
     });
 
+    // Переподключение
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
       logger.info(`reconnect_room from ${socket.id} to ${roomId}`);
       const game = games.get(roomId);
@@ -188,6 +201,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
+    // Ход
     socket.on('move', (roomId: string, row: number, col: number, callback) => {
       logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
       const game = games.get(roomId);
@@ -213,6 +227,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
+    // Продолжение серии
     socket.on('restart_round', (roomId: string, callback) => {
       logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -229,6 +244,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
+    // Полный сброс комнаты
     socket.on('reset_room', (roomId: string, callback) => {
       logger.info(`reset_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -245,6 +261,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
+    // Сдаться
     socket.on('forfeit', (roomId: string, callback) => {
       logger.info(`forfeit from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -266,11 +283,20 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       sendPersonalGameOver(io, game);
       logger.info(`Player ${socket.id} forfeited, winner: ${opponent}`);
       if (game.seriesWinner || game.maxWins === 1) {
+        // Сохраняем статистику
+        saveGameResult({
+          roomId,
+          winner: game.seriesWinner || (game.winner === 'red' ? 'host' : 'guest'),
+          players: { host: game.hostPlayerId!, guest: game.guestPlayerId! },
+          timestamp: Date.now(),
+          maxWins: game.maxWins,
+        });
         deleteGame(roomId);
       }
       callback({ success: true });
     });
 
+    // Явный выход
     socket.on('leave_room', (roomId: string) => {
       logger.info(`leave_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -297,6 +323,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
+    // Отключение
     socket.on('disconnect', () => {
       logger.info(`User disconnected: ${socket.id}`);
       for (const [roomId, game] of games.entries()) {
@@ -315,6 +342,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                 sendPersonalGameOver(io, currentGame);
                 logger.info(`Room ${roomId}: auto-forfeit, winner: ${winner}`);
                 if (currentGame.seriesWinner || currentGame.maxWins === 1) {
+                  // Сохраняем статистику
+                  saveGameResult({
+                    roomId,
+                    winner: currentGame.seriesWinner || (currentGame.winner === 'red' ? 'host' : 'guest'),
+                    players: { host: currentGame.hostPlayerId!, guest: currentGame.guestPlayerId! },
+                    timestamp: Date.now(),
+                    maxWins: currentGame.maxWins,
+                  });
                   deleteGame(roomId);
                 }
               }
@@ -327,8 +362,18 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    socket.on('error', (err) => {
-      logger.error(`Socket error from ${socket.id}: ${err.message}`);
+    // Профиль
+    socket.on('get_profile', (playerId: string, callback) => {
+      if (!playerId) {
+        callback({ games: 0, wins: 0, draws: 0, history: [] });
+        return;
+      }
+      getPlayerStats(playerId)
+        .then((stats: any) => callback(stats))
+        .catch((err: any) => {
+          logger.error('get_profile error', err);
+          callback({ games: 0, wins: 0, draws: 0, history: [] });
+        });
     });
   });
 }

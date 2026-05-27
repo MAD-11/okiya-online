@@ -5,8 +5,24 @@ import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import Profile from './Profile';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+
+// Генерация или загрузка playerId
+function getOrCreatePlayerId(): string {
+  let id = localStorage.getItem('okiya_playerId');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('okiya_playerId', id);
+  }
+  return id;
+}
+
+// Загрузка ника
+function getSavedNick(): string | null {
+  return localStorage.getItem('okiya_nick');
+}
 
 const Game: React.FC = () => {
   const { socket, connected } = useSocket(SERVER_URL);
@@ -16,6 +32,19 @@ const Game: React.FC = () => {
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [waitingReset, setWaitingReset] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const playerId = useMemo(() => getOrCreatePlayerId(), []);
+  const [nick, setNick] = useState(() => getSavedNick() || '');
+
+  const ensureNick = (): string => {
+    if (nick) return nick;
+    const newNick = prompt('Придумайте себе постоянный никнейм (не более 12 символов)') || 'Игрок';
+    const trimmed = newNick.slice(0, 12);
+    localStorage.setItem('okiya_nick', trimmed);
+    setNick(trimmed);
+    return trimmed;
+  };
 
   const clearSavedRoom = () => {
     localStorage.removeItem('okiya_roomId');
@@ -37,7 +66,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Автоподключение при перезагрузке
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -56,8 +84,8 @@ const Game: React.FC = () => {
   }, [socket, connected]);
 
   const createRoom = (maxWins: number) => {
-    const nick = prompt('Введите ваш никнейм') || 'Игрок';
-    socket?.emit('create_room', { maxWins, nick }, (res: any) => {
+    const n = ensureNick();
+    socket?.emit('create_room', { maxWins, playerId, nick: n }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
         localStorage.setItem('okiya_playerToken', res.playerToken);
@@ -74,8 +102,8 @@ const Game: React.FC = () => {
   const joinRoom = () => {
     const id = prompt('Введите код комнаты')?.toUpperCase();
     if (!id) return;
-    const nick = prompt('Введите ваш никнейм') || 'Игрок';
-    socket?.emit('join_room', { roomId: id, nick }, (res: any) => {
+    const n = ensureNick();
+    socket?.emit('join_room', { roomId: id, playerId, nick: n }, (res: any) => {
       if (res.error) {
         setMessage(res.error);
       } else {
@@ -157,7 +185,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Слушатели событий
   useEffect(() => {
     if (!socket) return;
 
@@ -209,7 +236,6 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
-  // Анимации
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -231,35 +257,40 @@ const Game: React.FC = () => {
     return <div style={styles.centered}>Подключение к серверу...</div>;
   }
 
-  // ========== ГЛАВНОЕ МЕНЮ ==========
   if (!gameState) {
     return (
       <div style={styles.lobbyContainer}>
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-
+          {nick && <p style={{ color: '#4a3f35', marginBottom: 20 }}>Ваш ник: <strong>{nick}</strong></p>}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>Серия до 3</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>Серия до 5</button>
           </div>
-
           <div style={styles.orDivider}>
             <span style={styles.orText}>или</span>
           </div>
-
           <button onClick={joinRoom} style={styles.secondaryBtn}>
             Присоединиться по коду
           </button>
-
+          <div style={styles.bottomButtons}>
+            <button onClick={() => setShowProfile(true)} style={styles.iconBtn}>👤 Профиль</button>
+          </div>
           {message && <p style={{ color: '#e74c3c', marginTop: 15 }}>{message}</p>}
         </div>
+        {showProfile && (
+          <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <Profile onClose={() => setShowProfile(false)} socket={socket} playerId={playerId} />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ========== ИГРОВОЕ ПОЛЕ ==========
   const isSpectator = !gameState.myColor;
   const canRestart = gameState.roundFinished && !waitingRestart;
 
@@ -336,7 +367,6 @@ const Game: React.FC = () => {
   );
 };
 
-// ==================== СТИЛИ ====================
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
@@ -411,6 +441,20 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#b0a090',
     fontSize: '14px',
     textTransform: 'uppercase',
+  },
+  bottomButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '20px',
+  },
+  iconBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '16px',
+    color: '#4a3f35',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: '5px',
   },
   centered: {
     display: 'flex',
@@ -503,6 +547,26 @@ const styles: Record<string, React.CSSProperties> = {
     transition: '0.2s',
     width: '100%',
     boxSizing: 'border-box',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '20px',
+    maxWidth: '400px',
+    width: '90%',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
   },
 };
 

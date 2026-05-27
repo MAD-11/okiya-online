@@ -10,6 +10,10 @@ export class Game {
   public players: { red?: string; black?: string };
   public hostSocketId: string | null = null;
   public guestSocketId: string | null = null;
+  public nickRed: string = 'Красные';
+  public nickBlack: string = 'Чёрные';
+  public hostPlayerId: string = '';
+  public guestPlayerId: string = '';
 
   // Токены для переподключения
   public hostToken: string | null = null;
