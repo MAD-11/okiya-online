@@ -5,19 +5,30 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocket = setupSocket;
 const Game_1 = require("../game/Game");
-const redis_1 = require("../redis");
+const logger_1 = require("../logger");
 const crypto_1 = __importDefault(require("crypto"));
+const saveGame = (roomId, game) => { };
+const deleteGame = (roomId) => { };
 let games;
+const disconnectTimers = new Map();
 function generateRoomCode() {
     return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 function generatePlayerToken() {
     return crypto_1.default.randomBytes(8).toString('hex');
 }
-function getClientGameState(game, playerSocketId) {
+function getClientGameState(game, playerSocketId, io) {
     const isHost = playerSocketId === game.hostSocketId;
     const myScore = isHost ? game.scores.host : game.scores.guest;
     const opponentScore = isHost ? game.scores.guest : game.scores.host;
+    let opponentConnected = false;
+    if (io && playerSocketId) {
+        const isRed = game.players.red === playerSocketId;
+        const opponentId = isRed ? game.players.black : game.players.red;
+        if (opponentId) {
+            opponentConnected = io.sockets.sockets.has(opponentId);
+        }
+    }
     return {
         board: game.board,
         currentPlayer: game.currentPlayer,
@@ -25,9 +36,7 @@ function getClientGameState(game, playerSocketId) {
         winner: game.winner,
         lastPickedTile: game.lastPickedTile,
         myColor: playerSocketId
-            ? game.players.red === playerSocketId
-                ? 'red'
-                : 'black'
+            ? game.players.red === playerSocketId ? 'red' : 'black'
             : null,
         myScore,
         opponentScore,
@@ -38,15 +47,17 @@ function getClientGameState(game, playerSocketId) {
         turnStartedAt: game.turnStartedAt,
         turnDuration: game.turnDuration,
         lastMove: game.lastMove,
+        opponentConnected,
     };
 }
 function setupSocket(io, loadedGames) {
     games = loadedGames;
     io.on('connection', (socket) => {
-        console.log('User connected:', socket.id);
-        // Создание комнаты
-        socket.on('create_room', (maxWins, callback) => {
+        logger_1.logger.info(`User connected: ${socket.id}`);
+        socket.on('create_room', (data, callback) => {
+            logger_1.logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}`);
             const validWins = [1, 3, 5];
+            let maxWins = data.maxWins;
             if (!validWins.includes(maxWins))
                 maxWins = 1;
             const roomId = generateRoomCode();
@@ -56,188 +67,281 @@ function setupSocket(io, loadedGames) {
             game.hostToken = hostToken;
             game.guestToken = null;
             game.setOnTimerExpired(() => {
+                logger_1.logger.info(`Timer expired in room ${roomId}`);
                 game.skipTurn();
                 sendPersonalGameState(io, game);
                 if (game.winner) {
                     sendPersonalGameOver(io, game);
                 }
-                (0, redis_1.saveGame)(roomId, game);
+                saveGame(roomId, game);
             });
             games.set(roomId, game);
             socket.join(roomId);
-            (0, redis_1.saveGame)(roomId, game);
+            saveGame(roomId, game);
+            logger_1.logger.info(`Room ${roomId} created by host ${socket.id}`);
             callback({
                 roomId,
                 playerToken: hostToken,
-                state: getClientGameState(game, socket.id)
+                state: getClientGameState(game, socket.id, io)
             });
         });
-        // Присоединение к комнате
-        socket.on('join_room', (roomId, callback) => {
+        socket.on('join_room', (data, callback) => {
+            logger_1.logger.info(`join_room from ${socket.id} for room ${data.roomId}`);
+            const roomId = data.roomId.toUpperCase();
             const game = games.get(roomId);
-            if (!game || game.status !== 'waiting') {
-                return callback({ error: 'Комната не найдена или игра уже началась' });
-            }
-            const added = game.addPlayer(socket.id);
-            if (!added)
-                return callback({ error: 'Комната полна' });
-            const guestToken = generatePlayerToken();
-            game.guestToken = guestToken;
-            socket.join(roomId);
-            callback({
-                playerToken: guestToken,
-                state: getClientGameState(game, socket.id)
-            });
-            (0, redis_1.saveGame)(roomId, game);
-            const redSocket = io.sockets.sockets.get(game.players.red);
-            const blackSocket = io.sockets.sockets.get(game.players.black);
-            if (redSocket)
-                redSocket.emit('game_started', getClientGameState(game, game.players.red));
-            if (blackSocket)
-                blackSocket.emit('game_started', getClientGameState(game, game.players.black));
-        });
-        // Переподключение
-        socket.on('reconnect_room', (roomId, playerToken, callback) => {
-            const game = games.get(roomId);
-            if (!game)
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found`);
                 return callback({ error: 'Комната не найдена' });
+            }
+            if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
+                logger_1.logger.info(`Cleaning dead red socket ${game.players.red}`);
+                game.players.red = undefined;
+            }
+            if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
+                logger_1.logger.info(`Cleaning dead black socket ${game.players.black}`);
+                game.players.black = undefined;
+            }
+            const canJoinAsRed = !game.players.red;
+            const canJoinAsBlack = !game.players.black;
+            if (!canJoinAsRed && !canJoinAsBlack) {
+                logger_1.logger.warn(`Room ${roomId} full`);
+                return callback({ error: 'Комната полна' });
+            }
+            let role;
+            if (canJoinAsRed) {
+                role = 'red';
+                game.players.red = socket.id;
+                game.hostSocketId = socket.id;
+                game.hostToken = generatePlayerToken();
+            }
+            else {
+                role = 'black';
+                game.players.black = socket.id;
+                game.guestSocketId = socket.id;
+                game.guestToken = generatePlayerToken();
+            }
+            if (game.players.red && game.players.black && game.status === 'waiting') {
+                game.status = 'playing';
+                game.turnStartedAt = Date.now();
+            }
+            else if (game.players.red && game.players.black && game.status !== 'playing') {
+                game.turnStartedAt = Date.now();
+            }
+            socket.join(roomId);
+            logger_1.logger.info(`Player ${socket.id} joined room ${roomId} as ${role}`);
+            const playerToken = role === 'red' ? game.hostToken : game.guestToken;
+            callback({ playerToken, state: getClientGameState(game, socket.id, io) });
+            saveGame(roomId, game);
+            if (game.players.red && game.players.black) {
+                logger_1.logger.info(`Sending game_state to both in room ${roomId}`);
+                sendPersonalGameState(io, game);
+            }
+        });
+        socket.on('reconnect_room', (roomId, playerToken, callback) => {
+            logger_1.logger.info(`reconnect_room from ${socket.id} to ${roomId}`);
+            const game = games.get(roomId);
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for reconnect`);
+                return callback({ error: 'Комната не найдена' });
+            }
             let role = null;
             if (game.hostToken === playerToken)
                 role = 'host';
             else if (game.guestToken === playerToken)
                 role = 'guest';
-            if (!role)
+            if (!role) {
+                logger_1.logger.warn(`Invalid token ${playerToken} for room ${roomId}`);
                 return callback({ error: 'Неверный токен' });
+            }
             if (role === 'host') {
-                if (game.players.red === game.hostSocketId)
-                    game.players.red = socket.id;
-                else if (game.players.black === game.hostSocketId)
-                    game.players.black = socket.id;
+                game.players.red = socket.id;
                 game.hostSocketId = socket.id;
             }
             else {
-                if (game.players.red === game.guestSocketId)
-                    game.players.red = socket.id;
-                else if (game.players.black === game.guestSocketId)
-                    game.players.black = socket.id;
+                game.players.black = socket.id;
                 game.guestSocketId = socket.id;
             }
             socket.join(roomId);
-            socket.emit('game_state', getClientGameState(game, socket.id));
-            if (game.status === 'playing' && game.players.red && game.players.black) {
-                game.turnStartedAt = Date.now();
+            logger_1.logger.info(`Player ${socket.id} reconnected to room ${roomId} as ${role}`);
+            const timerKey = `${roomId}_${socket.id}`;
+            if (disconnectTimers.has(timerKey)) {
+                clearTimeout(disconnectTimers.get(timerKey));
+                disconnectTimers.delete(timerKey);
             }
-            (0, redis_1.saveGame)(roomId, game);
+            socket.emit('game_state', getClientGameState(game, socket.id, io));
+            saveGame(roomId, game);
             callback({ success: true });
         });
-        // Ход
         socket.on('move', (roomId, row, col, callback) => {
+            logger_1.logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
             const game = games.get(roomId);
-            if (!game)
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for move`);
                 return callback({ error: 'Игра не найдена' });
+            }
             const success = game.makeMove(row, col, socket.id);
-            if (!success)
+            if (!success) {
+                logger_1.logger.warn(`Invalid move by ${socket.id}`);
                 return callback({ error: 'Недопустимый ход' });
-            (0, redis_1.saveGame)(roomId, game);
+            }
+            saveGame(roomId, game);
             sendPersonalGameState(io, game);
             if (game.winner) {
                 sendPersonalGameOver(io, game);
                 if (game.seriesWinner || game.maxWins === 1) {
-                    // Серия завершена — удаляем из Redis
-                    (0, redis_1.deleteGame)(roomId);
+                    deleteGame(roomId);
                 }
             }
             callback({ success: true });
         });
-        // Продолжение серии (ещё одна игра)
         socket.on('restart_round', (roomId, callback) => {
+            logger_1.logger.info(`restart_round from ${socket.id} in ${roomId}`);
             const game = games.get(roomId);
-            if (!game)
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for restart`);
                 return callback({ error: 'Игра не найдена' });
+            }
             const started = game.voteRestart(socket.id);
             if (started) {
-                (0, redis_1.saveGame)(roomId, game);
+                saveGame(roomId, game);
                 sendPersonalGameState(io, game);
+                logger_1.logger.info(`New round in ${roomId}`);
             }
             callback({ success: true });
         });
-        // Полный сброс комнаты (новая игра в той же комнате)
-        const resetVotes = new Map(); // roomId -> set of socketIds
         socket.on('reset_room', (roomId, callback) => {
+            logger_1.logger.info(`reset_room from ${socket.id} in ${roomId}`);
             const game = games.get(roomId);
-            if (!game)
-                return callback({ error: 'Комната не найдена' });
-            // Только хост или гость могут инициировать сброс
-            if (socket.id !== game.hostSocketId && socket.id !== game.guestSocketId) {
-                return callback({ error: 'Вы не участник этой комнаты' });
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for reset`);
+                return callback({ error: 'Игра не найдена' });
             }
-            if (!resetVotes.has(roomId)) {
-                resetVotes.set(roomId, new Set());
+            const success = game.voteReset(socket.id);
+            if (success) {
+                saveGame(roomId, game);
+                sendPersonalGameState(io, game);
+                logger_1.logger.info(`Room ${roomId} fully reset`);
             }
-            const votes = resetVotes.get(roomId);
-            votes.add(socket.id);
-            if (votes.size === 2) {
-                // Оба игрока согласны — сбрасываем комнату в начальное состояние
-                game.board = Game_1.Game.prototype.initBoard(); // или можно new Game, но сохраним maxWins
-                // Простой способ: создадим новый объект Game с тем же maxWins, перекинем токены и игроков
-                const newGame = new Game_1.Game(game.maxWins, game.turnDuration);
-                // Переносим игроков и токены
-                newGame.hostSocketId = game.hostSocketId;
-                newGame.guestSocketId = game.guestSocketId;
-                newGame.players.red = game.hostSocketId; // хост всегда красный при старте
-                newGame.players.black = game.guestSocketId;
-                newGame.hostToken = game.hostToken;
-                newGame.guestToken = game.guestToken;
-                newGame.status = 'playing'; // сразу playing, так как оба игрока уже подключены
-                newGame.setOnTimerExpired(() => {
-                    newGame.skipTurn();
-                    sendPersonalGameState(io, newGame);
-                    if (newGame.winner) {
-                        sendPersonalGameOver(io, newGame);
-                    }
-                    (0, redis_1.saveGame)(roomId, newGame);
-                });
-                games.set(roomId, newGame);
-                (0, redis_1.saveGame)(roomId, newGame);
-                resetVotes.delete(roomId);
-                // Оповещаем обоих
-                sendPersonalGameState(io, newGame);
-                callback({ success: true });
+            callback({ success: true });
+        });
+        socket.on('forfeit', (roomId, callback) => {
+            logger_1.logger.info(`forfeit from ${socket.id} in ${roomId}`);
+            const game = games.get(roomId);
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for forfeit`);
+                return callback({ error: 'Игра не найдена' });
+            }
+            if (game.status !== 'playing') {
+                logger_1.logger.warn(`Game not active in ${roomId}`);
+                return callback({ error: 'Игра не активна' });
+            }
+            const playerColor = game.players.red === socket.id ? 'red' : 'black';
+            const opponent = playerColor === 'red' ? 'black' : 'red';
+            game.winner = opponent;
+            game.handleGameOver();
+            saveGame(roomId, game);
+            sendPersonalGameState(io, game);
+            sendPersonalGameOver(io, game);
+            logger_1.logger.info(`Player ${socket.id} forfeited, winner: ${opponent}`);
+            if (game.seriesWinner || game.maxWins === 1) {
+                deleteGame(roomId);
+            }
+            callback({ success: true });
+        });
+        socket.on('leave_room', (roomId) => {
+            logger_1.logger.info(`leave_room from ${socket.id} in ${roomId}`);
+            const game = games.get(roomId);
+            if (!game) {
+                logger_1.logger.warn(`Room ${roomId} not found for leave`);
+                return;
+            }
+            const isRed = game.players.red === socket.id;
+            const isBlack = game.players.black === socket.id;
+            if (!isRed && !isBlack) {
+                logger_1.logger.warn(`Socket ${socket.id} not in room ${roomId}`);
+                return;
+            }
+            if (isRed)
+                game.players.red = undefined;
+            else
+                game.players.black = undefined;
+            if (!game.players.red && !game.players.black) {
+                games.delete(roomId);
+                deleteGame(roomId);
+                logger_1.logger.info(`Room ${roomId} deleted (empty)`);
             }
             else {
-                callback({ success: true }); // голос принят, ждём второго
+                sendPersonalGameState(io, game);
+                saveGame(roomId, game);
             }
         });
         socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
+            logger_1.logger.info(`User disconnected: ${socket.id}`);
+            for (const [roomId, game] of games.entries()) {
+                if (game.players.red === socket.id || game.players.black === socket.id) {
+                    sendPersonalGameState(io, game);
+                    const timerKey = `${roomId}_${socket.id}`;
+                    const timer = setTimeout(() => {
+                        const currentGame = games.get(roomId);
+                        if (currentGame && currentGame.status === 'playing') {
+                            if (currentGame.players.red === socket.id || currentGame.players.black === socket.id) {
+                                const winner = currentGame.players.red === socket.id ? 'black' : 'red';
+                                currentGame.winner = winner;
+                                currentGame.handleGameOver();
+                                saveGame(roomId, currentGame);
+                                sendPersonalGameState(io, currentGame);
+                                sendPersonalGameOver(io, currentGame);
+                                logger_1.logger.info(`Room ${roomId}: auto-forfeit, winner: ${winner}`);
+                                if (currentGame.seriesWinner || currentGame.maxWins === 1) {
+                                    deleteGame(roomId);
+                                }
+                            }
+                        }
+                        disconnectTimers.delete(timerKey);
+                    }, 60000);
+                    disconnectTimers.set(timerKey, timer);
+                    break;
+                }
+            }
+        });
+        socket.on('error', (err) => {
+            logger_1.logger.error(`Socket error from ${socket.id}: ${err.message}`);
         });
     });
 }
 function sendPersonalGameState(io, game) {
-    const redSocket = io.sockets.sockets.get(game.players.red);
-    const blackSocket = io.sockets.sockets.get(game.players.black);
-    if (redSocket)
-        redSocket.emit('game_state', getClientGameState(game, game.players.red));
-    if (blackSocket)
-        blackSocket.emit('game_state', getClientGameState(game, game.players.black));
+    const redId = game.players.red;
+    const blackId = game.players.black;
+    if (redId) {
+        const redSocket = io.sockets.sockets.get(redId);
+        if (redSocket) {
+            logger_1.logger.info(`Sending game_state to red ${redId}`);
+            redSocket.emit('game_state', getClientGameState(game, redId, io));
+        }
+    }
+    if (blackId) {
+        const blackSocket = io.sockets.sockets.get(blackId);
+        if (blackSocket) {
+            logger_1.logger.info(`Sending game_state to black ${blackId}`);
+            blackSocket.emit('game_state', getClientGameState(game, blackId, io));
+        }
+    }
 }
 function sendPersonalGameOver(io, game) {
-    const redSocket = io.sockets.sockets.get(game.players.red);
-    const blackSocket = io.sockets.sockets.get(game.players.black);
+    const redId = game.players.red;
+    const blackId = game.players.black;
     const resultForRed = game.winner === 'red' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
     const resultForBlack = game.winner === 'black' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
-    const dataRed = {
-        winner: game.winner,
-        yourResult: resultForRed,
-        seriesWinner: game.seriesWinner,
-    };
-    const dataBlack = {
-        winner: game.winner,
-        yourResult: resultForBlack,
-        seriesWinner: game.seriesWinner,
-    };
-    if (redSocket)
-        redSocket.emit('game_over', dataRed);
-    if (blackSocket)
-        blackSocket.emit('game_over', dataBlack);
+    const dataRed = { winner: game.winner, yourResult: resultForRed, seriesWinner: game.seriesWinner };
+    const dataBlack = { winner: game.winner, yourResult: resultForBlack, seriesWinner: game.seriesWinner };
+    if (redId) {
+        const redSocket = io.sockets.sockets.get(redId);
+        if (redSocket)
+            redSocket.emit('game_over', dataRed);
+    }
+    if (blackId) {
+        const blackSocket = io.sockets.sockets.get(blackId);
+        if (blackSocket)
+            blackSocket.emit('game_over', dataBlack);
+    }
 }

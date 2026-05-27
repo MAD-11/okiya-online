@@ -1,20 +1,18 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
-import rateLimit from 'express-rate-limit';
 import { setupSocket } from './socket/handler';
 import { pubClient, subClient, loadAllGames } from './redis';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { logger } from './logger';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 const server = http.createServer(app);
 
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
+  windowMs: 15 * 60 * 1000,
   max: 100,
-  message: 'Слишком много запросов, попробуйте позже',
 });
 app.use(limiter);
 

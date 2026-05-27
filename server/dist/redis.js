@@ -15,6 +15,7 @@ exports.pubClient = new ioredis_1.default(redisUrl);
 exports.subClient = exports.pubClient.duplicate();
 const dataClient = new ioredis_1.default(redisUrl);
 const GAME_PREFIX = 'okiya:game:';
+const GAME_TTL = 3600; // 1 час (в секундах)
 function serializeGame(game) {
     return JSON.stringify({
         board: game.board,
@@ -60,6 +61,8 @@ function deserializeGame(data) {
 async function saveGame(roomId, game) {
     const key = GAME_PREFIX + roomId;
     await dataClient.set(key, serializeGame(game));
+    // Продлеваем TTL каждый раз при сохранении
+    await dataClient.expire(key, GAME_TTL);
 }
 async function loadGame(roomId) {
     const key = GAME_PREFIX + roomId;
