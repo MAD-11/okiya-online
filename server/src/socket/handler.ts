@@ -35,9 +35,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     winner: game.winner,
     lastPickedTile: game.lastPickedTile,
     myColor: playerSocketId
-      ? game.players.red === playerSocketId
-        ? 'red'
-        : 'black'
+      ? game.players.red === playerSocketId ? 'red' : 'black'
       : null,
     myScore,
     opponentScore,
@@ -56,11 +54,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
 
   io.on('connection', (socket: Socket) => {
-    logger.info('User connected:', socket.id);
+    logger.info('User connected: ' + socket.id);
 
     // Создание комнаты
-    socket.on('create_room', (maxWins: number, callback) => {
+    socket.on('create_room', (data: { maxWins: number}, callback) => {
       const validWins = [1, 3, 5];
+      let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
       const roomId = generateRoomCode();
       const game = new Game(maxWins);
@@ -91,23 +90,15 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       });
     });
 
-        // Присоединение к комнате по коду
-    socket.on('join_room', (roomId: string, callback) => {
+    // Присоединение к комнате
+    socket.on('join_room', (data: { roomId: string}, callback) => {
+      const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
-      if (!game) {
-        return callback({ error: 'Комната не найдена' });
-      }
+      if (!game) return callback({ error: 'Комната не найдена' });
 
-      // Проверяем, жив ли старый сокет в слоте red
-      if (game.players.red && !io.sockets.sockets.has(game.players.red)) {
-        logger.info(`Cleaning up dead red socket ${game.players.red} in room ${roomId}`);
-        game.players.red = undefined;
-      }
-      // Проверяем, жив ли старый сокет в слоте black
-      if (game.players.black && !io.sockets.sockets.has(game.players.black)) {
-        logger.info(`Cleaning up dead black socket ${game.players.black} in room ${roomId}`);
-        game.players.black = undefined;
-      }
+      // Чистим мёртвые сокеты
+      if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
+      if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
       const canJoinAsRed = !game.players.red;
       const canJoinAsBlack = !game.players.black;
@@ -120,20 +111,18 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         role = 'red';
         game.players.red = socket.id;
         game.hostSocketId = socket.id;
-        game.hostToken = generatePlayerToken(); // новый токен
+        game.hostToken = generatePlayerToken();
       } else {
         role = 'black';
         game.players.black = socket.id;
         game.guestSocketId = socket.id;
-        game.guestToken = generatePlayerToken(); // новый токен
+        game.guestToken = generatePlayerToken();
       }
 
-      // Если оба игрока на месте, запускаем игру
       if (game.players.red && game.players.black && game.status === 'waiting') {
         game.status = 'playing';
         game.turnStartedAt = Date.now();
       } else if (game.players.red && game.players.black && game.status !== 'playing') {
-        // Игра уже шла, просто обновляем состояние
         game.turnStartedAt = Date.now();
       }
 
@@ -141,18 +130,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       logger.info(`Player ${socket.id} joined room ${roomId} as ${role}`);
 
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
-      callback({
-        playerToken,
-        state: getClientGameState(game, socket.id, io)
-      });
-
+      callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
       if (game.players.red && game.players.black) {
         sendPersonalGameState(io, game);
       }
     });
 
-    // Переподключение по токену (если есть сохранённый токен)
+    // Переподключение
     socket.on('reconnect_room', (roomId: string, playerToken: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Комната не найдена' });
@@ -160,9 +145,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       let role: 'host' | 'guest' | null = null;
       if (game.hostToken === playerToken) role = 'host';
       else if (game.guestToken === playerToken) role = 'guest';
-      if (!role) return callback({ error: 'Неверный токен. Попробуйте присоединиться по коду комнаты.' });
+      if (!role) return callback({ error: 'Неверный токен' });
 
-      // Обновляем сокет
       if (role === 'host') {
         game.players.red = socket.id;
         game.hostSocketId = socket.id;
@@ -185,34 +169,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Явный выход из комнаты (кнопка "Выйти в главное меню")
-    socket.on('leave_room', (roomId: string) => {
-      const game = games.get(roomId);
-      if (!game) return;
-
-      const isRed = game.players.red === socket.id;
-      const isBlack = game.players.black === socket.id;
-      if (!isRed && !isBlack) return;
-
-      logger.info(`Player ${socket.id} left room ${roomId}`);
-      if (isRed) {
-        game.players.red = undefined;
-      } else {
-        game.players.black = undefined;
-      }
-
-      // Если оба игрока вышли, удаляем комнату
-      if (!game.players.red && !game.players.black) {
-        games.delete(roomId);
-        deleteGame(roomId);
-        logger.info(`Room ${roomId} deleted (both players left)`);
-      } else {
-        // Уведомляем оставшегося соперника
-        sendPersonalGameState(io, game);
-        saveGame(roomId, game);
-      }
-    });
-
     // Ход
     socket.on('move', (roomId: string, row: number, col: number, callback) => {
       const game = games.get(roomId);
@@ -233,7 +189,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Продолжение серии
+    // Продолжение серии (ещё одна игра)
     socket.on('restart_round', (roomId: string, callback) => {
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
@@ -279,14 +235,34 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Отключение сокета
+    // Явный выход
+    socket.on('leave_room', (roomId: string) => {
+      const game = games.get(roomId);
+      if (!game) return;
+      const isRed = game.players.red === socket.id;
+      const isBlack = game.players.black === socket.id;
+      if (!isRed && !isBlack) return;
+      logger.info(`Player ${socket.id} left room ${roomId}`);
+      if (isRed) {
+        game.players.red = undefined;
+      } else {
+        game.players.black = undefined;
+      }
+      if (!game.players.red && !game.players.black) {
+        games.delete(roomId);
+        deleteGame(roomId);
+      } else {
+        sendPersonalGameState(io, game);
+        saveGame(roomId, game);
+      }
+    });
+
+    // Отключение
     socket.on('disconnect', () => {
-      logger.info('User disconnected:', socket.id);
+      logger.info('User disconnected: ' + socket.id);
       for (const [roomId, game] of games.entries()) {
         if (game.players.red === socket.id || game.players.black === socket.id) {
-          // Уведомляем оставшегося игрока, что соперник не в сети
           sendPersonalGameState(io, game);
-          // Запускаем таймер на авто-форфейт
           const timerKey = `${roomId}_${socket.id}`;
           const timer = setTimeout(() => {
             const currentGame = games.get(roomId);
@@ -306,7 +282,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
             }
             disconnectTimers.delete(timerKey);
           }, 60000);
-
           disconnectTimers.set(timerKey, timer);
           break;
         }
@@ -316,15 +291,21 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 }
 
 function sendPersonalGameState(io: Server, game: Game) {
-  const redSocket = io.sockets.sockets.get(game.players.red!);
-  const blackSocket = io.sockets.sockets.get(game.players.black!);
-  if (redSocket) redSocket.emit('game_state', getClientGameState(game, game.players.red, io));
-  if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, game.players.black, io));
+  const redId = game.players.red;
+  const blackId = game.players.black;
+  if (redId) {
+    const redSocket = io.sockets.sockets.get(redId);
+    if (redSocket) redSocket.emit('game_state', getClientGameState(game, redId, io));
+  }
+  if (blackId) {
+    const blackSocket = io.sockets.sockets.get(blackId);
+    if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, blackId, io));
+  }
 }
 
 function sendPersonalGameOver(io: Server, game: Game) {
-  const redSocket = io.sockets.sockets.get(game.players.red!);
-  const blackSocket = io.sockets.sockets.get(game.players.black!);
+  const redId = game.players.red;
+  const blackId = game.players.black;
 
   const resultForRed = game.winner === 'red' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
   const resultForBlack = game.winner === 'black' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
@@ -332,6 +313,12 @@ function sendPersonalGameOver(io: Server, game: Game) {
   const dataRed = { winner: game.winner, yourResult: resultForRed, seriesWinner: game.seriesWinner };
   const dataBlack = { winner: game.winner, yourResult: resultForBlack, seriesWinner: game.seriesWinner };
 
-  if (redSocket) redSocket.emit('game_over', dataRed);
-  if (blackSocket) blackSocket.emit('game_over', dataBlack);
+  if (redId) {
+    const redSocket = io.sockets.sockets.get(redId);
+    if (redSocket) redSocket.emit('game_over', dataRed);
+  }
+  if (blackId) {
+    const blackSocket = io.sockets.sockets.get(blackId);
+    if (blackSocket) blackSocket.emit('game_over', dataBlack);
+  }
 }
