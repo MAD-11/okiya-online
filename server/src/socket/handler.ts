@@ -22,7 +22,9 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
 
   let opponentConnected = false;
   if (io && playerSocketId) {
-    const opponentId = isHost ? game.guestSocketId : game.hostSocketId;
+    // Определяем соперника по players, а не по hostSocketId/guestSocketId
+    const isRed = game.players.red === playerSocketId;
+    const opponentId = isRed ? game.players.black : game.players.red;
     if (opponentId) {
       opponentConnected = io.sockets.sockets.has(opponentId);
     }
@@ -57,7 +59,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     logger.info('User connected: ' + socket.id);
 
     // Создание комнаты
-    socket.on('create_room', (data: { maxWins: number}, callback) => {
+    socket.on('create_room', (data: { maxWins: number }, callback) => {
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
@@ -91,7 +93,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Присоединение к комнате
-    socket.on('join_room', (data: { roomId: string}, callback) => {
+    socket.on('join_room', (data: { roomId: string }, callback) => {
       const roomId = data.roomId.toUpperCase();
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Комната не найдена' });
@@ -132,6 +134,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
+      // Отправляем состояние обоим игрокам, чтобы у хоста обновился статус соперника
       if (game.players.red && game.players.black) {
         sendPersonalGameState(io, game);
       }
