@@ -261,7 +261,6 @@ const Game: React.FC = () => {
   if (!connected) {
     return (
       <div style={styles.centered}>
-        <div className="spinner" />
         <p>Подключение к серверу...</p>
       </div>
     );
@@ -335,20 +334,29 @@ const Game: React.FC = () => {
         </div>
       )}
 
-      <div style={styles.gameLayout}>
-        <div style={styles.boardArea}>
-          <Board
-            board={gameState.board}
-            validMoves={validMoves}
-            onClick={handleCellClick}
-            currentPlayer={gameState.currentPlayer}
-            myColor={gameState.myColor}
-            lastMove={gameState.lastMove}
-          />
-          <LastPickedTile tile={gameState.lastPickedTile} />
+      {/* Основной блок: чат слева, доска и кнопки по центру */}
+      <div style={styles.mainLayout}>
+        <div style={styles.chatColumn}>
+          {gameState.status === 'playing' && !isSpectator && (
+            <Chat
+              messages={gameState.messages ?? []}
+              onSend={handleChatSend}
+              myNick={gameState.myNick}
+            />
+          )}
         </div>
-
-        <div style={styles.sidePanel}>
+        <div style={styles.centerColumn}>
+          <div style={styles.boardArea}>
+            <Board
+              board={gameState.board}
+              validMoves={validMoves}
+              onClick={handleCellClick}
+              currentPlayer={gameState.currentPlayer}
+              myColor={gameState.myColor}
+              lastMove={gameState.lastMove}
+            />
+            <LastPickedTile tile={gameState.lastPickedTile} />
+          </div>
           {personalGameOver && (
             <div style={styles.gameOverBlock}>
               <p style={styles.message}>{personalGameOver}</p>
@@ -360,28 +368,21 @@ const Game: React.FC = () => {
               {waitingRestart && <p style={{ fontSize: 13, color: '#7f6e5d' }}>Ожидание соперника…</p>}
             </div>
           )}
-
-          <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#6b5b4f' }}>
-            Выйти в меню
-          </button>
-          {(gameState.status === 'finished' || gameState.seriesWinner) && (
-            <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#4a6741' }}>
-              {waitingReset ? 'Ожидание…' : 'Новая игра'}
+          <div style={styles.buttonRow}>
+            <button onClick={backToMenu} style={{ ...styles.actionBtn, background: '#6b5b4f' }}>
+              Выйти в меню
             </button>
-          )}
-          {gameState.status === 'playing' && !isSpectator && (
-            <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#b5651d' }}>
-              Сдаться
-            </button>
-          )}
-
-          {gameState.status === 'playing' && !isSpectator && (
-            <Chat
-              messages={gameState.messages ?? []}
-              onSend={handleChatSend}
-              myNick={gameState.myNick}
-            />
-          )}
+            {(gameState.status === 'finished' || gameState.seriesWinner) && (
+              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, background: '#4a6741' }}>
+                {waitingReset ? 'Ожидание…' : 'Новая игра'}
+              </button>
+            )}
+            {gameState.status === 'playing' && !isSpectator && (
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, background: '#b5651d' }}>
+                Сдаться
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -489,7 +490,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f7f3eb',
     minHeight: '100vh',
     margin: 0,
-    padding: '32px 20px',
+    padding: '24px 16px',
     color: '#3e362e',
   },
   gameHeader: {
@@ -497,7 +498,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'baseline',
     justifyContent: 'center',
     gap: '20px',
-    marginBottom: '16px',
+    marginBottom: '12px',
   },
   titleSmall: {
     fontSize: '36px',
@@ -515,7 +516,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: '16px',
+    marginBottom: '12px',
     fontSize: '13px',
     color: '#5e503a',
   },
@@ -531,35 +532,48 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: '#b8860b',
   },
-  gameLayout: {
+  mainLayout: {
     display: 'flex',
     justifyContent: 'center',
+    alignItems: 'flex-start',
     gap: '40px',
-    flexWrap: 'wrap',
     marginTop: '16px',
+    flexWrap: 'wrap',
+  },
+  chatColumn: {
+    width: '300px',
+    height: '70vh',
+    flexShrink: 0,
+  },
+  centerColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
   },
   boardArea: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
   },
-  sidePanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    width: '260px',
-  },
   gameOverBlock: {
     background: 'rgba(255,255,245,0.9)',
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+    textAlign: 'center',
   },
   message: {
     fontWeight: 500,
     color: '#3e362e',
     fontSize: '16px',
     margin: '0 0 12px',
+  },
+  buttonRow: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   actionBtn: {
     padding: '10px 20px',

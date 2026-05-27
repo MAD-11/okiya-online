@@ -373,10 +373,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Чат
-    socket.on('chat_message', (roomId: string, text: string) => {
+        socket.on('chat_message', (roomId: string, text: string) => {
       const game = games.get(roomId);
       if (!game) return;
-      const sender = game.players.red === socket.id ? game.nickRed : game.nickBlack;
+      // Определяем ник по socket.id, а не по players.red/black
+      let sender = 'Игрок';
+      if (socket.id === game.hostSocketId) {
+        sender = game.nickRed;
+      } else if (socket.id === game.guestSocketId) {
+        sender = game.nickBlack;
+      }
       if (!chatMessages.has(roomId)) {
         chatMessages.set(roomId, []);
       }

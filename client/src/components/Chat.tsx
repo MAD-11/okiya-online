@@ -77,7 +77,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '280px',
+    height: '100%', // растягиваем на всю высоту родителя
     width: '100%',
     backgroundColor: '#fdfaf5',
     borderRadius: '20px',
