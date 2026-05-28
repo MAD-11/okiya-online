@@ -157,9 +157,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const playerToken = role === 'red' ? game.hostToken : game.guestToken;
       callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
+
       if (game.players.red && game.players.black) {
-        // Отправляем событие обоим о том, что соперник присоединился
-        logger.info(`Sending game_state to both in room ${roomId}`);
         io.to(roomId).emit('opponent_joined', {
           nick1: game.nickRed,
           nick2: game.nickBlack,
@@ -292,16 +291,45 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const isRed = game.players.red === socket.id;
       const isBlack = game.players.black === socket.id;
       if (!isRed && !isBlack) return;
+
+      // Определяем данные комнаты до удаления игрока
+      const maxWins = game.maxWins;
+      const hostSkin = game.hostSkin;
+      const nickRed = game.nickRed;
+      const nickBlack = game.nickBlack;
+      const hostPlayerId = game.hostPlayerId;
+      const guestPlayerId = game.guestPlayerId;
+
       if (isRed) game.players.red = undefined;
       else game.players.black = undefined;
 
       if (!game.players.red && !game.players.black) {
+        // Оба вышли – удаляем комнату
         games.delete(roomId);
         deleteGame(roomId);
         logger.info(`Room ${roomId} deleted (empty)`);
       } else {
-        sendPersonalGameState(io, game);
-        saveGame(roomId, game);
+        // Один игрок остался – пересоздаём игру, чтобы сбросить доску и таймер
+        const newGame = new Game(maxWins);
+        newGame.hostSkin = hostSkin;
+        newGame.nickRed = nickRed;
+        newGame.nickBlack = nickBlack;
+        newGame.hostPlayerId = hostPlayerId;
+        newGame.guestPlayerId = guestPlayerId;
+
+        const remainingSocketId = game.players.red || game.players.black!;
+        newGame.addPlayer(remainingSocketId);
+        newGame.hostToken = generatePlayerToken();
+        newGame.guestToken = null;
+
+        games.set(roomId, newGame);
+        saveGame(roomId, newGame);
+        // Оповещаем оставшегося игрока
+        const remainingSocket = io.sockets.sockets.get(remainingSocketId);
+        if (remainingSocket) {
+          remainingSocket.emit('game_state', getClientGameState(newGame, remainingSocketId, io));
+        }
+        logger.info(`Room ${roomId} restarted after player left`);
       }
     });
 
@@ -360,6 +388,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (chatMessages.get(roomId)!.length > 50) {
         chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
       }
+      // Отправляем обновлённое состояние всем в комнате
       sendPersonalGameState(io, game);
     });
 
@@ -367,11 +396,9 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
-        // Очищаем мёртвые сокеты перед показом
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем только если есть свободный слот
         if (!game.players.red || !game.players.black) {
           rooms.push({
             roomId,

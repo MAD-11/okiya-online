@@ -38,7 +38,6 @@ const Game: React.FC = () => {
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Анимация VS
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
@@ -284,7 +283,7 @@ const Game: React.FC = () => {
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && <p style={{ color: 'var(--text)', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
+          {nick && <p style={{ color: '#4a3f35', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
@@ -378,7 +377,6 @@ const Game: React.FC = () => {
       )}
 
       <div style={styles.gameLayout}>
-        {/* Чат всегда слева, если не зритель */}
         {!isSpectator && (
           <div style={styles.chatColumn}>
             <Chat
@@ -389,7 +387,6 @@ const Game: React.FC = () => {
           </div>
         )}
 
-        {/* Центральная колонка: доска и кнопки */}
         <div style={styles.centerColumn}>
           <div style={styles.boardArea}>
             <Board
@@ -445,18 +442,19 @@ const Game: React.FC = () => {
   );
 };
 
+// Стили
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    background: 'var(--bg)',
+    background: '#f7f3eb',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
     padding: '20px',
   },
   lobbyCard: {
-    background: 'var(--card-bg)',
+    background: '#ffffff',
     borderRadius: '24px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
     padding: '48px 40px',
@@ -467,14 +465,14 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '52px',
     margin: '0 0 8px',
-    color: 'var(--text)',
+    color: '#3e362e',
     fontWeight: 400,
     letterSpacing: '2px',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
   },
   subtitle: {
     fontSize: '16px',
-    color: 'var(--secondary-text)',
+    color: '#8b7a6b',
     marginBottom: '32px',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
     fontWeight: 300,
@@ -492,8 +490,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     border: 'none',
     borderRadius: '40px',
-    backgroundColor: 'var(--btn-bg)',
-    color: 'var(--btn-text)',
+    backgroundColor: '#3e362e',
+    color: '#fff',
     cursor: 'pointer',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
     transition: 'background-color 0.2s',
@@ -504,10 +502,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px 32px',
     fontSize: '16px',
     fontWeight: 500,
-    border: '2px solid var(--btn-bg)',
+    border: '2px solid #3e362e',
     borderRadius: '40px',
     backgroundColor: 'transparent',
-    color: 'var(--btn-bg)',
+    color: '#3e362e',
     cursor: 'pointer',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
     width: '100%',
@@ -517,7 +515,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   separator: {
     height: '1px',
-    backgroundColor: 'var(--border)',
+    backgroundColor: '#e0d6c8',
     margin: '20px 0',
     width: '60%',
     marginLeft: 'auto',
@@ -527,7 +525,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'none',
     border: 'none',
     fontSize: '14px',
-    color: 'var(--secondary-text)',
+    color: '#8b7a6b',
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
     textDecoration: 'underline',
@@ -539,7 +537,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     height: '100vh',
     fontSize: '18px',
-    color: 'var(--text)',
+    color: '#3e362e',
     fontFamily: '"Inter", sans-serif',
   },
   gameContainer: {
@@ -547,8 +545,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     height: '100vh',
     overflow: 'hidden',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text)',
+    backgroundColor: '#f7f3eb',
+    color: '#3e362e',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
   },
   gameHeader: {
@@ -563,11 +561,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 400,
     margin: 0,
     fontFamily: '"Cormorant Garamond", serif',
-    color: 'var(--text)',
+    color: '#3e362e',
   },
   roomCode: {
     fontSize: '14px',
-    color: 'var(--secondary-text)',
+    color: '#8b7a6b',
     fontFamily: '"Inter", sans-serif',
   },
   statusBar: {
@@ -576,12 +574,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     marginBottom: '8px',
     fontSize: '13px',
+    color: '#5e503a',
   },
   score: {
     fontSize: '16px',
     fontWeight: 500,
     marginBottom: '4px',
     textAlign: 'center',
+    color: '#3e362e',
   },
   turnIndicator: {
     fontSize: '16px',
@@ -615,15 +615,16 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   gameOverBlock: {
-    background: 'var(--card-bg)',
+    background: '#ffffff',
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
     textAlign: 'center',
+    color: '#3e362e',
   },
   message: {
     fontWeight: 500,
-    color: 'var(--text)',
+    color: '#3e362e',
     fontSize: '16px',
     margin: '0 0 12px',
   },
@@ -639,8 +640,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     border: 'none',
     borderRadius: '30px',
-    backgroundColor: 'var(--game-btn-bg)',
-    color: 'var(--game-btn-text)',
+    backgroundColor: '#5e503a',
+    color: '#fff',
     cursor: 'pointer',
     boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
     transition: 'background-color 0.2s',
@@ -651,14 +652,14 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'var(--overlay)',
+    backgroundColor: 'rgba(0,0,0,0.5)',  // явный полупрозрачный фон
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   modal: {
-    background: 'var(--modal-bg)',
+    background: '#ffffff',  // непрозрачный белый
     borderRadius: '24px',
     maxWidth: '440px',
     width: '90%',
