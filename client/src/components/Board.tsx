@@ -15,6 +15,7 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
   sakura: { red: '🌸', black: '⚫' },
   bird: { red: '🐦', black: '⚫' },
   maple: { red: '🍁', black: '⚫' },
+  moon: { red: '🌙', black: '⚫' },
 };
 
 const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, skin }) => {

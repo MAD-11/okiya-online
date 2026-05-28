@@ -5,6 +5,7 @@ const skins: { value: Skin; label: string }[] = [
   { value: 'sakura', label: '🌸 Сакура' },
   { value: 'bird', label: '🐦 Птица' },
   { value: 'maple', label: '🍁 Клён' },
+  { value: 'moon', label: '🌙 Луна' },
 ];
 
 const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {

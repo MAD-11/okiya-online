@@ -47,7 +47,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
               <div style={{
                 ...styles.bubble,
                 backgroundColor: isMine ? 'var(--chat-bubble-mine)' : 'var(--chat-bubble-other)',
-                color: isMine ? '#fff' : 'var(--text)',
+                color: isMine ? 'var(--chat-text-mine)' : 'var(--chat-text-other)',
               }}>
                 <div style={styles.sender}>{msg.sender}</div>
                 <div style={styles.text}>{msg.text}</div>

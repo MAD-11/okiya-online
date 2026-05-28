@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
-export type Skin = 'sakura' | 'bird' | 'maple';
+export type Skin = 'sakura' | 'bird' | 'maple' | 'moon';
 
 interface ThemeContextType {
   darkMode: boolean;
@@ -24,7 +24,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     localStorage.setItem('okiya_darkMode', String(darkMode));
-    document.documentElement.classList.toggle('dark', darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [darkMode]);
 
   useEffect(() => {
