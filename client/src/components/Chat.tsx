@@ -46,8 +46,8 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
               {!isMine && <div style={styles.avatar}>{msg.sender[0]}</div>}
               <div style={{
                 ...styles.bubble,
-                backgroundColor: isMine ? '#3e362e' : '#f0e8db',
-                color: isMine ? '#fff' : '#3e362e',
+                backgroundColor: isMine ? 'var(--chat-bubble-mine)' : 'var(--chat-bubble-other)',
+                color: isMine ? '#fff' : 'var(--text)',
               }}>
                 <div style={styles.sender}>{msg.sender}</div>
                 <div style={styles.text}>{msg.text}</div>
@@ -77,11 +77,11 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%', // растягиваем на всю высоту родителя
+    height: '100%',
     width: '100%',
-    backgroundColor: '#fdfaf5',
+    backgroundColor: 'var(--chat-bg)',
     borderRadius: '20px',
-    border: '1px solid #e0d6c8',
+    border: '1px solid var(--border)',
     overflow: 'hidden',
     fontFamily: '"Inter", sans-serif',
   },
@@ -89,9 +89,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 16px',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#5e503a',
-    borderBottom: '1px solid #e0d6c8',
-    backgroundColor: '#f7f3eb',
+    color: 'var(--text)',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--bg)',
     textTransform: 'uppercase',
     letterSpacing: '1px',
   },
@@ -104,7 +104,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   empty: {
-    color: '#b0a090',
+    color: 'var(--secondary-text)',
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: '50px',
@@ -119,8 +119,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: '24px',
     height: '24px',
     borderRadius: '12px',
-    backgroundColor: '#d4c3b3',
-    color: '#3e362e',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -155,17 +155,18 @@ const styles: Record<string, React.CSSProperties> = {
   inputArea: {
     display: 'flex',
     padding: '8px',
-    borderTop: '1px solid #e0d6c8',
-    backgroundColor: '#f7f3eb',
+    borderTop: '1px solid var(--border)',
+    backgroundColor: 'var(--bg)',
   },
   input: {
     flex: 1,
     padding: '8px 12px',
     borderRadius: '20px',
-    border: '1px solid #d4c3b3',
+    border: '1px solid var(--border)',
     outline: 'none',
     fontSize: '13px',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--cell-bg)',
+    color: 'var(--text)',
     fontFamily: 'inherit',
   },
   sendBtn: {
@@ -174,8 +175,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: '34px',
     borderRadius: '17px',
     border: 'none',
-    backgroundColor: '#3e362e',
-    color: '#fff',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     fontSize: '16px',
     cursor: 'pointer',
     display: 'flex',

@@ -13,6 +13,9 @@
   --chat-bubble-other: #f0e8db;
   --overlay: rgba(0, 0, 0, 0.4);
   --hover-bg: #5a4a3a;
+  --accent: #b8860b;
+  --danger: #b5651d;
+  --success: #4a6741;
 }
 
 .dark {
@@ -21,15 +24,18 @@
   --card-bg: #2c2c2c;
   --cell-bg: #3a3a3a;
   --border: #444444;
-  --btn-bg: #5a4a3a;
+  --btn-bg: #7a6a5a;
   --btn-text: #e0d6c8;
   --secondary-text: #a09080;
   --modal-bg: #2c2c2c;
   --chat-bg: #2c2c2c;
-  --chat-bubble-mine: #5a4a3a;
+  --chat-bubble-mine: #7a6a5a;
   --chat-bubble-other: #3a3a3a;
   --overlay: rgba(0, 0, 0, 0.7);
-  --hover-bg: #6b5b4f;
+  --hover-bg: #8b7b6b;
+  --accent: #c9a96e;
+  --danger: #c97a3a;
+  --success: #6b8b5a;
 }
 
 body {
@@ -37,4 +43,10 @@ body {
   background-color: var(--bg);
   color: var(--text);
   transition: background-color 0.3s, color 0.3s;
+  overflow: hidden; /* убираем скролл */
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
 }

@@ -9,6 +9,7 @@ import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
 import Settings from './Settings';
+import PlayerIntro from './PlayerIntro';
 import { useTheme } from '../contexts/ThemeContext';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
@@ -37,6 +38,8 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlayerIntro, setShowPlayerIntro] = useState(false);
+  const [introNick, setIntroNick] = useState('');
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
@@ -200,6 +203,14 @@ const Game: React.FC = () => {
     if (!socket) return;
 
     socket.on('game_started', (state: GameState) => {
+      // Проверяем, появился ли соперник (была ли игра в статусе waiting)
+      if (gameState?.status === 'waiting' && state.status === 'playing') {
+        const opponentNick = state.myColor === 'red' ? state.nickBlack : state.nickRed;
+        if (opponentNick) {
+          setIntroNick(opponentNick);
+          setShowPlayerIntro(true);
+        }
+      }
       setGameState(state);
       setPersonalGameOver(null);
       setWaitingRestart(false);
@@ -207,6 +218,14 @@ const Game: React.FC = () => {
     });
 
     socket.on('game_state', (state: GameState) => {
+      // Если пришло обновление и статус изменился на playing, тоже показываем интро
+      if (gameState?.status === 'waiting' && state.status === 'playing') {
+        const opponentNick = state.myColor === 'red' ? state.nickBlack : state.nickRed;
+        if (opponentNick) {
+          setIntroNick(opponentNick);
+          setShowPlayerIntro(true);
+        }
+      }
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
         setWaitingRestart(false);
@@ -257,6 +276,14 @@ const Game: React.FC = () => {
       }
       @keyframes placeStone {
         from { transform: scale(0); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes scaleIn {
+        from { transform: scale(0.5); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
     `;
@@ -331,6 +358,12 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
+      {showPlayerIntro && (
+        <PlayerIntro
+          nick={introNick}
+          onFinish={() => setShowPlayerIntro(false)}
+        />
+      )}
       <header style={styles.gameHeader}>
         <h2 style={styles.titleSmall}>Окийя</h2>
         {roomId && <span style={styles.roomCode}>Комната <strong>{roomId}</strong></span>}
@@ -362,17 +395,9 @@ const Game: React.FC = () => {
         </div>
       )}
 
-      <div style={{ position: 'relative', width: 'fit-content', margin: '0 auto' }}>
+      <div style={styles.mainLayout}>
         {!isSpectator && (
-          <div style={{
-            position: 'absolute',
-            right: '100%',
-            top: 0,
-            marginRight: '24px',
-            width: '300px',
-            height: '70vh',
-            zIndex: 10,
-          }}>
+          <div style={styles.chatColumn}>
             <Chat
               messages={gameState.messages ?? []}
               onSend={handleChatSend}
@@ -406,20 +431,20 @@ const Game: React.FC = () => {
             </div>
           )}
           <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={styles.actionBtn}>
+            <button onClick={backToMenu} style={{ ...styles.actionBtn, backgroundColor: 'var(--danger)' }}>
               Выйти в меню
             </button>
             {(gameState.status === 'finished' || gameState.seriesWinner) && (
-              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: '#4a6741' }}>
+              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: 'var(--success)' }}>
                 {waitingReset ? 'Ожидание…' : 'Новая игра'}
               </button>
             )}
             {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: 'var(--danger)' }}>
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: '#5e503a' }}>
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--btn-bg)' }}>
               Настройки
             </button>
           </div>
@@ -441,10 +466,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '100vh',
+    height: '100vh',
     background: 'var(--bg)',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
     padding: '20px',
+    overflow: 'hidden',
   },
   lobbyCard: {
     background: 'var(--card-bg)',
@@ -454,6 +480,8 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '440px',
     width: '100%',
     textAlign: 'center',
+    maxHeight: '90vh',
+    overflowY: 'auto',
   },
   title: {
     fontSize: '52px',
@@ -482,7 +510,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 500,
     border: 'none',
-    borderRadius: '40px', // овал
+    borderRadius: '40px',
     backgroundColor: 'var(--btn-bg)',
     color: 'var(--btn-text)',
     cursor: 'pointer',
@@ -515,13 +543,15 @@ const styles: Record<string, React.CSSProperties> = {
     marginRight: 'auto',
   },
   textBtn: {
-    background: 'none',
-    border: 'none',
+    background: 'var(--card-bg)',
+    border: '1px solid var(--border)',
+    borderRadius: '20px',
     fontSize: '14px',
-    color: 'var(--secondary-text)',
+    color: 'var(--text)',
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
-    textDecoration: 'underline',
+    padding: '8px 20px',
+    transition: 'background-color 0.2s',
   },
   centered: {
     display: 'flex',
@@ -532,22 +562,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '18px',
     color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
+    overflow: 'hidden',
   },
   gameContainer: {
-    textAlign: 'center',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
-    minHeight: '100vh',
-    margin: 0,
-    padding: '24px 16px',
     backgroundColor: 'var(--bg)',
     color: 'var(--text)',
+    overflow: 'hidden',
   },
   gameHeader: {
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'center',
     gap: '20px',
-    marginBottom: '12px',
+    padding: '12px 16px 0',
+    flexShrink: 0,
   },
   titleSmall: {
     fontSize: '36px',
@@ -565,58 +597,82 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: '12px',
+    padding: '8px 16px',
     fontSize: '13px',
+    flexShrink: 0,
   },
   score: {
     fontSize: '16px',
     fontWeight: 500,
-    marginBottom: '8px',
+    margin: '0 0 8px',
+    flexShrink: 0,
   },
   turnIndicator: {
     fontSize: '16px',
     marginBottom: '4px',
     fontWeight: 500,
-    color: '#b8860b',
+    color: 'var(--accent)',
+  },
+  mainLayout: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: '40px',
+    padding: '0 16px 16px',
+    overflow: 'hidden',
+    minHeight: 0,
+  },
+  chatColumn: {
+    width: '300px',
+    height: '100%',
+    maxHeight: 'calc(100vh - 180px)',
+    flexShrink: 0,
+    alignSelf: 'stretch',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
+    flexShrink: 0,
+    maxHeight: '100%',
+    overflow: 'hidden',
   },
   boardArea: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    flexShrink: 0,
   },
   gameOverBlock: {
     background: 'var(--card-bg)',
     borderRadius: '16px',
-    padding: '16px',
+    padding: '12px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
     textAlign: 'center',
+    flexShrink: 0,
   },
   message: {
     fontWeight: 500,
     color: 'var(--text)',
     fontSize: '16px',
-    margin: '0 0 12px',
+    margin: '0 0 8px',
   },
   buttonRow: {
     display: 'flex',
-    gap: '12px',
+    gap: '8px',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   actionBtn: {
-    padding: '12px 24px',
+    padding: '10px 20px',
     fontSize: '14px',
     fontWeight: 500,
     border: 'none',
     borderRadius: '40px',
-    backgroundColor: 'var(--btn-bg)',
-    color: 'var(--btn-text)',
+    color: '#fff',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
   },
