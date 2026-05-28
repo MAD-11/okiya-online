@@ -477,7 +477,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: '"Inter", "Segoe UI", sans-serif',
     fontWeight: 300,
   },
-  buttonGroup: { /* ... */ },
+  buttonGroup: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: '24px',
+  },
   primaryBtn: {
     padding: '14px 32px',
     fontSize: '16px',
@@ -523,6 +529,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
     textDecoration: 'underline',
+    textUnderlineOffset: '4px',
   },
   centered: {
     display: 'flex',
@@ -543,7 +550,13 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text)',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
   },
-  gameHeader: { /* ... */ },
+  gameHeader: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: '20px',
+    padding: '16px 20px 8px',
+  },
   titleSmall: {
     fontSize: '32px',
     fontWeight: 400,
@@ -577,10 +590,31 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: '#b8860b',
   },
-  gameLayout: { /* ... */ },
-  chatColumn: { /* ... */ },
-  centerColumn: { /* ... */ },
-  boardArea: { /* ... */ },
+  gameLayout: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: '24px',
+    flex: 1,
+    padding: '0 20px 20px',
+    overflow: 'hidden',
+  },
+  chatColumn: {
+    width: '280px',
+    height: '70vh',
+    flexShrink: 0,
+  },
+  centerColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  boardArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
   gameOverBlock: {
     background: 'var(--card-bg)',
     borderRadius: '16px',
@@ -595,7 +629,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     margin: '0 0 12px',
   },
-  buttonRow: { /* ... */ },
+  buttonRow: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
   actionBtn: {
     padding: '10px 20px',
     fontSize: '14px',
@@ -628,9 +667,30 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
   },
-  vsOverlay: { /* ... */ },
-  vsContent: { /* ... */ },
-  vsText: { /* ... */ },
+  vsOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+    animation: 'vsFadeIn 2.5s ease-out forwards',
+  },
+  vsContent: {
+    display: 'flex',
+    gap: '30px',
+    fontSize: '48px',
+    fontWeight: 700,
+    color: '#fff',
+    fontFamily: '"Cormorant Garamond", serif',
+  },
+  vsText: {
+    color: '#c9a96e',
+  },
 };
 
 export default Game;

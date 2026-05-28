@@ -9,10 +9,10 @@
   --secondary-text: #8b7a6b;
   --modal-bg: #ffffff;
   --chat-bg: #fdfaf5;
-  --chat-bubble-mine: #3e362e;
-  --chat-bubble-other: #f0e8db;
-  --chat-text-mine: #ffffff;
-  --chat-text-other: #3e362e;
+  --chat-bubble-mine: #e8f0fe;      /* светлый голубой для своих */
+  --chat-bubble-other: #f0e8db;     /* светлый кремовый для чужих */
+  --chat-text-mine: #1e1e1e;        /* почти чёрный */
+  --chat-text-other: #3e362e;       /* тёмно-коричневый */
   --overlay: rgba(0, 0, 0, 0.4);
   --hover-bg: #5a4a3a;
   --game-btn-bg: #5e503a;
