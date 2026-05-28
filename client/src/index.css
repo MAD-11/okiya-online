@@ -5,13 +5,14 @@
   --cell-bg: #fdfaf5;
   --border: #e0d6c8;
   --btn-bg: #3e362e;
-  --btn-text: #fff;
+  --btn-text: #ffffff;
   --secondary-text: #8b7a6b;
   --modal-bg: #ffffff;
   --chat-bg: #fdfaf5;
   --chat-bubble-mine: #3e362e;
   --chat-bubble-other: #f0e8db;
-  --overlay: rgba(0,0,0,0.4);
+  --overlay: rgba(0, 0, 0, 0.4);
+  --hover-bg: #5a4a3a;
 }
 
 .dark {
@@ -19,7 +20,7 @@
   --text: #e0d6c8;
   --card-bg: #2c2c2c;
   --cell-bg: #3a3a3a;
-  --border: #444;
+  --border: #444444;
   --btn-bg: #5a4a3a;
   --btn-text: #e0d6c8;
   --secondary-text: #a09080;
@@ -27,7 +28,8 @@
   --chat-bg: #2c2c2c;
   --chat-bubble-mine: #5a4a3a;
   --chat-bubble-other: #3a3a3a;
-  --overlay: rgba(0,0,0,0.7);
+  --overlay: rgba(0, 0, 0, 0.7);
+  --hover-bg: #6b5b4f;
 }
 
 body {

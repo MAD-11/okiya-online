@@ -19,40 +19,73 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
   }, [socket, playerId]);
 
   return (
-    <div style={{ fontFamily: '"Inter", sans-serif' }}>
-      <h3 style={{ fontSize: '20px', margin: '0 0 20px', color: '#3e362e', fontWeight: 400 }}>Профиль</h3>
+    <div style={styles.container}>
+      <h3 style={styles.title}>Профиль</h3>
       {stats ? (
-        <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '24px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', fontWeight: 600, color: '#3e362e' }}>{stats.games}</div>
-            <div style={{ fontSize: '12px', color: '#8b7a6b' }}>игр</div>
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}>
+            <div style={styles.statValue}>{stats.games}</div>
+            <div style={styles.statLabel}>игр</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', fontWeight: 600, color: '#3e362e' }}>{stats.wins}</div>
-            <div style={{ fontSize: '12px', color: '#8b7a6b' }}>побед</div>
+          <div style={styles.statCard}>
+            <div style={styles.statValue}>{stats.wins}</div>
+            <div style={styles.statLabel}>побед</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', fontWeight: 600, color: '#3e362e' }}>{stats.draws}</div>
-            <div style={{ fontSize: '12px', color: '#8b7a6b' }}>ничьих</div>
+          <div style={styles.statCard}>
+            <div style={styles.statValue}>{stats.draws}</div>
+            <div style={styles.statLabel}>ничьих</div>
           </div>
         </div>
       ) : (
-        <p style={{ color: '#8b7a6b' }}>Загрузка...</p>
+        <p style={{ color: 'var(--secondary-text)' }}>Загрузка...</p>
       )}
-      <button onClick={onClose} style={{
-        display: 'block',
-        margin: '0 auto',
-        background: '#3e362e',
-        border: 'none',
-        borderRadius: '20px',
-        padding: '10px 24px',
-        color: '#fff',
-        fontWeight: 500,
-        cursor: 'pointer',
-        fontFamily: '"Inter", sans-serif',
-      }}>Закрыть</button>
+      <button onClick={onClose} style={styles.closeBtn}>Закрыть</button>
     </div>
   );
+};
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    padding: '24px',
+    background: 'var(--modal-bg)',
+    color: 'var(--text)',
+    fontFamily: '"Inter", sans-serif',
+  },
+  title: {
+    fontSize: '20px',
+    fontWeight: 400,
+    margin: '0 0 20px',
+    color: 'var(--text)',
+    fontFamily: '"Cormorant Garamond", serif',
+  },
+  statsGrid: {
+    display: 'flex',
+    justifyContent: 'space-around',
+    marginBottom: '24px',
+  },
+  statCard: {
+    textAlign: 'center',
+  },
+  statValue: {
+    fontSize: '24px',
+    fontWeight: 600,
+    color: 'var(--text)',
+  },
+  statLabel: {
+    fontSize: '12px',
+    color: 'var(--secondary-text)',
+  },
+  closeBtn: {
+    display: 'block',
+    margin: '0 auto',
+    background: 'var(--btn-bg)',
+    border: 'none',
+    borderRadius: '20px',
+    padding: '10px 24px',
+    color: 'var(--btn-text)',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
 };
 
 export default Profile;

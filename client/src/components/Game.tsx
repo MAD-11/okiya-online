@@ -363,7 +363,6 @@ const Game: React.FC = () => {
       )}
 
       <div style={{ position: 'relative', width: 'fit-content', margin: '0 auto' }}>
-        {/* Чат всегда, если есть комната и игрок не зритель */}
         {!isSpectator && (
           <div style={{
             position: 'absolute',
@@ -479,21 +478,24 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '24px',
   },
   primaryBtn: {
-    padding: '12px 28px',
-    fontSize: '15px',
+    padding: '14px 32px',
+    fontSize: '16px',
     fontWeight: 500,
     border: 'none',
-    borderRadius: '40px',
+    borderRadius: '40px', // овал
     backgroundColor: 'var(--btn-bg)',
     color: 'var(--btn-text)',
     cursor: 'pointer',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
+    transition: 'background-color 0.2s',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    minWidth: '100px',
   },
   secondaryBtn: {
-    padding: '12px 28px',
-    fontSize: '15px',
+    padding: '14px 32px',
+    fontSize: '16px',
     fontWeight: 500,
-    border: '1px solid var(--btn-bg)',
+    border: '2px solid var(--btn-bg)',
     borderRadius: '40px',
     backgroundColor: 'transparent',
     color: 'var(--btn-bg)',
@@ -502,6 +504,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     boxSizing: 'border-box',
     marginTop: '12px',
+    transition: 'background-color 0.2s, color 0.2s',
   },
   separator: {
     height: '1px',
@@ -607,7 +610,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
   },
   actionBtn: {
-    padding: '10px 20px',
+    padding: '12px 24px',
     fontSize: '14px',
     fontWeight: 500,
     border: 'none',
@@ -615,6 +618,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: 'var(--btn-bg)',
     color: 'var(--btn-text)',
     cursor: 'pointer',
+    transition: 'background-color 0.2s',
   },
   modalOverlay: {
     position: 'fixed',
