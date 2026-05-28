@@ -50,6 +50,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--modal-bg)',
     color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
+    borderRadius: '24px',
   },
   title: {
     fontSize: '20px',

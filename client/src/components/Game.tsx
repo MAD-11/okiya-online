@@ -9,7 +9,6 @@ import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
 import Settings from './Settings';
-import PlayerIntro from './PlayerIntro';
 import { useTheme } from '../contexts/ThemeContext';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
@@ -38,8 +37,9 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showPlayerIntro, setShowPlayerIntro] = useState(false);
-  const [introNick, setIntroNick] = useState('');
+
+  // Анимация VS
+  const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
@@ -203,14 +203,6 @@ const Game: React.FC = () => {
     if (!socket) return;
 
     socket.on('game_started', (state: GameState) => {
-      // Проверяем, появился ли соперник (была ли игра в статусе waiting)
-      if (gameState?.status === 'waiting' && state.status === 'playing') {
-        const opponentNick = state.myColor === 'red' ? state.nickBlack : state.nickRed;
-        if (opponentNick) {
-          setIntroNick(opponentNick);
-          setShowPlayerIntro(true);
-        }
-      }
       setGameState(state);
       setPersonalGameOver(null);
       setWaitingRestart(false);
@@ -218,14 +210,6 @@ const Game: React.FC = () => {
     });
 
     socket.on('game_state', (state: GameState) => {
-      // Если пришло обновление и статус изменился на playing, тоже показываем интро
-      if (gameState?.status === 'waiting' && state.status === 'playing') {
-        const opponentNick = state.myColor === 'red' ? state.nickBlack : state.nickRed;
-        if (opponentNick) {
-          setIntroNick(opponentNick);
-          setShowPlayerIntro(true);
-        }
-      }
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
         setWaitingRestart(false);
@@ -259,32 +243,27 @@ const Game: React.FC = () => {
       setPersonalGameOver(text);
     });
 
+    socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
+      setVsAnimation(data);
+      setTimeout(() => setVsAnimation(null), 2500);
+    });
+
     return () => {
       socket.off('game_started');
       socket.off('game_state');
       socket.off('game_over');
+      socket.off('opponent_joined');
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
 
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
-      @keyframes pulse {
-        0% { box-shadow: 0 0 8px #f1c40f88; }
-        50% { box-shadow: 0 0 18px #f1c40fcc; }
-        100% { box-shadow: 0 0 8px #f1c40f88; }
-      }
-      @keyframes placeStone {
-        from { transform: scale(0); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes scaleIn {
-        from { transform: scale(0.5); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
+      @keyframes vsFadeIn {
+        0% { opacity: 0; transform: scale(0.8); }
+        10% { opacity: 1; transform: scale(1); }
+        90% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.2); }
       }
     `;
     document.head.appendChild(style);
@@ -358,11 +337,14 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
-      {showPlayerIntro && (
-        <PlayerIntro
-          nick={introNick}
-          onFinish={() => setShowPlayerIntro(false)}
-        />
+      {vsAnimation && (
+        <div style={styles.vsOverlay}>
+          <div style={styles.vsContent}>
+            <span>{vsAnimation.nick1}</span>
+            <span style={styles.vsText}>VS</span>
+            <span>{vsAnimation.nick2}</span>
+          </div>
+        </div>
       )}
       <header style={styles.gameHeader}>
         <h2 style={styles.titleSmall}>Окийя</h2>
@@ -387,7 +369,7 @@ const Game: React.FC = () => {
         </div>
       )}
       {gameState.status === 'playing' && !isSpectator && (
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 4, textAlign: 'center' }}>
           <p style={styles.turnIndicator}>
             {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
           </p>
@@ -395,7 +377,8 @@ const Game: React.FC = () => {
         </div>
       )}
 
-      <div style={styles.mainLayout}>
+      <div style={styles.gameLayout}>
+        {/* Чат всегда слева, если не зритель */}
         {!isSpectator && (
           <div style={styles.chatColumn}>
             <Chat
@@ -406,6 +389,7 @@ const Game: React.FC = () => {
           </div>
         )}
 
+        {/* Центральная колонка: доска и кнопки */}
         <div style={styles.centerColumn}>
           <div style={styles.boardArea}>
             <Board
@@ -431,20 +415,20 @@ const Game: React.FC = () => {
             </div>
           )}
           <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={{ ...styles.actionBtn, backgroundColor: 'var(--danger)' }}>
+            <button onClick={backToMenu} style={styles.actionBtn}>
               Выйти в меню
             </button>
             {(gameState.status === 'finished' || gameState.seriesWinner) && (
-              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: 'var(--success)' }}>
+              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: '#4a6741' }}>
                 {waitingReset ? 'Ожидание…' : 'Новая игра'}
               </button>
             )}
             {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: 'var(--danger)' }}>
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--btn-bg)' }}>
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: '#5e503a' }}>
               Настройки
             </button>
           </div>
@@ -466,11 +450,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100vh',
+    minHeight: '100vh',
     background: 'var(--bg)',
     fontFamily: '"Cormorant Garamond", "Times New Roman", serif',
     padding: '20px',
-    overflow: 'hidden',
   },
   lobbyCard: {
     background: 'var(--card-bg)',
@@ -480,8 +463,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '440px',
     width: '100%',
     textAlign: 'center',
-    maxHeight: '90vh',
-    overflowY: 'auto',
   },
   title: {
     fontSize: '52px',
@@ -543,15 +524,13 @@ const styles: Record<string, React.CSSProperties> = {
     marginRight: 'auto',
   },
   textBtn: {
-    background: 'var(--card-bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '20px',
+    background: 'none',
+    border: 'none',
     fontSize: '14px',
-    color: 'var(--text)',
+    color: 'var(--secondary-text)',
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
-    padding: '8px 20px',
-    transition: 'background-color 0.2s',
+    textDecoration: 'underline',
   },
   centered: {
     display: 'flex',
@@ -562,27 +541,25 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '18px',
     color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
-    overflow: 'hidden',
   },
   gameContainer: {
-    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    height: '100vh',
+    overflow: 'hidden',
     backgroundColor: 'var(--bg)',
     color: 'var(--text)',
-    overflow: 'hidden',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
   },
   gameHeader: {
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'center',
     gap: '20px',
-    padding: '12px 16px 0',
-    flexShrink: 0,
+    padding: '16px 20px 8px',
   },
   titleSmall: {
-    fontSize: '36px',
+    fontSize: '32px',
     fontWeight: 400,
     margin: 0,
     fontFamily: '"Cormorant Garamond", serif',
@@ -597,83 +574,75 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: '8px 16px',
+    marginBottom: '8px',
     fontSize: '13px',
-    flexShrink: 0,
   },
   score: {
     fontSize: '16px',
     fontWeight: 500,
-    margin: '0 0 8px',
-    flexShrink: 0,
+    marginBottom: '4px',
+    textAlign: 'center',
   },
   turnIndicator: {
     fontSize: '16px',
-    marginBottom: '4px',
+    margin: '0 0 4px',
     fontWeight: 500,
-    color: 'var(--accent)',
+    color: '#b8860b',
   },
-  mainLayout: {
-    flex: 1,
+  gameLayout: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    gap: '40px',
-    padding: '0 16px 16px',
+    gap: '24px',
+    flex: 1,
+    padding: '0 20px 20px',
     overflow: 'hidden',
-    minHeight: 0,
   },
   chatColumn: {
-    width: '300px',
-    height: '100%',
-    maxHeight: 'calc(100vh - 180px)',
+    width: '280px',
+    height: '70vh',
     flexShrink: 0,
-    alignSelf: 'stretch',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    flexShrink: 0,
-    maxHeight: '100%',
-    overflow: 'hidden',
   },
   boardArea: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    flexShrink: 0,
   },
   gameOverBlock: {
     background: 'var(--card-bg)',
     borderRadius: '16px',
-    padding: '12px',
+    padding: '16px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
     textAlign: 'center',
-    flexShrink: 0,
   },
   message: {
     fontWeight: 500,
     color: 'var(--text)',
     fontSize: '16px',
-    margin: '0 0 8px',
+    margin: '0 0 12px',
   },
   buttonRow: {
     display: 'flex',
-    gap: '8px',
+    gap: '12px',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   actionBtn: {
     padding: '10px 20px',
     fontSize: '14px',
-    fontWeight: 500,
+    fontWeight: 600,
     border: 'none',
-    borderRadius: '40px',
-    color: '#fff',
+    borderRadius: '30px',
+    backgroundColor: 'var(--game-btn-bg)',
+    color: 'var(--game-btn-text)',
     cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
     transition: 'background-color 0.2s',
   },
   modalOverlay: {
@@ -695,6 +664,30 @@ const styles: Record<string, React.CSSProperties> = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
+  },
+  vsOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+    animation: 'vsFadeIn 2.5s ease-out forwards',
+  },
+  vsContent: {
+    display: 'flex',
+    gap: '30px',
+    fontSize: '48px',
+    fontWeight: 700,
+    color: '#fff',
+    fontFamily: '"Cormorant Garamond", serif',
+  },
+  vsText: {
+    color: '#c9a96e',
   },
 };
 

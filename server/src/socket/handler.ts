@@ -158,7 +158,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ playerToken, state: getClientGameState(game, socket.id, io) });
       saveGame(roomId, game);
       if (game.players.red && game.players.black) {
+        // Отправляем событие обоим о том, что соперник присоединился
         logger.info(`Sending game_state to both in room ${roomId}`);
+        io.to(roomId).emit('opponent_joined', {
+          nick1: game.nickRed,
+          nick2: game.nickBlack,
+        });
         sendPersonalGameState(io, game);
       }
     });
@@ -362,16 +367,18 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
+        // Очищаем мёртвые сокеты перед показом
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
+        // Показываем только если есть свободный слот
         if (!game.players.red || !game.players.black) {
           rooms.push({
             roomId,
             players: `${game.players.red ? 1 : 0}/2`,
             status: game.status,
-            nickRed: game.nickRed || '???',
-            nickBlack: game.nickBlack || '???',
+            nickRed: game.players.red ? game.nickRed : 'ожидание',
+            nickBlack: game.players.black ? game.nickBlack : 'ожидание',
           });
         }
       }

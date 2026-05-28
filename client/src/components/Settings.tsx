@@ -45,13 +45,16 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     padding: '24px',
+    background: 'var(--modal-bg)',
+    color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
+    borderRadius: '24px',
   },
   title: {
     fontSize: '20px',
     fontWeight: 400,
-    color: 'var(--text)',
     margin: '0 0 20px',
+    color: 'var(--text)',
     fontFamily: '"Cormorant Garamond", serif',
   },
   option: {
@@ -89,7 +92,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--btn-text)',
     fontWeight: 500,
     cursor: 'pointer',
-    fontFamily: '"Inter", sans-serif',
   },
 };
 

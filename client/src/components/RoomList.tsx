@@ -73,7 +73,7 @@ const RoomList: React.FC<RoomListProps> = ({ onJoin, socket, onClose }) => {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    background: '#fff',
+    background: 'var(--modal-bg)',
     borderRadius: '20px',
     boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
     padding: '20px',
@@ -81,6 +81,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '90%',
     maxHeight: '70vh',
     overflowY: 'auto',
+    color: 'var(--text)',
   },
   header: {
     display: 'flex',
@@ -92,17 +93,17 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: '18px',
     fontWeight: 500,
-    color: '#3e362e',
+    color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
   },
   refreshBtn: {
     background: 'none',
-    border: '1px solid #d4c3b3',
+    border: '1px solid var(--border)',
     borderRadius: '20px',
     padding: '4px 12px',
     fontSize: '13px',
     cursor: 'pointer',
-    color: '#5e503a',
+    color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
   },
   closeBtn: {
@@ -110,7 +111,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontSize: '18px',
     cursor: 'pointer',
-    color: '#8b7a6b',
+    color: 'var(--secondary-text)',
     marginLeft: '8px',
   },
   list: {
@@ -119,7 +120,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   empty: {
-    color: '#b0a090',
+    color: 'var(--secondary-text)',
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: '20px',
@@ -130,8 +131,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '12px',
     borderRadius: '12px',
-    background: '#faf7f2',
-    border: '1px solid #e0d6c8',
+    background: 'var(--card-bg)',
+    border: '1px solid var(--border)',
   },
   roomInfo: {
     display: 'flex',
@@ -140,19 +141,19 @@ const styles: Record<string, React.CSSProperties> = {
   roomCode: {
     fontWeight: 600,
     fontSize: '15px',
-    color: '#3e362e',
+    color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
   },
   players: {
     fontSize: '13px',
-    color: '#7f6e5d',
+    color: 'var(--secondary-text)',
   },
   joinBtn: {
     padding: '8px 16px',
     borderRadius: '20px',
     border: 'none',
-    backgroundColor: '#3e362e',
-    color: '#fff',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
     cursor: 'pointer',
     fontWeight: 500,
     fontFamily: '"Inter", sans-serif',
