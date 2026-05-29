@@ -1,6 +1,5 @@
 import React from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
-import { initAudio } from '../utils/sound';
 
 interface BoardProps {
   board: BoardType;
@@ -23,13 +22,6 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
   const cellSize = 88;
   const fontSize = 32;
 
-  const handleCellClick = (row: number, col: number) => {
-    if (validMoves[row]?.[col]) {
-      initAudio();
-      onClick(row, col);
-    }
-  };
-
   return (
     <div style={styles.boardContainer}>
       <div style={styles.grid}>
@@ -41,7 +33,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
             return (
               <div
                 key={`${r}-${c}`}
-                onClick={() => handleCellClick(r, c)}
+                onClick={() => isValid && onClick(r, c)}
                 style={{
                   ...styles.cell,
                   width: cellSize,

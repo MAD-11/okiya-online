@@ -73,6 +73,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '8px',
     marginTop: '8px',
+    flexWrap: 'wrap',
   },
   skinBtn: {
     padding: '8px 16px',

@@ -4,7 +4,7 @@ import { GameState, ValidMoves, Tile } from '../types/game';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
+import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
 import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
@@ -37,7 +37,6 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
@@ -70,39 +69,8 @@ const Game: React.FC = () => {
       setPersonalGameOver(null);
       setWaitingRestart(false);
       setWaitingReset(false);
-      setReconnecting(false);
     }
   };
-
-  useEffect(() => {
-    if (!connected && roomId && !reconnecting) {
-      setReconnecting(true);
-      setMessage('Потеряно соединение с сервером. Переподключение...');
-      const timeout = setTimeout(() => {
-        if (!connected) {
-          setMessage('Не удалось переподключиться. Обновите страницу.');
-        }
-        setReconnecting(false);
-      }, 5000);
-      return () => clearTimeout(timeout);
-    } else if (connected && reconnecting) {
-      setReconnecting(false);
-      setMessage('');
-      const savedRoomId = localStorage.getItem('okiya_roomId');
-      const savedToken = localStorage.getItem('okiya_playerToken');
-      if (savedRoomId && savedToken && socket) {
-        socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
-          if (res.error) {
-            setMessage(res.error);
-            clearSavedRoom();
-            setGameState(null);
-          } else {
-            setRoomId(savedRoomId);
-          }
-        });
-      }
-    }
-  }, [connected, roomId, reconnecting, socket]);
 
   useEffect(() => {
     if (!socket || !connected) return;
@@ -231,6 +199,7 @@ const Game: React.FC = () => {
 
   useEffect(() => {
     if (!socket) return;
+
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
@@ -240,6 +209,7 @@ const Game: React.FC = () => {
       }
       setGameState(state);
     });
+
     socket.on('game_over', (data: { winner: string; yourResult: string; seriesWinner: string | null }) => {
       if (data.yourResult === 'win') playWinSound();
       else if (data.yourResult === 'lose') playLoseSound();
@@ -263,30 +233,18 @@ const Game: React.FC = () => {
       }
       setPersonalGameOver(text);
     });
+
     socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
       setVsAnimation(data);
       setTimeout(() => setVsAnimation(null), 2500);
     });
+
     return () => {
       socket.off('game_state');
       socket.off('game_over');
       socket.off('opponent_joined');
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes vsFadeIn {
-        0% { opacity: 0; transform: scale(0.8); }
-        10% { opacity: 1; transform: scale(1); }
-        90% { opacity: 1; transform: scale(1); }
-        100% { opacity: 0; transform: scale(1.2); }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
 
   if (!connected) {
     return (
@@ -302,7 +260,7 @@ const Game: React.FC = () => {
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && <p style={{ color: '#4a3f35', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
+          {nick && <p style={{ color: 'var(--secondary-text)', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
@@ -319,7 +277,7 @@ const Game: React.FC = () => {
             <button onClick={() => setShowProfile(true)} style={styles.textBtn}>👤 Профиль</button>
             <button onClick={() => setShowSettings(true)} style={styles.textBtn}>⚙️ Настройки</button>
           </div>
-          {message && <p style={{ color: '#c0392b', marginTop: 16, fontSize: 14 }}>{message}</p>}
+          {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
         {showProfile && (
           <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
@@ -355,7 +313,6 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
-      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
       {vsAnimation && (
         <div style={styles.vsOverlay}>
           <div style={styles.vsContent}>
@@ -445,7 +402,7 @@ const Game: React.FC = () => {
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: '#5e503a' }}>
+            <button onClick={() => setShowSettings(true)} style={styles.actionBtn}>
               Настройки
             </button>
           </div>
@@ -709,18 +666,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   vsText: {
     color: '#c9a96e',
-  },
-  reconnectBanner: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'var(--timer-low)',
-    color: '#fff',
-    textAlign: 'center',
-    padding: '8px',
-    zIndex: 2000,
-    fontWeight: 'bold',
   },
 };
 
