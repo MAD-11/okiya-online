@@ -1,22 +1,34 @@
 let audioCtx: AudioContext | null = null;
 let isResumed = false;
 
-function getAudioContext() {
+function getAudioContext(): AudioContext {
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
   return audioCtx;
 }
 
-export function initAudio() {
+export async function initAudio(): Promise<void> {
   const ctx = getAudioContext();
   if (!isResumed && ctx.state === 'suspended') {
-    ctx.resume().then(() => { isResumed = true; }).catch(console.warn);
+    try {
+      await ctx.resume();
+      isResumed = true;
+    } catch (e) {
+      console.warn('AudioContext resume failed', e);
+    }
   }
 }
 
-export function playMoveSound() {
-  if (!isResumed) return;
+async function ensureAudio(): Promise<boolean> {
+  if (!isResumed) {
+    await initAudio();
+  }
+  return isResumed;
+}
+
+export async function playMoveSound() {
+  if (!(await ensureAudio())) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -29,11 +41,11 @@ export function playMoveSound() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.1);
-  } catch (e) { /* игнорируем */ }
+  } catch (e) { /* ignore */ }
 }
 
-export function playWinSound() {
-  if (!isResumed) return;
+export async function playWinSound() {
+  if (!(await ensureAudio())) return;
   try {
     const ctx = getAudioContext();
     const notes = [523.25, 659.25, 783.99];
@@ -52,8 +64,8 @@ export function playWinSound() {
   } catch (e) {}
 }
 
-export function playLoseSound() {
-  if (!isResumed) return;
+export async function playLoseSound() {
+  if (!(await ensureAudio())) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -69,8 +81,8 @@ export function playLoseSound() {
   } catch (e) {}
 }
 
-export function playDrawSound() {
-  if (!isResumed) return;
+export async function playDrawSound() {
+  if (!(await ensureAudio())) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();

@@ -183,6 +183,7 @@ const Game: React.FC = () => {
   }, [gameState]);
 
   const handleCellClick = useCallback((row: number, col: number) => {
+    initAudio();
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (gameState.myColor !== gameState.currentPlayer) {
       setMessage('Сейчас не ваш ход');
