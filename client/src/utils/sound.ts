@@ -9,10 +9,13 @@ function getAudioContext(): AudioContext {
 }
 
 export async function initAudio(): Promise<void> {
+  console.log('initAudio called');
   const ctx = getAudioContext();
+  console.log('AudioContext state:', ctx.state);
   if (!isResumed && ctx.state === 'suspended') {
     try {
       await ctx.resume();
+      console.log('AudioContext resumed, new state:', ctx.state);
       isResumed = true;
     } catch (e) {
       console.warn('AudioContext resume failed', e);

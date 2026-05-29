@@ -24,10 +24,11 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
   const fontSize = 32;
 
   const handleCellClick = (row: number, col: number) => {
-    if (validMoves[row]?.[col]) {
-      initAudio();
-      onClick(row, col);
-    }
+  console.log('Board click, initAudio');
+  initAudio();
+  if (validMoves[row]?.[col]) {
+    onClick(row, col);
+  }
   };
 
   return (
