@@ -12,6 +12,8 @@ interface ChatProps {
   myNick?: string;
 }
 
+const MAX_MESSAGE_LENGTH = 200; // FIX: лимит
+
 const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -21,7 +23,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
   }, [messages]);
 
   const handleSend = () => {
-    const trimmed = input.trim();
+    const trimmed = input.trim().slice(0, MAX_MESSAGE_LENGTH);
     if (trimmed) {
       onSend(trimmed);
       setInput('');
@@ -65,6 +67,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Сообщение..."
+          maxLength={MAX_MESSAGE_LENGTH} // FIX: атрибут maxlength
           style={styles.input}
         />
         <button onClick={handleSend} style={styles.sendBtn}>↑</button>
@@ -72,6 +75,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
     </div>
   );
 };
+
 
 const styles: Record<string, React.CSSProperties> = {
   container: {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
+import { initAudio } from '../utils/sound'; // FIX: импорт
 
 interface BoardProps {
   board: BoardType;
@@ -22,6 +23,13 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
   const cellSize = 88;
   const fontSize = 32;
 
+  const handleCellClick = (row: number, col: number) => {
+    if (validMoves[row]?.[col]) {
+      initAudio(); // FIX: разрешаем звук при первом клике на игровое поле
+      onClick(row, col);
+    }
+  };
+
   return (
     <div style={styles.boardContainer}>
       <div style={styles.grid}>
@@ -33,7 +41,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
             return (
               <div
                 key={`${r}-${c}`}
-                onClick={() => isValid && onClick(r, c)}
+                onClick={() => handleCellClick(r, c)}
                 style={{
                   ...styles.cell,
                   width: cellSize,
@@ -66,7 +74,7 @@ function getTileEmoji(plant: string, symbol: string): string {
     sakura: '🌸', iris: '🌺', pine: '🌲', maple: '🍁',
     sun: '☀️', bird: '🐦', rain: '🌧️', tanzaku: '📜',
   };
-  return `${map[plant] || ' '}${map[symbol] || ' '}`;
+  return `${map[plant] || '❓'}${map[symbol] || '❓'}`; // FIX: fallback
 }
 
 const styles: Record<string, React.CSSProperties> = {

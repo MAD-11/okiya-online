@@ -1,4 +1,5 @@
 let audioCtx: AudioContext | null = null;
+let isResumed = false;
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -7,7 +8,18 @@ function getAudioContext() {
   return audioCtx;
 }
 
+// FIX: функция для вызова по первому жесту пользователя
+export function initAudio() {
+  const ctx = getAudioContext();
+  if (!isResumed && ctx.state === 'suspended') {
+    ctx.resume().then(() => {
+      isResumed = true;
+    }).catch(e => console.warn('AudioContext resume failed', e));
+  }
+}
+
 export function playMoveSound() {
+  if (!isResumed) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -20,10 +32,11 @@ export function playMoveSound() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.1);
-  } catch (e) { /* игнорируем ошибки, если браузер не поддерживает */ }
+  } catch (e) { /* игнорируем */ }
 }
 
 export function playWinSound() {
+  if (!isResumed) return;
   try {
     const ctx = getAudioContext();
     const notes = [523.25, 659.25, 783.99];
@@ -43,6 +56,7 @@ export function playWinSound() {
 }
 
 export function playLoseSound() {
+  if (!isResumed) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -59,6 +73,7 @@ export function playLoseSound() {
 }
 
 export function playDrawSound() {
+  if (!isResumed) return;
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();

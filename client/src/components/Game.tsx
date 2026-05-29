@@ -4,7 +4,7 @@ import { GameState, ValidMoves, Tile } from '../types/game';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
 import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
@@ -37,6 +37,7 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false); // FIX: состояние переподключения
 
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
@@ -70,8 +71,41 @@ const Game: React.FC = () => {
       setPersonalGameOver(null);
       setWaitingRestart(false);
       setWaitingReset(false);
+      setReconnecting(false);
     }
   };
+
+  // FIX: мониторинг соединения
+  useEffect(() => {
+    if (!connected && roomId && !reconnecting) {
+      setReconnecting(true);
+      setMessage('Потеряно соединение с сервером. Переподключение...');
+      const timeout = setTimeout(() => {
+        if (!connected) {
+          setMessage('Не удалось переподключиться. Обновите страницу.');
+        }
+        setReconnecting(false);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    } else if (connected && reconnecting) {
+      setReconnecting(false);
+      setMessage('');
+      // повторно подключаемся к комнате
+      const savedRoomId = localStorage.getItem('okiya_roomId');
+      const savedToken = localStorage.getItem('okiya_playerToken');
+      if (savedRoomId && savedToken && socket) {
+        socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
+          if (res.error) {
+            setMessage(res.error);
+            clearSavedRoom();
+            setGameState(null);
+          } else {
+            setRoomId(savedRoomId);
+          }
+        });
+      }
+    }
+  }, [connected, roomId, reconnecting, socket]);
 
   useEffect(() => {
     if (!socket || !connected) return;
@@ -201,12 +235,7 @@ const Game: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('game_started', (state: GameState) => {
-      setGameState(state);
-      setPersonalGameOver(null);
-      setWaitingRestart(false);
-      setWaitingReset(false);
-    });
+    // FIX: удалён обработчик game_started, так как сервер его не посылает
 
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
@@ -248,7 +277,6 @@ const Game: React.FC = () => {
     });
 
     return () => {
-      socket.off('game_started');
       socket.off('game_state');
       socket.off('game_over');
       socket.off('opponent_joined');
@@ -336,6 +364,7 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
+      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
       {vsAnimation && (
         <div style={styles.vsOverlay}>
           <div style={styles.vsContent}>
@@ -441,6 +470,7 @@ const Game: React.FC = () => {
     </div>
   );
 };
+
 
 // Стили
 const styles: Record<string, React.CSSProperties> = {
@@ -666,6 +696,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
+  },
+  reconnectBanner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#e67e22',
+    color: 'white',
+    textAlign: 'center',
+    padding: '8px',
+    zIndex: 2000,
+    fontWeight: 'bold',
   },
   vsOverlay: {
     position: 'fixed',

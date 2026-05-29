@@ -5,7 +5,13 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 export const pubClient = new Redis(redisUrl);
 export const subClient = pubClient.duplicate();
+
+// FIX: отдельный клиент для операций с данными
 const dataClient = new Redis(redisUrl);
+
+// FIX: клиенты для чата (Pub/Sub)
+export const chatPublisher = new Redis(redisUrl);
+export const chatSubscriber = chatPublisher.duplicate();
 
 const GAME_PREFIX = 'okiya:game:';
 const GAME_TTL = 3600; // 1 час
@@ -86,15 +92,33 @@ export async function deleteGame(roomId: string): Promise<void> {
   await dataClient.del(GAME_PREFIX + roomId);
 }
 
+// FIX: замена KEYS * на SCAN
 export async function loadAllGames(): Promise<Map<string, Game>> {
   const games = new Map<string, Game>();
-  const keys = await dataClient.keys(GAME_PREFIX + '*');
-  for (const key of keys) {
-    const roomId = key.replace(GAME_PREFIX, '');
-    const game = await loadGame(roomId);
-    if (game) {
-      games.set(roomId, game);
+  let cursor = '0';
+  do {
+    const reply = await dataClient.scan(cursor, 'MATCH', GAME_PREFIX + '*', 'COUNT', 100);
+    cursor = reply[0];
+    const keys = reply[1];
+    for (const key of keys) {
+      const roomId = key.replace(GAME_PREFIX, '');
+      const game = await loadGame(roomId);
+      if (game) {
+        game.roomId = roomId; // FIX: устанавливаем roomId
+        games.set(roomId, game);
+      }
     }
-  }
+  } while (cursor !== '0');
   return games;
+}
+
+// FIX: функция для graceful shutdown
+export async function closeRedisConnections(): Promise<void> {
+  await Promise.all([
+    pubClient.quit(),
+    subClient.quit(),
+    dataClient.quit(),
+    chatPublisher.quit(),
+    chatSubscriber.quit(),
+  ]);
 }

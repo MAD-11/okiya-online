@@ -9,10 +9,10 @@
   --secondary-text: #8b7a6b;
   --modal-bg: #ffffff;
   --chat-bg: #fdfaf5;
-  --chat-bubble-mine: #e8f0fe;      /* светлый голубой для своих */
-  --chat-bubble-other: #f0e8db;     /* светлый кремовый для чужих */
-  --chat-text-mine: #1e1e1e;        /* почти чёрный */
-  --chat-text-other: #3e362e;       /* тёмно-коричневый */
+  --chat-bubble-mine: #e8f0fe;          /* светлый голубой для своих */
+  --chat-bubble-other: #f0e8db;         /* кремовый для чужих */
+  --chat-text-mine: #1e1e1e;            /* почти чёрный */
+  --chat-text-other: #3e362e;
   --overlay: rgba(0, 0, 0, 0.4);
   --hover-bg: #5a4a3a;
   --game-btn-bg: #5e503a;
@@ -52,4 +52,9 @@ html, body, #root {
 
 body {
   font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+@keyframes placeStone {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }

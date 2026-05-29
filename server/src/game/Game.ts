@@ -2,6 +2,7 @@ import { Board, GameStatus, Tile, Winner } from './types';
 import { initBoard, isValidMove, checkWin } from './Board';
 
 export class Game {
+  public roomId: string | null = null; // FIX: добавлено поле для хранения ID комнаты
   public board: Board;
   public currentPlayer: 'red' | 'black';
   public status: GameStatus;
@@ -20,7 +21,7 @@ export class Game {
   public hostPlayerId: string = '';
   public guestPlayerId: string = '';
 
-  public hostSkin: string = 'sakura'; // новое поле
+  public hostSkin: string = 'sakura';
 
   public maxWins: number;
   public scores: { host: number; guest: number };

@@ -1,13 +1,43 @@
 import { Server, Socket } from 'socket.io';
 import { Game } from '../game/Game';
-import { saveGame, deleteGame } from '../redis';
+import { saveGame, deleteGame, chatPublisher, chatSubscriber } from '../redis';
 import { saveGameResult, getPlayerStats } from '../stats';
 import { logger } from '../logger';
 import crypto from 'crypto';
+import { Mutex } from 'async-mutex'; // FIX: добавлен async-mutex
+import { z } from 'zod'; // FIX: добавлена валидация
+
+// FIX: санитизация строк
+function sanitize(str: string): string {
+  return str.replace(/[<>]/g, '').slice(0, 200);
+}
+
+// FIX: валидация схем
+const MoveSchema = z.object({
+  roomId: z.string().length(4).regex(/^[A-Z0-9]+$/),
+  row: z.number().int().min(0).max(3),
+  col: z.number().int().min(0).max(3),
+});
+
+const JoinRoomSchema = z.object({
+  roomId: z.string().length(4).regex(/^[A-Z0-9]+$/),
+  playerId: z.string().min(1),
+  nick: z.string().max(12),
+});
 
 let games: Map<string, Game>;
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const chatMessages: Map<string, { sender: string; text: string; timestamp: number }[]> = new Map();
+
+// FIX: мьютексы на комнату
+const roomMutexes = new Map<string, Mutex>();
+
+function getRoomMutex(roomId: string): Mutex {
+  if (!roomMutexes.has(roomId)) {
+    roomMutexes.set(roomId, new Mutex());
+  }
+  return roomMutexes.get(roomId)!;
+}
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -31,7 +61,8 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     }
   }
 
-  const roomId = [...games.entries()].find(([, g]) => g === game)?.[0] || '';
+  // FIX: используем game.roomId вместо линейного поиска
+  const roomId = game.roomId || '';
 
   return {
     board: game.board,
@@ -60,22 +91,47 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   };
 }
 
+// FIX: вспомогательная функция очистки таймеров комнаты
+function cleanupRoomTimers(roomId: string) {
+  for (const [key, timer] of disconnectTimers.entries()) {
+    if (key.startsWith(roomId)) {
+      clearTimeout(timer);
+      disconnectTimers.delete(key);
+    }
+  }
+}
+
+// FIX: подписка на чат через Redis (для масштабирования)
+chatSubscriber.subscribe('chat');
+chatSubscriber.on('message', (channel, message) => {
+  try {
+    const { roomId, msg } = JSON.parse(message);
+    const io = (global as any).io; // нужно будет передать io в этот модуль. Лучше передать через замыкание.
+    if (io) {
+      io.to(roomId).emit('chat_message', msg);
+    }
+  } catch (e) {}
+});
+
 export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
+  (global as any).io = io; // FIX: костыль для доступа к io в обработчике чата, лучше передать через функцию, но для простоты так
 
   io.on('connection', (socket: Socket) => {
     logger.info('User connected: ' + socket.id);
 
     // Создание комнаты
     socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string; skin?: string }, callback) => {
-      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${data.nick}, skin: ${data.skin}`);
+      const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
+      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${nick}, skin: ${data.skin}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
       const roomId = generateRoomCode();
       const game = new Game(maxWins);
+      game.roomId = roomId; // FIX: установка roomId
       game.addPlayer(socket.id);
-      game.nickRed = data.nick || 'Красные';
+      game.nickRed = nick;
       game.nickBlack = 'Чёрные';
       game.hostPlayerId = data.playerId;
       game.guestPlayerId = '';
@@ -109,8 +165,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Присоединение к комнате
     socket.on('join_room', (data: { roomId: string; playerId: string; nick: string }, callback) => {
-      logger.info(`join_room from ${socket.id} for room ${data.roomId}, playerId: ${data.playerId}, nick: ${data.nick}`);
+      const validation = JoinRoomSchema.safeParse(data);
+      if (!validation.success) {
+        return callback({ error: 'Некорректные данные' });
+      }
       const roomId = data.roomId.toUpperCase();
+      const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
+      logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}`);
+
       const game = games.get(roomId);
       if (!game) {
         logger.warn(`Room ${roomId} not found`);
@@ -133,14 +195,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.players.red = socket.id;
         game.hostSocketId = socket.id;
         game.hostToken = generatePlayerToken();
-        game.nickRed = data.nick || 'Красные';
+        game.nickRed = nick;
         game.hostPlayerId = data.playerId;
       } else {
         role = 'black';
         game.players.black = socket.id;
         game.guestSocketId = socket.id;
         game.guestToken = generatePlayerToken();
-        game.nickBlack = data.nick || 'Чёрные';
+        game.nickBlack = nick;
         game.guestPlayerId = data.playerId;
       }
 
@@ -200,34 +262,44 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Ход
-    socket.on('move', (roomId: string, row: number, col: number, callback) => {
-      logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
-      const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
-      const success = game.makeMove(row, col, socket.id);
-      if (!success) return callback({ error: 'Недопустимый ход' });
-
-      saveGame(roomId, game);
-      sendPersonalGameState(io, game);
-
-      if (game.winner) {
-        sendPersonalGameOver(io, game);
-        if (game.seriesWinner || game.maxWins === 1) {
-          saveGameResult({
-            roomId,
-            winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
-            players: { host: game.hostPlayerId, guest: game.guestPlayerId },
-            timestamp: Date.now(),
-            maxWins: game.maxWins,
-          });
-          deleteGame(roomId);
-        }
+    // Ход с мьютексом и валидацией
+    socket.on('move', async (roomId: string, row: number, col: number, callback) => {
+      const validation = MoveSchema.safeParse({ roomId, row, col });
+      if (!validation.success) {
+        return callback({ error: 'Недопустимые координаты' });
       }
-      callback({ success: true });
+      const mutex = getRoomMutex(roomId);
+      const release = await mutex.acquire();
+      try {
+        logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
+        const game = games.get(roomId);
+        if (!game) return callback({ error: 'Игра не найдена' });
+        const success = game.makeMove(row, col, socket.id);
+        if (!success) return callback({ error: 'Недопустимый ход' });
+
+        await saveGame(roomId, game);
+        sendPersonalGameState(io, game);
+
+        if (game.winner) {
+          sendPersonalGameOver(io, game);
+          if (game.seriesWinner || game.maxWins === 1) {
+            await saveGameResult({
+              roomId,
+              winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
+              players: { host: game.hostPlayerId, guest: game.guestPlayerId },
+              timestamp: Date.now(),
+              maxWins: game.maxWins,
+            });
+            await deleteGame(roomId);
+          }
+        }
+        callback({ success: true });
+      } finally {
+        release();
+      }
     });
 
-    // Продолжение серии (ещё одна игра)
+    // Продолжение серии
     socket.on('restart_round', (roomId: string, callback) => {
       logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -292,7 +364,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const isBlack = game.players.black === socket.id;
       if (!isRed && !isBlack) return;
 
-      // Определяем данные комнаты до удаления игрока
       const maxWins = game.maxWins;
       const hostSkin = game.hostSkin;
       const nickRed = game.nickRed;
@@ -304,13 +375,13 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       else game.players.black = undefined;
 
       if (!game.players.red && !game.players.black) {
-        // Оба вышли – удаляем комнату
+        cleanupRoomTimers(roomId);
         games.delete(roomId);
         deleteGame(roomId);
         logger.info(`Room ${roomId} deleted (empty)`);
       } else {
-        // Один игрок остался – пересоздаём игру, чтобы сбросить доску и таймер
         const newGame = new Game(maxWins);
+        newGame.roomId = roomId;
         newGame.hostSkin = hostSkin;
         newGame.nickRed = nickRed;
         newGame.nickBlack = nickBlack;
@@ -324,7 +395,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
         games.set(roomId, newGame);
         saveGame(roomId, newGame);
-        // Оповещаем оставшегося игрока
         const remainingSocket = io.sockets.sockets.get(remainingSocketId);
         if (remainingSocket) {
           remainingSocket.emit('game_state', getClientGameState(newGame, remainingSocketId, io));
@@ -333,7 +403,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    // Отключение
+    // Отключение с очисткой таймеров
     socket.on('disconnect', () => {
       logger.info(`User disconnected: ${socket.id}`);
       for (const [roomId, game] of games.entries()) {
@@ -371,8 +441,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    // Чат
+    // Чат с ограничением длины и публикацией в Redis
     socket.on('chat_message', (roomId: string, text: string) => {
+      let sanitizedText = sanitize(text).slice(0, 200);
+      if (!sanitizedText) return;
       const game = games.get(roomId);
       if (!game) return;
       let sender = 'Игрок';
@@ -381,14 +453,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       } else if (socket.id === game.guestSocketId) {
         sender = game.nickBlack;
       }
+      const msg = { sender, text: sanitizedText, timestamp: Date.now() };
       if (!chatMessages.has(roomId)) {
         chatMessages.set(roomId, []);
       }
-      chatMessages.get(roomId)!.push({ sender, text, timestamp: Date.now() });
+      chatMessages.get(roomId)!.push(msg);
       if (chatMessages.get(roomId)!.length > 50) {
         chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
       }
-      // Отправляем обновлённое состояние всем в комнате
+      // Публикуем в Redis для других экземпляров
+      chatPublisher.publish('chat', JSON.stringify({ roomId, msg }));
       sendPersonalGameState(io, game);
     });
 
