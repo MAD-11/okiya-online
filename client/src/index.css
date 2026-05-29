@@ -18,7 +18,7 @@
   --game-btn-bg: #5e503a;
   --game-btn-text: #ffffff;
   --turn-indicator: #b8860b;
-  --valid-move-border: #c9a96e;
+  --valid-move-border: #c9a96e;   /* важная переменная */
   --timer-low: #c0392b;
   --stone-red-bg: rgba(180, 130, 110, 0.2);
   --stone-black-bg: rgba(80, 70, 60, 0.2);
@@ -46,7 +46,7 @@
   --game-btn-bg: #7a6b5a;
   --game-btn-text: #ffffff;
   --turn-indicator: #e6b422;
-  --valid-move-border: #d4a373;
+  --valid-move-border: #d4a373;   /* тёмная тема – свой цвет */
   --timer-low: #e67e22;
   --stone-red-bg: rgba(180, 100, 70, 0.3);
   --stone-black-bg: rgba(100, 90, 80, 0.3);
