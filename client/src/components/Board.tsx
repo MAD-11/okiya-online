@@ -1,6 +1,6 @@
 import React from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
-import { initAudio } from '../utils/sound'; // FIX: импорт
+import { initAudio } from '../utils/sound';
 
 interface BoardProps {
   board: BoardType;
@@ -25,7 +25,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
 
   const handleCellClick = (row: number, col: number) => {
     if (validMoves[row]?.[col]) {
-      initAudio(); // FIX: разрешаем звук при первом клике на игровое поле
+      initAudio();
       onClick(row, col);
     }
   };
@@ -49,9 +49,9 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
                   fontSize: fontSize,
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
-                    ? cell === 'red' ? 'rgba(180,130,110,0.2)' : 'rgba(80,70,60,0.2)'
+                    ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
                     : 'var(--cell-bg)',
-                  border: isValid ? '2px solid #c9a96e' : '1px solid var(--border)',
+                  border: isValid ? '2px solid var(--valid-move-border)' : '1px solid var(--border)',
                   animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
                 }}
               >
@@ -74,7 +74,7 @@ function getTileEmoji(plant: string, symbol: string): string {
     sakura: '🌸', iris: '🌺', pine: '🌲', maple: '🍁',
     sun: '☀️', bird: '🐦', rain: '🌧️', tanzaku: '📜',
   };
-  return `${map[plant] || '❓'}${map[symbol] || '❓'}`; // FIX: fallback
+  return `${map[plant] || '❓'}${map[symbol] || '❓'}`;
 }
 
 const styles: Record<string, React.CSSProperties> = {

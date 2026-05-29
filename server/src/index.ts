@@ -38,18 +38,14 @@ async function start() {
   });
 }
 
-// FIX: graceful shutdown
 async function shutdown() {
   logger.info('Shutting down gracefully...');
-  // Закрываем сервер, чтобы не принимать новые соединения
   server.close(async () => {
     logger.info('HTTP server closed');
-    // Закрываем Redis соединения
     await closeRedisConnections();
     logger.info('Redis connections closed');
     process.exit(0);
   });
-  // Если через 10 секунд не закрылся – принудительно
   setTimeout(() => {
     logger.error('Could not close connections in time, forcefully shutting down');
     process.exit(1);

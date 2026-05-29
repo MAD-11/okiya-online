@@ -4,15 +4,13 @@ import { saveGame, deleteGame, chatPublisher, chatSubscriber } from '../redis';
 import { saveGameResult, getPlayerStats } from '../stats';
 import { logger } from '../logger';
 import crypto from 'crypto';
-import { Mutex } from 'async-mutex'; // FIX: добавлен async-mutex
-import { z } from 'zod'; // FIX: добавлена валидация
+import { Mutex } from 'async-mutex';
+import { z } from 'zod';
 
-// FIX: санитизация строк
 function sanitize(str: string): string {
   return str.replace(/[<>]/g, '').slice(0, 200);
 }
 
-// FIX: валидация схем
 const MoveSchema = z.object({
   roomId: z.string().length(4).regex(/^[A-Z0-9]+$/),
   row: z.number().int().min(0).max(3),
@@ -28,8 +26,6 @@ const JoinRoomSchema = z.object({
 let games: Map<string, Game>;
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const chatMessages: Map<string, { sender: string; text: string; timestamp: number }[]> = new Map();
-
-// FIX: мьютексы на комнату
 const roomMutexes = new Map<string, Mutex>();
 
 function getRoomMutex(roomId: string): Mutex {
@@ -61,7 +57,6 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     }
   }
 
-  // FIX: используем game.roomId вместо линейного поиска
   const roomId = game.roomId || '';
 
   return {
@@ -91,7 +86,6 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   };
 }
 
-// FIX: вспомогательная функция очистки таймеров комнаты
 function cleanupRoomTimers(roomId: string) {
   for (const [key, timer] of disconnectTimers.entries()) {
     if (key.startsWith(roomId)) {
@@ -101,12 +95,12 @@ function cleanupRoomTimers(roomId: string) {
   }
 }
 
-// FIX: подписка на чат через Redis (для масштабирования)
+// Подписка на чат через Redis (для масштабирования)
 chatSubscriber.subscribe('chat');
 chatSubscriber.on('message', (channel, message) => {
   try {
     const { roomId, msg } = JSON.parse(message);
-    const io = (global as any).io; // нужно будет передать io в этот модуль. Лучше передать через замыкание.
+    const io = (global as any).io;
     if (io) {
       io.to(roomId).emit('chat_message', msg);
     }
@@ -115,7 +109,7 @@ chatSubscriber.on('message', (channel, message) => {
 
 export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
   games = loadedGames;
-  (global as any).io = io; // FIX: костыль для доступа к io в обработчике чата, лучше передать через функцию, но для простоты так
+  (global as any).io = io;
 
   io.on('connection', (socket: Socket) => {
     logger.info('User connected: ' + socket.id);
@@ -129,7 +123,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (!validWins.includes(maxWins)) maxWins = 1;
       const roomId = generateRoomCode();
       const game = new Game(maxWins);
-      game.roomId = roomId; // FIX: установка roomId
+      game.roomId = roomId;
       game.addPlayer(socket.id);
       game.nickRed = nick;
       game.nickBlack = 'Чёрные';
@@ -262,7 +256,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Ход с мьютексом и валидацией
+    // Ход с мьютексом
     socket.on('move', async (roomId: string, row: number, col: number, callback) => {
       const validation = MoveSchema.safeParse({ roomId, row, col });
       if (!validation.success) {
@@ -441,7 +435,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    // Чат с ограничением длины и публикацией в Redis
+    // Чат с ограничением и публикацией в Redis
     socket.on('chat_message', (roomId: string, text: string) => {
       let sanitizedText = sanitize(text).slice(0, 200);
       if (!sanitizedText) return;
@@ -461,7 +455,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (chatMessages.get(roomId)!.length > 50) {
         chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
       }
-      // Публикуем в Redis для других экземпляров
       chatPublisher.publish('chat', JSON.stringify({ roomId, msg }));
       sendPersonalGameState(io, game);
     });

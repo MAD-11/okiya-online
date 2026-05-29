@@ -5,11 +5,8 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 export const pubClient = new Redis(redisUrl);
 export const subClient = pubClient.duplicate();
-
-// FIX: отдельный клиент для операций с данными
 const dataClient = new Redis(redisUrl);
 
-// FIX: клиенты для чата (Pub/Sub)
 export const chatPublisher = new Redis(redisUrl);
 export const chatSubscriber = chatPublisher.duplicate();
 
@@ -92,7 +89,6 @@ export async function deleteGame(roomId: string): Promise<void> {
   await dataClient.del(GAME_PREFIX + roomId);
 }
 
-// FIX: замена KEYS * на SCAN
 export async function loadAllGames(): Promise<Map<string, Game>> {
   const games = new Map<string, Game>();
   let cursor = '0';
@@ -104,7 +100,7 @@ export async function loadAllGames(): Promise<Map<string, Game>> {
       const roomId = key.replace(GAME_PREFIX, '');
       const game = await loadGame(roomId);
       if (game) {
-        game.roomId = roomId; // FIX: устанавливаем roomId
+        game.roomId = roomId;
         games.set(roomId, game);
       }
     }
@@ -112,7 +108,6 @@ export async function loadAllGames(): Promise<Map<string, Game>> {
   return games;
 }
 
-// FIX: функция для graceful shutdown
 export async function closeRedisConnections(): Promise<void> {
   await Promise.all([
     pubClient.quit(),

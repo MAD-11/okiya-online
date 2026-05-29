@@ -25,7 +25,7 @@ const Timer: React.FC<TimerProps> = ({ turnStartedAt, turnDuration }) => {
     <div style={{
       fontSize: 20,
       fontWeight: 500,
-      color: isLow ? '#c0392b' : 'var(--text)',
+      color: isLow ? 'var(--timer-low)' : 'var(--text)',
       fontFamily: '"Inter", sans-serif',
       textAlign: 'center',
       marginTop: 4,

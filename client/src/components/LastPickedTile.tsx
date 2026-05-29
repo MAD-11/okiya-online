@@ -19,12 +19,12 @@ const LastPickedTile: React.FC<LastPickedTileProps> = ({ tile }) => {
       gap: '8px',
       marginTop: '12px',
       fontSize: '15px',
-      color: '#5e503a',
+      color: 'var(--secondary-text)',
       fontFamily: '"Inter", sans-serif',
-      background: 'rgba(255,255,245,0.8)',
+      background: 'var(--chat-bubble-other)',
       padding: '6px 16px',
       borderRadius: '20px',
-      border: '1px solid #e0d6c8',
+      border: '1px solid var(--border)',
     }}>
       <span style={{ fontSize: '22px' }}>{tileEmojiMap[tile.plant]}{tileEmojiMap[tile.symbol]}</span>
       <span style={{ textTransform: 'capitalize' }}>{tile.plant} · {tile.symbol}</span>

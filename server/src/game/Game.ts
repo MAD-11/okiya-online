@@ -2,7 +2,7 @@ import { Board, GameStatus, Tile, Winner } from './types';
 import { initBoard, isValidMove, checkWin } from './Board';
 
 export class Game {
-  public roomId: string | null = null; // FIX: добавлено поле для хранения ID комнаты
+  public roomId: string | null = null;
   public board: Board;
   public currentPlayer: 'red' | 'black';
   public status: GameStatus;

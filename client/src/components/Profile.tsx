@@ -46,7 +46,6 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
               <div style={styles.statLabel}>ничьих</div>
             </div>
           </div>
-          {/* FIX: отображение истории */}
           {stats.history && stats.history.length > 0 && (
             <div style={styles.historySection}>
               <h4 style={styles.historyTitle}>Последние игры</h4>

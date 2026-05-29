@@ -37,8 +37,7 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false); // FIX: состояние переподключения
-
+  const [reconnecting, setReconnecting] = useState(false);
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
@@ -75,7 +74,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // FIX: мониторинг соединения
   useEffect(() => {
     if (!connected && roomId && !reconnecting) {
       setReconnecting(true);
@@ -90,7 +88,6 @@ const Game: React.FC = () => {
     } else if (connected && reconnecting) {
       setReconnecting(false);
       setMessage('');
-      // повторно подключаемся к комнате
       const savedRoomId = localStorage.getItem('okiya_roomId');
       const savedToken = localStorage.getItem('okiya_playerToken');
       if (savedRoomId && savedToken && socket) {
@@ -234,9 +231,6 @@ const Game: React.FC = () => {
 
   useEffect(() => {
     if (!socket) return;
-
-    // FIX: удалён обработчик game_started, так как сервер его не посылает
-
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
@@ -246,7 +240,6 @@ const Game: React.FC = () => {
       }
       setGameState(state);
     });
-
     socket.on('game_over', (data: { winner: string; yourResult: string; seriesWinner: string | null }) => {
       if (data.yourResult === 'win') playWinSound();
       else if (data.yourResult === 'lose') playLoseSound();
@@ -270,12 +263,10 @@ const Game: React.FC = () => {
       }
       setPersonalGameOver(text);
     });
-
     socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
       setVsAnimation(data);
       setTimeout(() => setVsAnimation(null), 2500);
     });
-
     return () => {
       socket.off('game_state');
       socket.off('game_over');
@@ -381,7 +372,7 @@ const Game: React.FC = () => {
       <div style={styles.statusBar}>
         <span style={{
           width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-          backgroundColor: gameState.opponentConnected ? '#27ae60' : '#c0392b'
+          backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
         }} />
         <span style={{ marginLeft: 6, fontSize: 13 }}>
           {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
@@ -471,8 +462,6 @@ const Game: React.FC = () => {
   );
 };
 
-
-// Стили
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
@@ -618,7 +607,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     margin: '0 0 4px',
     fontWeight: 500,
-    color: '#b8860b',
+    color: 'var(--turn-indicator)',
   },
   gameLayout: {
     display: 'flex',
@@ -697,18 +686,6 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
   },
-  reconnectBanner: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#e67e22',
-    color: 'white',
-    textAlign: 'center',
-    padding: '8px',
-    zIndex: 2000,
-    fontWeight: 'bold',
-  },
   vsOverlay: {
     position: 'fixed',
     top: 0,
@@ -732,6 +709,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   vsText: {
     color: '#c9a96e',
+  },
+  reconnectBanner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'var(--timer-low)',
+    color: '#fff',
+    textAlign: 'center',
+    padding: '8px',
+    zIndex: 2000,
+    fontWeight: 'bold',
   },
 };
 

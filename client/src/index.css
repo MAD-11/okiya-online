@@ -9,14 +9,21 @@
   --secondary-text: #8b7a6b;
   --modal-bg: #ffffff;
   --chat-bg: #fdfaf5;
-  --chat-bubble-mine: #e8f0fe;          /* светлый голубой для своих */
-  --chat-bubble-other: #f0e8db;         /* кремовый для чужих */
-  --chat-text-mine: #1e1e1e;            /* почти чёрный */
+  --chat-bubble-mine: #e8f0fe;
+  --chat-bubble-other: #f0e8db;
+  --chat-text-mine: #1e1e1e;
   --chat-text-other: #3e362e;
   --overlay: rgba(0, 0, 0, 0.4);
   --hover-bg: #5a4a3a;
   --game-btn-bg: #5e503a;
   --game-btn-text: #ffffff;
+  --turn-indicator: #b8860b;
+  --valid-move-border: #c9a96e;
+  --timer-low: #c0392b;
+  --stone-red-bg: rgba(180, 130, 110, 0.2);
+  --stone-black-bg: rgba(80, 70, 60, 0.2);
+  --opponent-online: #27ae60;
+  --opponent-offline: #c0392b;
 }
 
 .dark {
@@ -38,6 +45,13 @@
   --hover-bg: #6b5b4f;
   --game-btn-bg: #7a6b5a;
   --game-btn-text: #ffffff;
+  --turn-indicator: #e6b422;
+  --valid-move-border: #d4a373;
+  --timer-low: #e67e22;
+  --stone-red-bg: rgba(180, 100, 70, 0.3);
+  --stone-black-bg: rgba(100, 90, 80, 0.3);
+  --opponent-online: #2ecc71;
+  --opponent-offline: #e74c3c;
 }
 
 html, body, #root {
