@@ -8,13 +8,10 @@ function getAudioContext() {
   return audioCtx;
 }
 
-// FIX: функция для вызова по первому жесту пользователя
 export function initAudio() {
   const ctx = getAudioContext();
   if (!isResumed && ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      isResumed = true;
-    }).catch(e => console.warn('AudioContext resume failed', e));
+    ctx.resume().then(() => { isResumed = true; }).catch(console.warn);
   }
 }
 

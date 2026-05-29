@@ -4,7 +4,7 @@ import { GameState, ValidMoves, Tile } from '../types/game';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
 import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
@@ -37,6 +37,7 @@ const Game: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
@@ -69,9 +70,42 @@ const Game: React.FC = () => {
       setPersonalGameOver(null);
       setWaitingRestart(false);
       setWaitingReset(false);
+      setReconnecting(false);
     }
   };
 
+  // Мониторинг потери соединения
+  useEffect(() => {
+    if (!connected && roomId && !reconnecting) {
+      setReconnecting(true);
+      setMessage('Потеряно соединение с сервером. Переподключение...');
+      const timeout = setTimeout(() => {
+        if (!connected) {
+          setMessage('Не удалось переподключиться. Обновите страницу.');
+        }
+        setReconnecting(false);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    } else if (connected && reconnecting) {
+      setReconnecting(false);
+      setMessage('');
+      const savedRoomId = localStorage.getItem('okiya_roomId');
+      const savedToken = localStorage.getItem('okiya_playerToken');
+      if (savedRoomId && savedToken && socket) {
+        socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
+          if (res.error) {
+            setMessage(res.error);
+            clearSavedRoom();
+            setGameState(null);
+          } else {
+            setRoomId(savedRoomId);
+          }
+        });
+      }
+    }
+  }, [connected, roomId, reconnecting, socket]);
+
+  // Автоматическое переподключение при загрузке
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -200,6 +234,8 @@ const Game: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // УДАЛЁН game_started, так как сервер его не отправляет
+
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
         setPersonalGameOver(null);
@@ -245,6 +281,24 @@ const Game: React.FC = () => {
       socket.off('opponent_joined');
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
+
+  // Добавляем анимацию VS в глобальный стиль, если её нет
+  useEffect(() => {
+    if (!document.querySelector('#vs-animation-style')) {
+      const style = document.createElement('style');
+      style.id = 'vs-animation-style';
+      style.innerHTML = `
+        @keyframes vsFadeIn {
+          0% { opacity: 0; transform: scale(0.8); }
+          10% { opacity: 1; transform: scale(1); }
+          90% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.2); }
+        }
+      `;
+      document.head.appendChild(style);
+      return () => { document.head.removeChild(style); };
+    }
+  }, []);
 
   if (!connected) {
     return (
@@ -313,6 +367,7 @@ const Game: React.FC = () => {
 
   return (
     <div style={styles.gameContainer}>
+      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
       {vsAnimation && (
         <div style={styles.vsOverlay}>
           <div style={styles.vsContent}>
@@ -402,7 +457,7 @@ const Game: React.FC = () => {
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={styles.actionBtn}>
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }}>
               Настройки
             </button>
           </div>
@@ -419,6 +474,7 @@ const Game: React.FC = () => {
   );
 };
 
+// Стили с использованием CSS-переменных
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
@@ -666,6 +722,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   vsText: {
     color: '#c9a96e',
+  },
+  reconnectBanner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'var(--timer-low)',
+    color: '#fff',
+    textAlign: 'center',
+    padding: '8px',
+    zIndex: 2000,
+    fontWeight: 'bold',
   },
 };
 
