@@ -1,37 +1,20 @@
 let audioCtx: AudioContext | null = null;
-let isResumed = false;
 
-function getAudioContext(): AudioContext {
+function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
   return audioCtx;
 }
 
-export async function initAudio(): Promise<void> {
-  console.log('initAudio called');
+export function initAudio() {
   const ctx = getAudioContext();
-  console.log('AudioContext state:', ctx.state);
-  if (!isResumed && ctx.state === 'suspended') {
-    try {
-      await ctx.resume();
-      console.log('AudioContext resumed, new state:', ctx.state);
-      isResumed = true;
-    } catch (e) {
-      console.warn('AudioContext resume failed', e);
-    }
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(e => console.warn('AudioContext resume failed', e));
   }
 }
 
-async function ensureAudio(): Promise<boolean> {
-  if (!isResumed) {
-    await initAudio();
-  }
-  return isResumed;
-}
-
-export async function playMoveSound() {
-  if (!(await ensureAudio())) return;
+export function playMoveSound() {
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -44,11 +27,12 @@ export async function playMoveSound() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.1);
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    // игнорируем ошибки
+  }
 }
 
-export async function playWinSound() {
-  if (!(await ensureAudio())) return;
+export function playWinSound() {
   try {
     const ctx = getAudioContext();
     const notes = [523.25, 659.25, 783.99];
@@ -67,8 +51,7 @@ export async function playWinSound() {
   } catch (e) {}
 }
 
-export async function playLoseSound() {
-  if (!(await ensureAudio())) return;
+export function playLoseSound() {
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
@@ -84,8 +67,7 @@ export async function playLoseSound() {
   } catch (e) {}
 }
 
-export async function playDrawSound() {
-  if (!(await ensureAudio())) return;
+export function playDrawSound() {
   try {
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
