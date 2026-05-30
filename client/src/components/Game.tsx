@@ -44,6 +44,15 @@ const Game: React.FC = () => {
   const [nick, setNick] = useState(() => getSavedNick() || '');
   const { skin: localSkin } = useTheme();
 
+  // Мобильная адаптация
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const ensureNick = (): string => {
     if (nick) return nick;
     const newNick = prompt('Придумайте себе постоянный никнейм (не более 12 символов)') || 'Игрок';
@@ -140,24 +149,25 @@ const Game: React.FC = () => {
   };
 
   const joinRoom = (code?: string) => {
-    const id = code || prompt('Введите код комнаты')?.toUpperCase();
-    if (!id) return;
-    const n = ensureNick();
-    socket?.emit('join_room', { roomId: id, playerId, nick: n }, (res: any) => {
-      if (res.error) {
-        setMessage(res.error);
-      } else {
-        localStorage.setItem('okiya_roomId', id);
-        localStorage.setItem('okiya_playerToken', res.playerToken);
-        setRoomId(id);
-        setGameState(res.state);
-        setMessage('');
-        setPersonalGameOver(null);
-        setWaitingRestart(false);
-        setWaitingReset(false);
-      }
-    });
-  };
+  const id = code || prompt('Введите код комнаты')?.toUpperCase();
+  if (!id) return;
+  const n = ensureNick();
+  // FIX: передаём skin гостя на сервер
+  socket?.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
+    if (res.error) {
+      setMessage(res.error);
+    } else {
+      localStorage.setItem('okiya_roomId', id);
+      localStorage.setItem('okiya_playerToken', res.playerToken);
+      setRoomId(id);
+      setGameState(res.state);
+      setMessage('');
+      setPersonalGameOver(null);
+      setWaitingRestart(false);
+      setWaitingReset(false);
+    }
+  });
+};
 
   const validMoves: ValidMoves = useMemo(() => {
     if (!gameState || gameState.status !== 'playing' || gameState.myColor !== gameState.currentPlayer) {
@@ -411,13 +421,28 @@ const Game: React.FC = () => {
 
       <div style={styles.gameLayout}>
         {!isSpectator && (
-          <div style={styles.chatColumn}>
-            <Chat
-              messages={gameState.messages ?? []}
-              onSend={handleChatSend}
-              myNick={gameState.myNick}
-            />
-          </div>
+          <>
+            {!isMobile ? (
+              <div style={styles.chatColumn}>
+                <Chat
+                  messages={gameState.messages ?? []}
+                  onSend={handleChatSend}
+                  myNick={gameState.myNick}
+                />
+              </div>
+            ) : (
+              <details style={styles.mobileChatToggle}>
+                <summary style={styles.mobileChatSummary}>💬 Чат</summary>
+                <div style={styles.mobileChatContent}>
+                  <Chat
+                    messages={gameState.messages ?? []}
+                    onSend={handleChatSend}
+                    myNick={gameState.myNick}
+                  />
+                </div>
+              </details>
+            )}
+          </>
         )}
 
         <div style={styles.centerColumn}>
@@ -429,7 +454,9 @@ const Game: React.FC = () => {
               currentPlayer={gameState.currentPlayer}
               myColor={gameState.myColor}
               lastMove={gameState.lastMove}
-              skin={gameState.hostSkin || 'sakura'}
+              skin={gameState.myColor === 'red' 
+                ? (gameState.hostSkin || 'sakura') 
+                : (gameState.guestSkin || 'sakura')}
             />
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
@@ -699,6 +726,28 @@ const styles: Record<string, React.CSSProperties> = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
+  },
+  mobileChatToggle: {
+    width: '100%',
+    marginBottom: '12px',
+    background: 'var(--card-bg)',
+    borderRadius: '20px',
+    border: '1px solid var(--border)',
+    overflow: 'hidden',
+  },
+  mobileChatSummary: {
+    padding: '10px 16px',
+    cursor: 'pointer',
+    fontWeight: 500,
+    color: 'var(--text)',
+    userSelect: 'none',
+    listStyle: 'none',
+  },
+  mobileChatContent: {
+    padding: '12px',
+    borderTop: '1px solid var(--border)',
+    height: '300px',
+    overflow: 'auto',
   },
   vsOverlay: {
     position: 'fixed',

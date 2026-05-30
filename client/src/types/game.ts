@@ -34,6 +34,7 @@ export interface GameState {
   myNick: string;
   messages: { sender: string; text: string; timestamp: number }[];
   hostSkin: string;
+  guestSkin: string; // FIX: добавлено поле для скина гостя
 }
 
 export type ValidMoves = boolean[][];

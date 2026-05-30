@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
+import { string } from 'zod/v4';
 
 function sanitize(str: string): string {
   return str.replace(/[<>]/g, '').slice(0, 200);
@@ -21,6 +22,7 @@ const JoinRoomSchema = z.object({
   roomId: z.string().length(4).regex(/^[A-Z0-9]+$/),
   playerId: z.string().min(1),
   nick: z.string().max(12),
+  skin: z.string().optional(),
 });
 
 let games: Map<string, Game>;
@@ -83,6 +85,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     myNick: playerSocketId === game.hostSocketId ? game.nickRed : (playerSocketId === game.guestSocketId ? game.nickBlack : ''),
     messages: chatMessages.get(roomId) || [],
     hostSkin: game.hostSkin,
+    guestSkin: game.guestSkin || 'sakura',
   };
 }
 
@@ -158,13 +161,14 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Присоединение к комнате
-    socket.on('join_room', (data: { roomId: string; playerId: string; nick: string }, callback) => {
+    socket.on('join_room', (data: { roomId: string; playerId: string; nick: string; skin?: string }, callback) => {
       const validation = JoinRoomSchema.safeParse(data);
       if (!validation.success) {
         return callback({ error: 'Некорректные данные' });
       }
       const roomId = data.roomId.toUpperCase();
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
+      const skin = data.skin || 'sakura';
       logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}`);
 
       const game = games.get(roomId);
@@ -198,6 +202,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.guestToken = generatePlayerToken();
         game.nickBlack = nick;
         game.guestPlayerId = data.playerId;
+        game.guestSkin = skin; // FIX: сохраняем скин гостя
       }
 
       if (game.players.red && game.players.black && game.status === 'waiting') {

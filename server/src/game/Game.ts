@@ -22,7 +22,8 @@ export class Game {
   public guestPlayerId: string = '';
 
   public hostSkin: string = 'sakura';
-
+  public guestSkin: string = 'sakura';
+  
   public maxWins: number;
   public scores: { host: number; guest: number };
   public roundFinished: boolean;

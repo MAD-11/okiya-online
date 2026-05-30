@@ -37,6 +37,7 @@ function serializeGame(game: Game): string {
     turnDuration: game.turnDuration,
     lastMove: game.lastMove,
     hostSkin: game.hostSkin,
+    guestSkin: game.guestSkin,
   });
 }
 
@@ -64,6 +65,7 @@ function deserializeGame(data: string): Game {
   game.turnDuration = obj.turnDuration;
   game.lastMove = obj.lastMove;
   game.hostSkin = obj.hostSkin || 'sakura';
+  game.guestSkin = obj.guestSkin || 'sakura';
   return game;
 }
 
