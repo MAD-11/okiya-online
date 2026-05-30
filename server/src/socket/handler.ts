@@ -444,6 +444,13 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
+    socket.on('clear_chat', (roomId: string) => {
+      if (chatMessages.has(roomId)) {
+        chatMessages.set(roomId, []);
+        io.to(roomId).emit('chat_cleared');
+      }
+    });
+
     // Чат с ограничением и публикацией в Redis
     socket.on('chat_message', (roomId: string, text: string) => {
       let sanitizedText = sanitize(text).slice(0, 200);

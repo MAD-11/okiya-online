@@ -67,12 +67,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && (
-                  <span style={{ ...styles.stone, ...styles.redStone }}>{getStoneEmoji('red')}</span>
-                )}
-                {cell === 'black' && (
-                  <span style={{ ...styles.stone, ...styles.blackStone }}>{getStoneEmoji('black')}</span>
-                )}
+                {cell === 'red' && <span style={styles.stone}>{getStoneEmoji('red')}</span>}
+                {cell === 'black' && <span style={styles.stone}>{getStoneEmoji('black')}</span>}
               </div>
             );
           })
@@ -109,18 +105,10 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
   },
   tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
-  stone: { fontSize: '34px', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.2))' },
-  redStone: {
-    backgroundColor: 'rgba(255, 100, 100, 0.2)',
-    borderRadius: '50%',
-    padding: '6px',
-    border: '2px solid rgba(255, 80, 80, 0.6)',
-  },
-  blackStone: {
-    backgroundColor: 'rgba(80, 80, 80, 0.4)',
-    borderRadius: '50%',
-    padding: '6px',
-    border: '2px solid rgba(0, 0, 0, 0.5)',
+  stone: {
+    fontSize: '34px',
+    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
+    // Нет фона, нет рамки – только эмодзи
   },
 };
 

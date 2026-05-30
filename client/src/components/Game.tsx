@@ -39,15 +39,13 @@ const Game: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false); // приватная комната
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
   const { skin: localSkin } = useTheme();
 
-  // Мобильная адаптация
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [isPrivate, setIsPrivate] = useState(false);
-
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -85,7 +83,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Мониторинг потери соединения
   useEffect(() => {
     if (!connected && roomId && !reconnecting) {
       setReconnecting(true);
@@ -116,7 +113,6 @@ const Game: React.FC = () => {
     }
   }, [connected, roomId, reconnecting, socket]);
 
-  // Автоматическое переподключение при загрузке
   useEffect(() => {
     if (!socket || !connected) return;
     const savedRoomId = localStorage.getItem('okiya_roomId');
@@ -151,28 +147,28 @@ const Game: React.FC = () => {
   };
 
   const joinRoom = (code?: string) => {
-  const id = code || prompt('Введите код комнаты')?.toUpperCase();
-  if (!id) return;
-  const n = ensureNick();
-  if (!socket) {
-    setMessage('Нет соединения с сервером');
-    return;
-  }
-  socket.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
-    if (res.error) {
-      setMessage(res.error);
-    } else {
-      localStorage.setItem('okiya_roomId', id);
-      localStorage.setItem('okiya_playerToken', res.playerToken);
-      setRoomId(id);
-      setGameState(res.state);
-      setMessage('');
-      setPersonalGameOver(null);
-      setWaitingRestart(false);
-      setWaitingReset(false);
+    const id = code || prompt('Введите код комнаты')?.toUpperCase();
+    if (!id) return;
+    const n = ensureNick();
+    if (!socket) {
+      setMessage('Нет соединения с сервером');
+      return;
     }
-  });
-};
+    socket.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
+      if (res.error) {
+        setMessage(res.error);
+      } else {
+        localStorage.setItem('okiya_roomId', id);
+        localStorage.setItem('okiya_playerToken', res.playerToken);
+        setRoomId(id);
+        setGameState(res.state);
+        setMessage('');
+        setPersonalGameOver(null);
+        setWaitingRestart(false);
+        setWaitingReset(false);
+      }
+    });
+  };
 
   const validMoves: ValidMoves = useMemo(() => {
     if (!gameState || gameState.status !== 'playing' || gameState.myColor !== gameState.currentPlayer) {
@@ -221,17 +217,6 @@ const Game: React.FC = () => {
     });
   };
 
-  const handleResetRoom = () => {
-    if (!socket || !roomId) return;
-    setWaitingReset(true);
-    socket.emit('reset_room', roomId, (res: any) => {
-      if (res?.error) {
-        setWaitingReset(false);
-        setMessage(res.error);
-      }
-    });
-  };
-
   const handleForfeit = () => {
     if (!socket || !roomId || !gameState || gameState.status !== 'playing') return;
     if (window.confirm('Вы уверены, что хотите сдаться? Вам будет засчитано поражение.')) {
@@ -249,8 +234,6 @@ const Game: React.FC = () => {
 
   useEffect(() => {
     if (!socket) return;
-
-    // УДАЛЁН game_started, так как сервер его не отправляет
 
     socket.on('game_state', (state: GameState) => {
       if (state.status === 'playing' && gameState?.status === 'finished') {
@@ -287,18 +270,26 @@ const Game: React.FC = () => {
     });
 
     socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
+      // Очищаем чат при подключении соперника
+      if (roomId && socket) {
+        socket.emit('clear_chat', roomId);
+      }
       setVsAnimation(data);
       setTimeout(() => setVsAnimation(null), 2500);
+    });
+
+    socket.on('chat_cleared', () => {
+      setGameState(prev => prev ? { ...prev, messages: [] } : null);
     });
 
     return () => {
       socket.off('game_state');
       socket.off('game_over');
       socket.off('opponent_joined');
+      socket.off('chat_cleared');
     };
-  }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins]);
+  }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins, roomId]);
 
-  // Добавляем анимацию VS в глобальный стиль, если её нет
   useEffect(() => {
     if (!document.querySelector('#vs-animation-style')) {
       const style = document.createElement('style');
@@ -342,8 +333,10 @@ const Game: React.FC = () => {
                 type="checkbox"
                 checked={isPrivate}
                 onChange={(e) => setIsPrivate(e.target.checked)}
+                style={styles.hiddenCheckbox}
               />
-              🔒 Приватная комната (не будет видна в списке)
+              <span style={styles.customCheckbox}>{isPrivate ? '🔒' : '🔓'}</span>
+              <span>Приватная комната (по коду)</span>
             </label>
           </div>
           <div style={styles.separator} />
@@ -408,7 +401,7 @@ const Game: React.FC = () => {
         {roomId && (
           <span style={styles.roomCode}>
             Комната <strong>{roomId}</strong>
-            {gameState?.isPrivate && <span style={{ marginLeft: '8px' }}>🔒</span>}
+            {gameState.isPrivate && <span style={{ marginLeft: '8px' }}>🔒</span>}
           </span>
         )}
       </header>
@@ -494,11 +487,6 @@ const Game: React.FC = () => {
             <button onClick={backToMenu} style={styles.actionBtn}>
               Выйти в меню
             </button>
-            {(gameState.status === 'finished' || gameState.seriesWinner) && (
-              <button onClick={handleResetRoom} style={{ ...styles.actionBtn, backgroundColor: '#4a6741' }}>
-                {waitingReset ? 'Ожидание…' : 'Новая игра'}
-              </button>
-            )}
             {gameState.status === 'playing' && !isSpectator && (
               <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
                 Сдаться
@@ -521,7 +509,6 @@ const Game: React.FC = () => {
   );
 };
 
-// Стили с использованием CSS-переменных
 const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
@@ -578,21 +565,50 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: '100px',
   },
   secondaryBtn: {
-  padding: '14px 32px',
-  fontSize: '16px',
-  fontWeight: 500,
-  border: 'none',                      // убираем обводку
-  borderRadius: '40px',
-  backgroundColor: 'var(--btn-bg)',    // тот же фон, что у primaryBtn
-  color: 'var(--btn-text)',            // тот же цвет текста
-  cursor: 'pointer',
-  fontFamily: '"Inter", "Segoe UI", sans-serif',
-  width: '100%',
-  boxSizing: 'border-box',
-  marginTop: '12px',
-  transition: 'background-color 0.2s',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-},
+    padding: '14px 32px',
+    fontSize: '16px',
+    fontWeight: 500,
+    border: 'none',
+    borderRadius: '40px',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    cursor: 'pointer',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+    width: '100%',
+    boxSizing: 'border-box',
+    marginTop: '12px',
+    transition: 'background-color 0.2s',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  },
+  privateToggle: {
+    margin: '16px 0 8px',
+    textAlign: 'center',
+  },
+  checkboxLabel: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '12px',
+    cursor: 'pointer',
+    fontFamily: '"Inter", sans-serif',
+    fontSize: '14px',
+    color: 'var(--text)',
+  },
+  hiddenCheckbox: {
+    display: 'none',
+  },
+  customCheckbox: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '20px',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    transition: 'all 0.2s',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+  },
   separator: {
     height: '1px',
     backgroundColor: 'var(--border)',
@@ -674,7 +690,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    gap: '24px',
+    gap: '0px',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
@@ -683,12 +699,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '280px',
     height: '70vh',
     flexShrink: 0,
+    marginRight: '20px',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
+    flex: 1,
   },
   boardArea: {
     display: 'flex',
@@ -768,19 +786,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid var(--border)',
     height: '300px',
     overflow: 'auto',
-  },
-  privateToggle: {
-    margin: '16px 0 8px',
-    textAlign: 'center',
-  },
-  checkboxLabel: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    fontFamily: '"Inter", sans-serif',
   },
   vsOverlay: {
     position: 'fixed',
