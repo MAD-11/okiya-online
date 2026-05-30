@@ -46,6 +46,8 @@ const Game: React.FC = () => {
 
   // Мобильная адаптация
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isPrivate, setIsPrivate] = useState(false);
+
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -134,7 +136,7 @@ const Game: React.FC = () => {
 
   const createRoom = (maxWins: number) => {
     const n = ensureNick();
-    socket?.emit('create_room', { maxWins, playerId, nick: n, skin: localSkin }, (res: any) => {
+    socket?.emit('create_room', { maxWins, playerId, nick: n, skin: localSkin, isPrivate }, (res: any) => {
       if (res.roomId) {
         localStorage.setItem('okiya_roomId', res.roomId);
         localStorage.setItem('okiya_playerToken', res.playerToken);
@@ -334,6 +336,16 @@ const Game: React.FC = () => {
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
           </div>
+          <div style={styles.privateToggle}>
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
+              🔒 Приватная комната (не будет видна в списке)
+            </label>
+          </div>
           <div style={styles.separator} />
           <button onClick={() => joinRoom()} style={styles.secondaryBtn}>
             Войти по коду
@@ -393,7 +405,12 @@ const Game: React.FC = () => {
       )}
       <header style={styles.gameHeader}>
         <h2 style={styles.titleSmall}>Окийя</h2>
-        {roomId && <span style={styles.roomCode}>Комната <strong>{roomId}</strong></span>}
+        {roomId && (
+          <span style={styles.roomCode}>
+            Комната <strong>{roomId}</strong>
+            {gameState?.isPrivate && <span style={{ marginLeft: '8px' }}>🔒</span>}
+          </span>
+        )}
       </header>
       <div style={styles.statusBar}>
         <span style={{
@@ -751,6 +768,19 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid var(--border)',
     height: '300px',
     overflow: 'auto',
+  },
+  privateToggle: {
+    margin: '16px 0 8px',
+    textAlign: 'center',
+  },
+  checkboxLabel: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontFamily: '"Inter", sans-serif',
   },
   vsOverlay: {
     position: 'fixed',

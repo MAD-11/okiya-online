@@ -35,6 +35,7 @@ export interface GameState {
   messages: { sender: string; text: string; timestamp: number }[];
   hostSkin: string;
   guestSkin: string; // FIX: добавлено поле для скина гостя
+  isPrivate?: boolean;
 }
 
 export type ValidMoves = boolean[][];

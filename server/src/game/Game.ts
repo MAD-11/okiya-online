@@ -22,14 +22,14 @@ export class Game {
   public guestPlayerId: string = '';
 
   public hostSkin: string = 'sakura';
-  public guestSkin: string = 'sakura'; // <-- ДОБАВИТЬ
+  public guestSkin: string = 'sakura';
 
   public maxWins: number;
   public scores: { host: number; guest: number };
   public roundFinished: boolean;
   public seriesWinner: 'host' | 'guest' | null;
   private restartVotes: Set<string>;
-
+  public isPrivate: boolean = false;
   public resetVotes: Set<string> = new Set();
 
   public turnStartedAt: number = Date.now();
@@ -156,16 +156,15 @@ export class Game {
         this.scores.guest++;
       }
     }
-  
-    // Для одиночной игры (maxWins === 1) не определяем победителя серии,
-    // а устанавливаем roundFinished = true, чтобы предложить реванш со сменой цветов
+
+    // Для одиночной игры (maxWins === 1) предлагаем реванш со сменой цветов
     if (this.maxWins === 1) {
       this.roundFinished = true;
       this.seriesWinner = null;
       this.restartVotes.clear();
       return;
     }
-    
+
     const winThreshold = Math.ceil(this.maxWins / 2);
     if (this.scores.host >= winThreshold) {
       this.seriesWinner = 'host';
@@ -173,7 +172,7 @@ export class Game {
       this.seriesWinner = 'guest';
     }
 
-    if (this.seriesWinner || this.maxWins === 1) {
+    if (this.seriesWinner) {
       this.roundFinished = false;
     } else {
       this.roundFinished = true;
@@ -213,7 +212,7 @@ export class Game {
     const nickRed = this.nickRed;
     const nickBlack = this.nickBlack;
     const hostSkin = this.hostSkin;
-    const guestSkin = this.guestSkin; // <-- ДОБАВИТЬ
+    const guestSkin = this.guestSkin;
 
     this.board = initBoard();
     this.currentPlayer = 'red';
@@ -229,7 +228,7 @@ export class Game {
     this.nickRed = nickRed;
     this.nickBlack = nickBlack;
     this.hostSkin = hostSkin;
-    this.guestSkin = guestSkin; // <-- ДОБАВИТЬ
+    this.guestSkin = guestSkin;
     this.maxWins = maxWins;
     this.turnDuration = turnDuration;
     this.scores = { host: 0, guest: 0 };
@@ -258,9 +257,35 @@ export class Game {
 
   private swapColors() {
     if (this.players.red && this.players.black) {
-      const temp = this.players.red;
+      // Обмен сокетами
+      const tempSocket = this.players.red;
       this.players.red = this.players.black;
-      this.players.black = temp;
+      this.players.black = tempSocket;
+
+      // Обмен socketId хоста и гостя
+      const tempHostSocket = this.hostSocketId;
+      this.hostSocketId = this.guestSocketId;
+      this.guestSocketId = tempHostSocket;
+
+      // Обмен никами
+      const tempNickRed = this.nickRed;
+      this.nickRed = this.nickBlack;
+      this.nickBlack = tempNickRed;
+
+      // Обмен скинами
+      const tempHostSkin = this.hostSkin;
+      this.hostSkin = this.guestSkin;
+      this.guestSkin = tempHostSkin;
+
+      // Обмен playerId
+      const tempHostId = this.hostPlayerId;
+      this.hostPlayerId = this.guestPlayerId;
+      this.guestPlayerId = tempHostId;
+
+      // Обмен токенами (для переподключения)
+      const tempHostToken = this.hostToken;
+      this.hostToken = this.guestToken;
+      this.guestToken = tempHostToken;
     }
   }
 

@@ -49,7 +49,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   const isHost = playerSocketId === game.hostSocketId;
   const myScore = isHost ? game.scores.host : game.scores.guest;
   const opponentScore = isHost ? game.scores.guest : game.scores.host;
-
+  
   let opponentConnected = false;
   if (io && playerSocketId) {
     const isRed = game.players.red === playerSocketId;
@@ -86,6 +86,7 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     messages: chatMessages.get(roomId) || [],
     hostSkin: game.hostSkin,
     guestSkin: game.guestSkin || 'sakura',
+    isPrivate: game.isPrivate,
   };
 }
 
@@ -118,14 +119,16 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     logger.info('User connected: ' + socket.id);
 
     // Создание комнаты
-    socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string; skin?: string }, callback) => {
+    socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string; skin?: string; isPrivate?: boolean }, callback) => {
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
       logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${nick}, skin: ${data.skin}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
       const roomId = generateRoomCode();
+      const isPrivate = data.isPrivate === true; // по умолчанию false
       const game = new Game(maxWins);
+      game.isPrivate = isPrivate;
       game.roomId = roomId;
       game.addPlayer(socket.id);
       game.nickRed = nick;
@@ -469,12 +472,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
-        // Очищаем мёртвые сокеты
+        // Очистка мёртвых сокетов
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем комнаты, где есть ХОТЯ БЫ ОДИН игрок (исключаем полностью пустые 0/2)
-        if (game.players.red || game.players.black) {
+        // Показываем только публичные комнаты (не приватные) и с хотя бы одним игроком
+        if (!game.isPrivate && (game.players.red || game.players.black)) {
           rooms.push({
             roomId,
             players: `${game.players.red ? 1 : 0}/2`,
@@ -484,7 +487,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           });
         }
       }
-      logger.info(`Returning ${rooms.length} public rooms`);
       callback(rooms);
     });
 
