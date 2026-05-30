@@ -152,13 +152,11 @@ const Game: React.FC = () => {
   const id = code || prompt('Введите код комнаты')?.toUpperCase();
   if (!id) return;
   const n = ensureNick();
-  // FIX: проверяем socket на null
   if (!socket) {
     setMessage('Нет соединения с сервером');
     return;
   }
   socket.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
-    console.log('Sending skin:', localSkin);
     if (res.error) {
       setMessage(res.error);
     } else {

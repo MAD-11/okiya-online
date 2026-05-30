@@ -12,11 +12,12 @@ interface BoardProps {
   skin: string;
 }
 
+// FIX: для каждого скина задаём уникальную пару (красный, чёрный)
 const skinEmoji: Record<string, { red: string; black: string }> = {
-  sakura: { red: '🌸', black: '⚫' },
-  bird: { red: '🐦', black: '⚫' },
-  maple: { red: '🍁', black: '⚫' },
-  moon: { red: '🌙', black: '⚫' },
+  sakura: { red: '🌸', black: '🌺' },
+  bird: { red: '🐦', black: '🐦‍⬛' },
+  maple: { red: '🍁', black: '🍂' },
+  moon: { red: '🌙', black: '🌑' },
 };
 
 const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, skin }) => {
@@ -24,11 +25,10 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
   const fontSize = 32;
 
   const handleCellClick = (row: number, col: number) => {
-  console.log('Board click, initAudio');
-  initAudio();
-  if (validMoves[row]?.[col]) {
-    onClick(row, col);
-  }
+    if (validMoves[row]?.[col]) {
+      initAudio();
+      onClick(row, col);
+    }
   };
 
   return (
@@ -39,6 +39,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
             const isValid = validMoves[r]?.[c];
             const isPlayerCell = cell === 'red' || cell === 'black';
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
+            const emoji = skinEmoji[skin] || skinEmoji.sakura;
             return (
               <div
                 key={`${r}-${c}`}
@@ -59,8 +60,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && <span style={styles.stone}>{skinEmoji[skin]?.red || '🌸'}</span>}
-                {cell === 'black' && <span style={styles.stone}>{skinEmoji[skin]?.black || '⚫'}</span>}
+                {cell === 'red' && <span style={styles.stone}>{emoji.red}</span>}
+                {cell === 'black' && <span style={styles.stone}>{emoji.black}</span>}
               </div>
             );
           })

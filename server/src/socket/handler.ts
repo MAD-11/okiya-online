@@ -473,7 +473,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем только комнаты, где есть хотя бы один игрок (не 0/2)
+        // Показываем комнаты, где есть ХОТЯ БЫ ОДИН игрок (исключаем полностью пустые 0/2)
         if (game.players.red || game.players.black) {
           rooms.push({
             roomId,
