@@ -202,7 +202,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.guestToken = generatePlayerToken();
         game.nickBlack = nick;
         game.guestPlayerId = data.playerId;
-        game.guestSkin = skin; // FIX: сохраняем скин гостя
+        game.guestSkin = skin;
       }
 
       if (game.players.red && game.players.black && game.status === 'waiting') {

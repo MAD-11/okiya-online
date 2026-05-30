@@ -22,8 +22,8 @@ export class Game {
   public guestPlayerId: string = '';
 
   public hostSkin: string = 'sakura';
-  public guestSkin: string = 'sakura';
-  
+  public guestSkin: string = 'sakura'; // <-- ДОБАВИТЬ
+
   public maxWins: number;
   public scores: { host: number; guest: number };
   public roundFinished: boolean;
@@ -203,6 +203,7 @@ export class Game {
     const nickRed = this.nickRed;
     const nickBlack = this.nickBlack;
     const hostSkin = this.hostSkin;
+    const guestSkin = this.guestSkin; // <-- ДОБАВИТЬ
 
     this.board = initBoard();
     this.currentPlayer = 'red';
@@ -218,6 +219,7 @@ export class Game {
     this.nickRed = nickRed;
     this.nickBlack = nickBlack;
     this.hostSkin = hostSkin;
+    this.guestSkin = guestSkin; // <-- ДОБАВИТЬ
     this.maxWins = maxWins;
     this.turnDuration = turnDuration;
     this.scores = { host: 0, guest: 0 };
