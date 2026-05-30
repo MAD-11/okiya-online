@@ -335,8 +335,15 @@ const Game: React.FC = () => {
                 onChange={(e) => setIsPrivate(e.target.checked)}
                 style={styles.hiddenCheckbox}
               />
-              <span style={styles.customCheckbox}>{isPrivate ? '🔒' : '🔓'}</span>
-              <span>Приватная комната (по коду)</span>
+              <span style={{
+                ...styles.customCheckbox,
+                backgroundColor: isPrivate ? '#f1c40f' : 'var(--btn-bg)',
+                color: isPrivate ? '#000' : 'var(--btn-text)',
+                border: isPrivate ? '1px solid #f1c40f' : 'none',
+              }}>
+                {isPrivate ? '🔒' : '🔓'}
+              </span>
+              <span style={styles.privateText}>Приватная комната (только по коду)</span>
             </label>
           </div>
           <div style={styles.separator} />
@@ -401,7 +408,7 @@ const Game: React.FC = () => {
         {roomId && (
           <span style={styles.roomCode}>
             Комната <strong>{roomId}</strong>
-            {gameState.isPrivate && <span style={{ marginLeft: '8px' }}>🔒</span>}
+            {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
           </span>
         )}
       </header>
@@ -597,17 +604,29 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'none',
   },
   customCheckbox: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '20px',
-    backgroundColor: 'var(--btn-bg)',
-    color: 'var(--btn-text)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
+    fontSize: '22px',
     transition: 'all 0.2s',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+  },
+  lockIcon: {
+    marginLeft: '8px',
+    fontSize: '16px',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: '20px',
+    padding: '2px 8px',
+    color: '#f1c40f',
+    fontWeight: 'bold',
+  },
+  privateText: {
+    fontSize: '14px',
+    fontWeight: 500,
+    color: 'var(--text)',
   },
   separator: {
     height: '1px',
@@ -687,26 +706,24 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--turn-indicator)',
   },
   gameLayout: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    gap: '0px',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto', // чат занимает всё свободное место слева, доска – по ширине контента
+    gap: '20px',
+    alignItems: 'start',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
   },
   chatColumn: {
-    width: '280px',
+    width: '100%',     // растягивается на всю ширину своей колонки
     height: '70vh',
-    flexShrink: 0,
-    marginRight: '20px',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    flex: 1,
+    justifySelf: 'center', // доска центрируется внутри своей колонки
   },
   boardArea: {
     display: 'flex',
