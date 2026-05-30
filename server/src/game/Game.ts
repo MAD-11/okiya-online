@@ -156,6 +156,16 @@ export class Game {
         this.scores.guest++;
       }
     }
+  
+    // Для одиночной игры (maxWins === 1) не определяем победителя серии,
+    // а устанавливаем roundFinished = true, чтобы предложить реванш со сменой цветов
+    if (this.maxWins === 1) {
+      this.roundFinished = true;
+      this.seriesWinner = null;
+      this.restartVotes.clear();
+      return;
+    }
+    
     const winThreshold = Math.ceil(this.maxWins / 2);
     if (this.scores.host >= winThreshold) {
       this.seriesWinner = 'host';

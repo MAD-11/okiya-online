@@ -9,10 +9,10 @@ interface BoardProps {
   currentPlayer: string;
   myColor: string | null;
   lastMove: { row: number; col: number } | null;
-  skin: string;
+  hostSkin: string;   // скин для красных фигур (всегда хост)
+  guestSkin: string;  // скин для чёрных фигур (всегда гость)
 }
 
-// FIX: для каждого скина задаём уникальную пару (красный, чёрный)
 const skinEmoji: Record<string, { red: string; black: string }> = {
   sakura: { red: '🌸', black: '🌺' },
   bird: { red: '🐦', black: '🐦‍⬛' },
@@ -20,7 +20,7 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
   moon: { red: '🌙', black: '🌑' },
 };
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, skin }) => {
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin }) => {
   const cellSize = 88;
   const fontSize = 32;
 
@@ -28,6 +28,14 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
     if (validMoves[row]?.[col]) {
       initAudio();
       onClick(row, col);
+    }
+  };
+
+  const getStoneEmoji = (color: 'red' | 'black') => {
+    if (color === 'red') {
+      return skinEmoji[hostSkin]?.red || skinEmoji.sakura.red;
+    } else {
+      return skinEmoji[guestSkin]?.black || skinEmoji.sakura.black;
     }
   };
 
@@ -39,7 +47,6 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
             const isValid = validMoves[r]?.[c];
             const isPlayerCell = cell === 'red' || cell === 'black';
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
-            const emoji = skinEmoji[skin] || skinEmoji.sakura;
             return (
               <div
                 key={`${r}-${c}`}
@@ -60,8 +67,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, ski
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && <span style={styles.stone}>{emoji.red}</span>}
-                {cell === 'black' && <span style={styles.stone}>{emoji.black}</span>}
+                {cell === 'red' && <span style={styles.stone}>{getStoneEmoji('red')}</span>}
+                {cell === 'black' && <span style={styles.stone}>{getStoneEmoji('black')}</span>}
               </div>
             );
           })

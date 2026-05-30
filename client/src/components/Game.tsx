@@ -457,9 +457,8 @@ const Game: React.FC = () => {
               currentPlayer={gameState.currentPlayer}
               myColor={gameState.myColor}
               lastMove={gameState.lastMove}
-              skin={gameState.myColor === 'red' 
-                ? (gameState.hostSkin || 'sakura') 
-                : (gameState.guestSkin || 'sakura')}
+              hostSkin={gameState.hostSkin || 'sakura'}
+              guestSkin={gameState.guestSkin || 'sakura'}
             />
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
