@@ -169,7 +169,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const roomId = data.roomId.toUpperCase();
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
       const skin = data.skin || 'sakura';
-      logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}`);
+      logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}, skin:${skin}`);
 
       const game = games.get(roomId);
       if (!game) {
@@ -204,6 +204,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.guestPlayerId = data.playerId;
         game.guestSkin = skin;
       }
+      console.log('Guest skin saved:', game.guestSkin);
 
       if (game.players.red && game.players.black && game.status === 'waiting') {
         game.status = 'playing';
@@ -468,10 +469,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
+        // Очищаем мёртвые сокеты
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        if (!game.players.red || !game.players.black) {
+        // Показываем только комнаты, где есть хотя бы один игрок (не 0/2)
+        if (game.players.red || game.players.black) {
           rooms.push({
             roomId,
             players: `${game.players.red ? 1 : 0}/2`,

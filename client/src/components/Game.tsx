@@ -152,8 +152,13 @@ const Game: React.FC = () => {
   const id = code || prompt('Введите код комнаты')?.toUpperCase();
   if (!id) return;
   const n = ensureNick();
-  // FIX: передаём skin гостя на сервер
-  socket?.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
+  // FIX: проверяем socket на null
+  if (!socket) {
+    setMessage('Нет соединения с сервером');
+    return;
+  }
+  socket.emit('join_room', { roomId: id, playerId, nick: n, skin: localSkin }, (res: any) => {
+    console.log('Sending skin:', localSkin);
     if (res.error) {
       setMessage(res.error);
     } else {
@@ -559,20 +564,21 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: '100px',
   },
   secondaryBtn: {
-    padding: '14px 32px',
-    fontSize: '16px',
-    fontWeight: 500,
-    border: '2px solid var(--btn-bg)',
-    borderRadius: '40px',
-    backgroundColor: 'transparent',
-    color: 'var(--btn-bg)',
-    cursor: 'pointer',
-    fontFamily: '"Inter", "Segoe UI", sans-serif',
-    width: '100%',
-    boxSizing: 'border-box',
-    marginTop: '12px',
-    transition: 'background-color 0.2s, color 0.2s',
-  },
+  padding: '14px 32px',
+  fontSize: '16px',
+  fontWeight: 500,
+  border: 'none',                      // убираем обводку
+  borderRadius: '40px',
+  backgroundColor: 'var(--btn-bg)',    // тот же фон, что у primaryBtn
+  color: 'var(--btn-text)',            // тот же цвет текста
+  cursor: 'pointer',
+  fontFamily: '"Inter", "Segoe UI", sans-serif',
+  width: '100%',
+  boxSizing: 'border-box',
+  marginTop: '12px',
+  transition: 'background-color 0.2s',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+},
   separator: {
     height: '1px',
     backgroundColor: 'var(--border)',
