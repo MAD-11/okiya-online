@@ -404,19 +404,24 @@ const Game: React.FC = () => {
         )}
         {showJoinModal && (
           <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <h3 style={{ margin: '0 0 16px', color: 'var(--text)' }}>Введите код комнаты</h3>
+            <div style={styles.joinModal} onClick={e => e.stopPropagation()}>
+              <h3 style={styles.joinModalTitle}>Введите код комнаты</h3>
               <input
                 ref={joinInputRef}
                 value={joinCode}
                 onChange={e => setJoinCode(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key === 'Enter' && joinRoom(joinCode)}
-                style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--card-bg)', color: 'var(--text)' }}
-                autoFocus
+                style={styles.joinModalInput}
+                placeholder="Например: A1B2"
+                maxLength={4}
               />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button onClick={() => setShowJoinModal(false)} style={styles.secondaryBtn}>Отмена</button>
-                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.primaryBtn}>Войти</button>
+              <div style={styles.joinModalButtons}>
+                <button onClick={() => setShowJoinModal(false)} style={styles.joinModalBtnCancel}>
+                  Отмена
+                </button>
+                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.joinModalBtnConfirm}>
+                  Войти
+                </button>
               </div>
             </div>
           </div>
@@ -777,25 +782,26 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--turn-indicator)',
   },
   gameLayout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr auto',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
     gap: '20px',
-    alignItems: 'start',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
   },
   chatColumn: {
-    width: '100%',
+    width: '280px',
+    flexShrink: 0,
     height: '70vh',
-    minWidth: '200px',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    justifySelf: 'center',
+    flex: '0 1 auto',
+    margin: '0 auto',
   },
   boardArea: {
     display: 'flex',
@@ -912,6 +918,60 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px',
     zIndex: 2000,
     fontWeight: 'bold',
+  },
+
+  // В объект styles добавить:
+  joinModal: {
+    background: 'var(--modal-bg)',
+    borderRadius: '24px',
+    maxWidth: '360px',
+    width: '90%',
+    padding: '24px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+  },
+  joinModalTitle: {
+    margin: '0 0 16px',
+    fontSize: '20px',
+    fontWeight: 500,
+    color: 'var(--text)',
+    textAlign: 'center',
+  },
+  joinModalInput: {
+    width: '100%',
+    padding: '12px',
+    fontSize: '16px',
+    borderRadius: '12px',
+    border: '1px solid var(--border)',
+    background: 'var(--card-bg)',
+    color: 'var(--text)',
+    marginBottom: '20px',
+    boxSizing: 'border-box',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    letterSpacing: '2px',
+  },
+  joinModalButtons: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+  },
+  joinModalBtnCancel: {
+    padding: '10px 20px',
+    borderRadius: '30px',
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontSize: '14px',
+  },
+  joinModalBtnConfirm: {
+    padding: '10px 20px',
+    borderRadius: '30px',
+    border: 'none',
+    background: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    cursor: 'pointer',
+    fontSize: '14px',
   },
 };
 
