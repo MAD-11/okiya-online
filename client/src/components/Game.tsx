@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { GameState, ValidMoves, Tile } from '../types/game';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
+import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio, playJoinSound } from '../utils/sound';
 import Chat from './Chat';
 import Profile from './Profile';
 import RoomList from './RoomList';
 import Settings from './Settings';
+import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
@@ -39,7 +40,13 @@ const Game: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [vsAnimation, setVsAnimation] = useState<{ nick1: string; nick2: string } | null>(null);
-  const [isPrivate, setIsPrivate] = useState(false); // приватная комната
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
+  const [opponentTyping, setOpponentTyping] = useState(false);
+  const [shakeBoard, setShakeBoard] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const joinInputRef = useRef<HTMLInputElement>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
@@ -52,6 +59,12 @@ const Game: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (showJoinModal && joinInputRef.current) {
+      joinInputRef.current.focus();
+    }
+  }, [showJoinModal]);
 
   const ensureNick = (): string => {
     if (nick) return nick;
@@ -68,21 +81,33 @@ const Game: React.FC = () => {
   };
 
   const backToMenu = () => {
-    if (window.confirm('Вы уверены, что хотите выйти в главное меню? Текущая игра будет потеряна.')) {
-      if (socket && roomId) {
-        socket.emit('leave_room', roomId);
-      }
-      clearSavedRoom();
-      setGameState(null);
-      setRoomId(null);
-      setMessage('');
-      setPersonalGameOver(null);
-      setWaitingRestart(false);
-      setWaitingReset(false);
-      setReconnecting(false);
+    setConfirmExitOpen(true);
+  };
+
+  const handleConfirmExit = () => {
+    setConfirmExitOpen(false);
+    if (socket && roomId) {
+      socket.emit('leave_room', roomId);
+    }
+    clearSavedRoom();
+    setGameState(null);
+    setRoomId(null);
+    setMessage('');
+    setPersonalGameOver(null);
+    setWaitingRestart(false);
+    setWaitingReset(false);
+    setReconnecting(false);
+  };
+
+  const copyRoomCode = () => {
+    if (roomId) {
+      navigator.clipboard.writeText(roomId);
+      setMessage('Код комнаты скопирован!');
+      setTimeout(() => setMessage(''), 2000);
     }
   };
 
+  // Мониторинг потери соединения
   useEffect(() => {
     if (!connected && roomId && !reconnecting) {
       setReconnecting(true);
@@ -147,7 +172,7 @@ const Game: React.FC = () => {
   };
 
   const joinRoom = (code?: string) => {
-    const id = code || prompt('Введите код комнаты')?.toUpperCase();
+    const id = code || joinCode;
     if (!id) return;
     const n = ensureNick();
     if (!socket) {
@@ -250,6 +275,10 @@ const Game: React.FC = () => {
       else if (data.yourResult === 'lose') playLoseSound();
       else if (data.yourResult === 'draw') playDrawSound();
 
+      // Тряска доски
+      setShakeBoard(true);
+      setTimeout(() => setShakeBoard(false), 500);
+
       let text = '';
       if (data.yourResult === 'win') text = '🎉 Вы выиграли!';
       else if (data.yourResult === 'lose') text = 'Поражение. Победил ' + (data.winner === 'red' ? '🌸 Красные' : '🐦 Чёрные');
@@ -270,7 +299,7 @@ const Game: React.FC = () => {
     });
 
     socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
-      // Очищаем чат при подключении соперника
+      playJoinSound();
       if (roomId && socket) {
         socket.emit('clear_chat', roomId);
       }
@@ -282,34 +311,23 @@ const Game: React.FC = () => {
       setGameState(prev => prev ? { ...prev, messages: [] } : null);
     });
 
+    socket.on('opponent_typing', (isTyping: boolean) => {
+      setOpponentTyping(isTyping);
+    });
+
     return () => {
       socket.off('game_state');
       socket.off('game_over');
       socket.off('opponent_joined');
       socket.off('chat_cleared');
+      socket.off('opponent_typing');
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins, roomId]);
-
-  useEffect(() => {
-    if (!document.querySelector('#vs-animation-style')) {
-      const style = document.createElement('style');
-      style.id = 'vs-animation-style';
-      style.innerHTML = `
-        @keyframes vsFadeIn {
-          0% { opacity: 0; transform: scale(0.8); }
-          10% { opacity: 1; transform: scale(1); }
-          90% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1.2); }
-        }
-      `;
-      document.head.appendChild(style);
-      return () => { document.head.removeChild(style); };
-    }
-  }, []);
 
   if (!connected) {
     return (
       <div style={styles.centered}>
+        <div className="spinner"></div>
         <p>Подключение к серверу...</p>
       </div>
     );
@@ -347,15 +365,15 @@ const Game: React.FC = () => {
             </label>
           </div>
           <div style={styles.separator} />
-          <button onClick={() => joinRoom()} style={styles.secondaryBtn}>
+          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>
             Войти по коду
           </button>
           <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>
             Открытые комнаты
           </button>
           <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
-            <button onClick={() => setShowProfile(true)} style={styles.textBtn}>👤 Профиль</button>
-            <button onClick={() => setShowSettings(true)} style={styles.textBtn}>⚙️ Настройки</button>
+            <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
+            <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
           </div>
           {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
@@ -370,7 +388,7 @@ const Game: React.FC = () => {
           <div style={styles.modalOverlay} onClick={() => setShowRoomList(false)}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
               <RoomList
-                onJoin={(roomId) => joinRoom(roomId)}
+                onJoin={(roomId) => { joinRoom(roomId); setShowRoomList(false); }}
                 socket={socket}
                 onClose={() => setShowRoomList(false)}
               />
@@ -384,6 +402,32 @@ const Game: React.FC = () => {
             </div>
           </div>
         )}
+        {showJoinModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 16px', color: 'var(--text)' }}>Введите код комнаты</h3>
+              <input
+                ref={joinInputRef}
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && joinRoom(joinCode)}
+                style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--card-bg)', color: 'var(--text)' }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowJoinModal(false)} style={styles.secondaryBtn}>Отмена</button>
+                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.primaryBtn}>Войти</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <ConfirmDialog
+          open={confirmExitOpen}
+          title="Выйти из игры?"
+          message="Текущая игра будет потеряна. Вы уверены?"
+          onConfirm={handleConfirmExit}
+          onCancel={() => setConfirmExitOpen(false)}
+        />
       </div>
     );
   }
@@ -409,6 +453,7 @@ const Game: React.FC = () => {
           <span style={styles.roomCode}>
             Комната <strong>{roomId}</strong>
             {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
+            <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код комнаты">📋</button>
           </span>
         )}
       </header>
@@ -448,6 +493,9 @@ const Game: React.FC = () => {
                   messages={gameState.messages ?? []}
                   onSend={handleChatSend}
                   myNick={gameState.myNick}
+                  socket={socket}
+                  roomId={roomId}
+                  opponentTyping={opponentTyping}
                 />
               </div>
             ) : (
@@ -458,6 +506,9 @@ const Game: React.FC = () => {
                     messages={gameState.messages ?? []}
                     onSend={handleChatSend}
                     myNick={gameState.myNick}
+                    socket={socket}
+                    roomId={roomId}
+                    opponentTyping={opponentTyping}
                   />
                 </div>
               </details>
@@ -476,6 +527,7 @@ const Game: React.FC = () => {
               lastMove={gameState.lastMove}
               hostSkin={gameState.hostSkin || 'sakura'}
               guestSkin={gameState.guestSkin || 'sakura'}
+              shake={shakeBoard}
             />
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
@@ -491,15 +543,15 @@ const Game: React.FC = () => {
             </div>
           )}
           <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={styles.actionBtn}>
+            <button onClick={backToMenu} style={styles.actionBtn} title="Выйти в главное меню">
               Выйти в меню
             </button>
             {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }} title="Сдаться и завершить игру">
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }}>
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }} title="Настройки">
               Настройки
             </button>
           </div>
@@ -512,6 +564,13 @@ const Game: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmExitOpen}
+        title="Выйти из игры?"
+        message="Текущая игра будет потеряна. Вы уверены?"
+        onConfirm={handleConfirmExit}
+        onCancel={() => setConfirmExitOpen(false)}
+      />
     </div>
   );
 };
@@ -614,15 +673,6 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
     boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
   },
-  lockIcon: {
-    marginLeft: '8px',
-    fontSize: '16px',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: '20px',
-    padding: '2px 8px',
-    color: '#f1c40f',
-    fontWeight: 'bold',
-  },
   privateText: {
     fontSize: '14px',
     fontWeight: 500,
@@ -683,6 +733,27 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     color: 'var(--secondary-text)',
     fontFamily: '"Inter", sans-serif',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  copyBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '18px',
+    cursor: 'pointer',
+    padding: '0 4px',
+    color: 'var(--secondary-text)',
+    transition: 'transform 0.1s',
+  },
+  lockIcon: {
+    marginLeft: '4px',
+    fontSize: '14px',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: '20px',
+    padding: '2px 8px',
+    color: '#f1c40f',
+    fontWeight: 'bold',
   },
   statusBar: {
     display: 'flex',
@@ -707,7 +778,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameLayout: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto', // чат занимает всё свободное место слева, доска – по ширине контента
+    gridTemplateColumns: '1fr auto',
     gap: '20px',
     alignItems: 'start',
     flex: 1,
@@ -715,15 +786,16 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   chatColumn: {
-    width: '100%',     // растягивается на всю ширину своей колонки
+    width: '100%',
     height: '70vh',
+    minWidth: '200px',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    justifySelf: 'center', // доска центрируется внутри своей колонки
+    justifySelf: 'center',
   },
   boardArea: {
     display: 'flex',
@@ -781,6 +853,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     overflow: 'hidden',
+    padding: '24px',
   },
   mobileChatToggle: {
     width: '100%',

@@ -14,71 +14,41 @@ export function initAudio() {
   }
 }
 
-export function playMoveSound() {
+function playTone(frequency: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.3) {
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
   try {
-    const ctx = getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    osc.frequency.value = frequency;
+    osc.type = type;
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
-  } catch (e) {
-    // игнорируем ошибки
-  }
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) {}
+}
+
+export function playMoveSound() {
+  playTone(800, 0.1, 'sine', 0.3);
 }
 
 export function playWinSound() {
-  try {
-    const ctx = getAudioContext();
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = 'triangle';
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.3);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
-    });
-  } catch (e) {}
+  playTone(523.25, 0.3, 'triangle', 0.3);
+  setTimeout(() => playTone(659.25, 0.3, 'triangle', 0.3), 150);
+  setTimeout(() => playTone(783.99, 0.3, 'triangle', 0.3), 300);
 }
 
 export function playLoseSound() {
-  try {
-    const ctx = getAudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 300;
-    osc.type = 'sawtooth';
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-  } catch (e) {}
+  playTone(300, 0.4, 'sawtooth', 0.2);
 }
 
 export function playDrawSound() {
-  try {
-    const ctx = getAudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 440;
-    osc.type = 'square';
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  } catch (e) {}
+  playTone(440, 0.2, 'square', 0.15);
+}
+
+export function playJoinSound() {
+  playTone(880, 0.2, 'sine', 0.2);
 }

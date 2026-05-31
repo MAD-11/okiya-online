@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Socket } from 'socket.io-client';
 
 interface Message {
   sender: string;
@@ -10,23 +11,54 @@ interface ChatProps {
   messages: Message[];
   onSend: (text: string) => void;
   myNick?: string;
+  socket?: Socket | null;
+  roomId?: string | null;
+  opponentTyping?: boolean;
 }
 
 const MAX_MESSAGE_LENGTH = 200;
 
-const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
+const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, roomId, opponentTyping = false }) => {
   const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<number>(); // fixed: NodeJS.Timeout -> number
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    if (!isTyping && value.trim()) {
+      setIsTyping(true);
+      socket?.emit('typing', roomId, true);
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false);
+        socket?.emit('typing', roomId, false);
+      }
+    }, 2000);
+  };
 
   const handleSend = () => {
     const trimmed = input.trim().slice(0, MAX_MESSAGE_LENGTH);
     if (trimmed) {
       onSend(trimmed);
       setInput('');
+      if (isTyping) {
+        setIsTyping(false);
+        socket?.emit('typing', roomId, false);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      }
     }
   };
 
@@ -38,9 +70,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
     <div style={styles.container}>
       <div style={styles.header}>Чат</div>
       <div style={styles.messageList}>
-        {messages.length === 0 && (
-          <div style={styles.empty}>Нет сообщений</div>
-        )}
+        {messages.length === 0 && <div style={styles.empty}>Нет сообщений</div>}
         {messages.map((msg, i) => {
           const isMine = msg.sender === myNick;
           return (
@@ -63,8 +93,9 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
       </div>
       <div style={styles.inputArea}>
         <input
+          ref={inputRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Сообщение..."
           maxLength={MAX_MESSAGE_LENGTH}
@@ -72,6 +103,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick }) => {
         />
         <button onClick={handleSend} style={styles.sendBtn}>↑</button>
       </div>
+      {opponentTyping && <div style={styles.typingIndicator}>Соперник печатает...</div>}
     </div>
   );
 };
@@ -187,6 +219,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  typingIndicator: {
+    fontSize: '11px',
+    padding: '4px 12px 8px',
+    color: 'var(--secondary-text)',
+    fontStyle: 'italic',
   },
 };
 

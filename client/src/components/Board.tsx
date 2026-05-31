@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
 import { initAudio } from '../utils/sound';
 
@@ -11,6 +11,7 @@ interface BoardProps {
   lastMove: { row: number; col: number } | null;
   hostSkin: string;
   guestSkin: string;
+  shake?: boolean;
 }
 
 const skinEmoji: Record<string, { red: string; black: string }> = {
@@ -20,14 +21,18 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
   moon: { red: '🌙', black: '🌑' },
 };
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin }) => {
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false }) => {
   const cellSize = 88;
   const fontSize = 32;
+  const [invalidCell, setInvalidCell] = useState<{ row: number; col: number } | null>(null);
 
   const handleCellClick = (row: number, col: number) => {
     if (validMoves[row]?.[col]) {
       initAudio();
       onClick(row, col);
+    } else {
+      setInvalidCell({ row, col });
+      setTimeout(() => setInvalidCell(null), 200);
     }
   };
 
@@ -40,13 +45,14 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
   };
 
   return (
-    <div style={styles.boardContainer}>
+    <div className={shake ? 'board-shake' : ''} style={styles.boardContainer}>
       <div style={styles.grid}>
         {board.map((row, r) =>
           row.map((cell, c) => {
             const isValid = validMoves[r]?.[c];
             const isPlayerCell = cell === 'red' || cell === 'black';
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
+            const isInvalid = invalidCell?.row === r && invalidCell?.col === c;
             return (
               <div
                 key={`${r}-${c}`}
@@ -59,7 +65,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
-                    : 'var(--cell-bg)',
+                    : isInvalid ? '#ffcccc' : 'var(--cell-bg)',
                   border: isValid ? '2px solid var(--valid-move-border)' : '1px solid var(--border)',
                   animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
                 }}
@@ -105,11 +111,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
   },
   tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
-  stone: {
-    fontSize: '34px',
-    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
-    // Нет фона, нет рамки – только эмодзи
-  },
+  stone: { fontSize: '34px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' },
 };
 
 export default Board;

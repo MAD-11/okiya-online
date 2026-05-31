@@ -1,7 +1,7 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
-import { setupSocket } from './socket/handler';
+import { setupSocket, clearAllDisconnectTimers } from './socket/handler';
 import { pubClient, subClient, loadAllGames, closeRedisConnections } from './redis';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { logger } from './logger';
@@ -42,12 +42,22 @@ async function shutdown() {
   logger.info('Shutting down gracefully...');
   server.close(async () => {
     logger.info('HTTP server closed');
+    // Закрываем все активные сокеты
+    const sockets = await io.fetchSockets();
+    for (const socket of sockets) {
+      socket.disconnect(true);
+    }
+    logger.info(`Disconnected ${sockets.length} sockets`);
+    // Очищаем таймеры отключения
+    clearAllDisconnectTimers();
+    // Закрываем Redis
     await closeRedisConnections();
     logger.info('Redis connections closed');
     process.exit(0);
   });
+  // Принудительное завершение через 10 секунд
   setTimeout(() => {
-    logger.error('Could not close connections in time, forcefully shutting down');
+    logger.error('Forceful shutdown');
     process.exit(1);
   }, 10000);
 }

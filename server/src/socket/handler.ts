@@ -6,8 +6,8 @@ import { logger } from '../logger';
 import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
-import { string } from 'zod/v4';
 
+// Санитизация и валидация
 function sanitize(str: string): string {
   return str.replace(/[<>]/g, '').slice(0, 200);
 }
@@ -25,10 +25,20 @@ const JoinRoomSchema = z.object({
   skin: z.string().optional(),
 });
 
+// Глобальные хранилища
 let games: Map<string, Game>;
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const chatMessages: Map<string, { sender: string; text: string; timestamp: number }[]> = new Map();
 const roomMutexes = new Map<string, Mutex>();
+const userRoomCount = new Map<string, number>();
+const MAX_ROOMS_PER_USER = 3;
+
+export function clearAllDisconnectTimers() {
+  for (const timer of disconnectTimers.values()) {
+    clearTimeout(timer);
+  }
+  disconnectTimers.clear();
+}
 
 function getRoomMutex(roomId: string): Mutex {
   if (!roomMutexes.has(roomId)) {
@@ -45,11 +55,20 @@ function generatePlayerToken(): string {
   return crypto.randomBytes(8).toString('hex');
 }
 
+function cleanupRoomTimers(roomId: string) {
+  for (const [key, timer] of disconnectTimers.entries()) {
+    if (key.startsWith(roomId)) {
+      clearTimeout(timer);
+      disconnectTimers.delete(key);
+    }
+  }
+}
+
 function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
   const isHost = playerSocketId === game.hostSocketId;
   const myScore = isHost ? game.scores.host : game.scores.guest;
   const opponentScore = isHost ? game.scores.guest : game.scores.host;
-  
+
   let opponentConnected = false;
   if (io && playerSocketId) {
     const isRed = game.players.red === playerSocketId;
@@ -85,21 +104,42 @@ function getClientGameState(game: Game, playerSocketId?: string, io?: Server) {
     myNick: playerSocketId === game.hostSocketId ? game.nickRed : (playerSocketId === game.guestSocketId ? game.nickBlack : ''),
     messages: chatMessages.get(roomId) || [],
     hostSkin: game.hostSkin,
-    guestSkin: game.guestSkin || 'sakura',
+    guestSkin: game.guestSkin,
     isPrivate: game.isPrivate,
   };
 }
 
-function cleanupRoomTimers(roomId: string) {
-  for (const [key, timer] of disconnectTimers.entries()) {
-    if (key.startsWith(roomId)) {
-      clearTimeout(timer);
-      disconnectTimers.delete(key);
-    }
+function sendPersonalGameState(io: Server, game: Game) {
+  const redId = game.players.red;
+  const blackId = game.players.black;
+  if (redId) {
+    const redSocket = io.sockets.sockets.get(redId);
+    if (redSocket) redSocket.emit('game_state', getClientGameState(game, redId, io));
+  }
+  if (blackId) {
+    const blackSocket = io.sockets.sockets.get(blackId);
+    if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, blackId, io));
   }
 }
 
-// Подписка на чат через Redis (для масштабирования)
+function sendPersonalGameOver(io: Server, game: Game) {
+  const redId = game.players.red;
+  const blackId = game.players.black;
+  const resultForRed = game.winner === 'red' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
+  const resultForBlack = game.winner === 'black' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
+  const dataRed = { winner: game.winner, yourResult: resultForRed, seriesWinner: game.seriesWinner };
+  const dataBlack = { winner: game.winner, yourResult: resultForBlack, seriesWinner: game.seriesWinner };
+  if (redId) {
+    const redSocket = io.sockets.sockets.get(redId);
+    if (redSocket) redSocket.emit('game_over', dataRed);
+  }
+  if (blackId) {
+    const blackSocket = io.sockets.sockets.get(blackId);
+    if (blackSocket) blackSocket.emit('game_over', dataBlack);
+  }
+}
+
+// Подписка на чат через Redis
 chatSubscriber.subscribe('chat');
 chatSubscriber.on('message', (channel, message) => {
   try {
@@ -121,21 +161,31 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     // Создание комнаты
     socket.on('create_room', (data: { maxWins: number; playerId: string; nick: string; skin?: string; isPrivate?: boolean }, callback) => {
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
-      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${nick}, skin: ${data.skin}`);
+      const skin = data.skin || 'sakura';
+      const isPrivate = data.isPrivate === true;
+      logger.info(`create_room from ${socket.id} with maxWins: ${data.maxWins}, playerId: ${data.playerId}, nick: ${nick}, skin: ${skin}, private: ${isPrivate}`);
       const validWins = [1, 3, 5];
       let maxWins = data.maxWins;
       if (!validWins.includes(maxWins)) maxWins = 1;
+
+      // Лимит комнат
+      const currentCount = userRoomCount.get(data.playerId) || 0;
+      if (currentCount >= MAX_ROOMS_PER_USER) {
+        logger.warn(`User ${data.playerId} exceeded room limit`);
+        return callback({ error: 'Вы создали слишком много комнат (максимум 3). Закройте лишние.' });
+      }
+
       const roomId = generateRoomCode();
-      const isPrivate = data.isPrivate === true; // по умолчанию false
       const game = new Game(maxWins);
-      game.isPrivate = isPrivate;
       game.roomId = roomId;
+      game.isPrivate = isPrivate;
       game.addPlayer(socket.id);
       game.nickRed = nick;
       game.nickBlack = 'Чёрные';
       game.hostPlayerId = data.playerId;
       game.guestPlayerId = '';
-      game.hostSkin = data.skin || 'sakura';
+      game.hostSkin = skin;
+      game.guestSkin = 'sakura';
 
       const hostToken = generatePlayerToken();
       game.hostToken = hostToken;
@@ -154,6 +204,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       games.set(roomId, game);
       socket.join(roomId);
       saveGame(roomId, game);
+      userRoomCount.set(data.playerId, currentCount + 1);
       logger.info(`Room ${roomId} created by host ${socket.id}`);
 
       callback({
@@ -172,7 +223,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const roomId = data.roomId.toUpperCase();
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
       const skin = data.skin || 'sakura';
-      logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}, skin:${skin}`);
+      logger.info(`join_room from ${socket.id} for room ${roomId}, playerId: ${data.playerId}, nick: ${nick}, skin: ${skin}`);
 
       const game = games.get(roomId);
       if (!game) {
@@ -198,6 +249,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.hostToken = generatePlayerToken();
         game.nickRed = nick;
         game.hostPlayerId = data.playerId;
+        // skin для хоста не меняем, он уже задан при создании
       } else {
         role = 'black';
         game.players.black = socket.id;
@@ -207,7 +259,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         game.guestPlayerId = data.playerId;
         game.guestSkin = skin;
       }
-      console.log('Guest skin saved:', game.guestSkin);
 
       if (game.players.red && game.players.black && game.status === 'waiting') {
         game.status = 'playing';
@@ -302,7 +353,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    // Продолжение серии
+    // Реванш (ещё одна игра)
     socket.on('restart_round', (roomId: string, callback) => {
       logger.info(`restart_round from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -312,20 +363,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         saveGame(roomId, game);
         sendPersonalGameState(io, game);
         logger.info(`New round in ${roomId}`);
-      }
-      callback({ success: true });
-    });
-
-    // Полный сброс комнаты
-    socket.on('reset_room', (roomId: string, callback) => {
-      logger.info(`reset_room from ${socket.id} in ${roomId}`);
-      const game = games.get(roomId);
-      if (!game) return callback({ error: 'Игра не найдена' });
-      const success = game.voteReset(socket.id);
-      if (success) {
-        saveGame(roomId, game);
-        sendPersonalGameState(io, game);
-        logger.info(`Room ${roomId} fully reset`);
       }
       callback({ success: true });
     });
@@ -358,7 +395,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       callback({ success: true });
     });
 
-    // Явный выход
+    // Выход из комнаты (явный)
     socket.on('leave_room', (roomId: string) => {
       logger.info(`leave_room from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
@@ -373,16 +410,23 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       const nickBlack = game.nickBlack;
       const hostPlayerId = game.hostPlayerId;
       const guestPlayerId = game.guestPlayerId;
+      const hostId = game.hostPlayerId;
 
       if (isRed) game.players.red = undefined;
       else game.players.black = undefined;
 
       if (!game.players.red && !game.players.black) {
+        // комната становится пустой – удаляем
+        if (hostId) {
+          const count = userRoomCount.get(hostId) || 0;
+          if (count > 0) userRoomCount.set(hostId, count - 1);
+        }
         cleanupRoomTimers(roomId);
         games.delete(roomId);
         deleteGame(roomId);
         logger.info(`Room ${roomId} deleted (empty)`);
       } else {
+        // остался один игрок – пересоздаём игру
         const newGame = new Game(maxWins);
         newGame.roomId = roomId;
         newGame.hostSkin = hostSkin;
@@ -390,12 +434,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         newGame.nickBlack = nickBlack;
         newGame.hostPlayerId = hostPlayerId;
         newGame.guestPlayerId = guestPlayerId;
-
         const remainingSocketId = game.players.red || game.players.black!;
         newGame.addPlayer(remainingSocketId);
         newGame.hostToken = generatePlayerToken();
         newGame.guestToken = null;
-
         games.set(roomId, newGame);
         saveGame(roomId, newGame);
         const remainingSocket = io.sockets.sockets.get(remainingSocketId);
@@ -406,7 +448,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    // Отключение с очисткой таймеров
+    // Отключение (автоматическое)
     socket.on('disconnect', () => {
       logger.info(`User disconnected: ${socket.id}`);
       for (const [roomId, game] of games.entries()) {
@@ -444,14 +486,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       }
     });
 
-    socket.on('clear_chat', (roomId: string) => {
-      if (chatMessages.has(roomId)) {
-        chatMessages.set(roomId, []);
-        io.to(roomId).emit('chat_cleared');
-      }
-    });
-
-    // Чат с ограничением и публикацией в Redis
+    // Отправка сообщения в чат
     socket.on('chat_message', (roomId: string, text: string) => {
       let sanitizedText = sanitize(text).slice(0, 200);
       if (!sanitizedText) return;
@@ -475,15 +510,22 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       sendPersonalGameState(io, game);
     });
 
+    // Очистка чата (при подключении второго игрока)
+    socket.on('clear_chat', (roomId: string) => {
+      if (chatMessages.has(roomId)) {
+        chatMessages.set(roomId, []);
+        io.to(roomId).emit('chat_cleared');
+      }
+    });
+
     // Список открытых комнат
     socket.on('list_rooms', (callback) => {
       const rooms: any[] = [];
       for (const [roomId, game] of games.entries()) {
-        // Очистка мёртвых сокетов
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем только публичные комнаты (не приватные) и с хотя бы одним игроком
+        // Показываем только публичные, непустые комнаты
         if (!game.isPrivate && (game.players.red || game.players.black)) {
           rooms.push({
             roomId,
@@ -494,10 +536,15 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           });
         }
       }
+      logger.info(`Returning ${rooms.length} public rooms`);
       callback(rooms);
     });
-
-    // Профиль
+    
+    // Индикация набора текста
+    socket.on('typing', (roomId: string, isTyping: boolean) => {
+      socket.to(roomId).emit('opponent_typing', isTyping);
+    });
+    // Профиль игрока
     socket.on('get_profile', (playerId: string, callback) => {
       logger.info(`get_profile from ${socket.id} for playerId: ${playerId}`);
       if (!playerId) {
@@ -505,44 +552,11 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         return;
       }
       getPlayerStats(playerId)
-        .then((stats: any) => callback(stats))
-        .catch((err: any) => {
+        .then((stats) => callback(stats))
+        .catch((err) => {
           logger.error('get_profile error', err);
           callback({ games: 0, wins: 0, draws: 0, history: [] });
         });
     });
   });
-}
-
-function sendPersonalGameState(io: Server, game: Game) {
-  const redId = game.players.red;
-  const blackId = game.players.black;
-  if (redId) {
-    const redSocket = io.sockets.sockets.get(redId);
-    if (redSocket) redSocket.emit('game_state', getClientGameState(game, redId, io));
-  }
-  if (blackId) {
-    const blackSocket = io.sockets.sockets.get(blackId);
-    if (blackSocket) blackSocket.emit('game_state', getClientGameState(game, blackId, io));
-  }
-}
-
-function sendPersonalGameOver(io: Server, game: Game) {
-  const redId = game.players.red;
-  const blackId = game.players.black;
-
-  const resultForRed = game.winner === 'red' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
-  const resultForBlack = game.winner === 'black' ? 'win' : game.winner === 'draw' ? 'draw' : 'lose';
-
-  const dataRed = { winner: game.winner, yourResult: resultForRed, seriesWinner: game.seriesWinner };
-  const dataBlack = { winner: game.winner, yourResult: resultForBlack, seriesWinner: game.seriesWinner };
-
-  if (redId) {
-    const redSocket = io.sockets.sockets.get(redId);
-    if (redSocket) redSocket.emit('game_over', dataRed);
-  }
-  if (blackId) {
-    const blackSocket = io.sockets.sockets.get(blackId);
-    if (blackSocket) blackSocket.emit('game_over', dataBlack);
-  }
 }
