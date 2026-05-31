@@ -490,6 +490,7 @@ const Game: React.FC = () => {
       )}
 
       <div style={styles.gameLayout}>
+        {/* Левая колонка – чат (видимый) */}
         {!isSpectator && (
           <>
             {!isMobile ? (
@@ -521,6 +522,7 @@ const Game: React.FC = () => {
           </>
         )}
 
+        {/* Центральная колонка – доска */}
         <div style={styles.centerColumn}>
           <div style={styles.boardArea}>
             <Board
@@ -782,17 +784,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--turn-indicator)',
   },
   gameLayout: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    display: 'grid',
+    gridTemplateColumns: '320px auto 320px', // левая (чат) | центр (доска) | правая (пустая)
+    alignItems: 'start',
     gap: '20px',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
   },
   chatColumn: {
-    width: '280px',
-    flexShrink: 0,
+    width: '100%',        // занимает всю ширину своей колонки (320px)
     height: '70vh',
   },
   centerColumn: {
@@ -800,8 +801,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    flex: '0 1 auto',
-    margin: '0 auto',
+    justifySelf: 'center', // центрирование доски внутри средней колонки
+    gridColumn: '2 / 3',   // явно указываем, что это вторая колонка
   },
   boardArea: {
     display: 'flex',
