@@ -908,10 +908,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 20px 20px',
     overflow: 'hidden',
   },
-  chatColumn: {
-    width: '100%',        // занимает всю ширину своей колонки (320px)
-    height: '70vh',
-  },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
@@ -919,11 +915,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     justifySelf: 'center', // центрирование доски внутри средней колонки
     gridColumn: '2 / 3',   // явно указываем, что это вторая колонка
-  },
-  boardArea: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
   },
   gameOverBlock: {
     background: 'var(--card-bg)',
@@ -971,18 +962,30 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameLayoutDesktop: {
     display: 'flex',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'flex-start',
-    gap: '20px',
+    gap: '24px',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
+    width: '100%',
+  },
+  chatColumn: {
+    width: '280px',
+    flexShrink: 0,
+    height: '70vh',
   },
   centerColumnDesktop: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
+    flex: '1 1 auto',
+  },
+  boardArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
     margin: '0 auto',
   },
   modal: {
