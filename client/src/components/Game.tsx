@@ -571,8 +571,7 @@ const Game: React.FC = () => {
     );
   }
 
-  // Десктопная версия (оставляем существующий return как есть)
-
+  // ДЕСКТОПНАЯ ВЕРСИЯ (ПОЛНОСТЬЮ РАБОЧАЯ)
   return (
     <div style={styles.gameContainer}>
       {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
