@@ -899,14 +899,27 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: 'var(--turn-indicator)',
   },
-  gameLayout: {
+  gameLayoutDesktop: {
     display: 'grid',
-    gridTemplateColumns: '320px auto 320px', // левая (чат) | центр (доска) | правая (пустая)
+    gridTemplateColumns: '400px auto 400px', // чат | доска | пустая (симметрия)
     alignItems: 'start',
     gap: '20px',
     flex: 1,
     padding: '0 20px 20px',
     overflow: 'hidden',
+    width: '100%',
+  },
+  chatColumn: {
+    width: '100%',        // заполняет первую колонку
+    height: '70vh',
+  },
+  centerColumnDesktop: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    gridColumn: '2 / 3',  // явно во второй колонке
+    justifySelf: 'center', // центрирование доски внутри своей колонки
   },
   centerColumn: {
     display: 'flex',
@@ -959,28 +972,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-  },
-  gameLayoutDesktop: {
-    display: 'flex',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    gap: '24px',
-    flex: 1,
-    padding: '0 20px 20px',
-    overflow: 'hidden',
-    width: '100%',
-  },
-  chatColumn: {
-    width: '280px',
-    flexShrink: 0,
-    height: '70vh',
-  },
-  centerColumnDesktop: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '12px',
-    flex: '1 1 auto',
   },
   boardArea: {
     display: 'flex',
