@@ -912,6 +912,7 @@ const styles: Record<string, React.CSSProperties> = {
   chatColumn: {
     width: '100%',        // заполняет первую колонку
     height: '70vh',
+    marginLeft: '100px',
   },
   centerColumnDesktop: {
     display: 'flex',
