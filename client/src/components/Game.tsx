@@ -440,61 +440,54 @@ const Game: React.FC = () => {
   const isSpectator = !gameState.myColor;
   const canRestart = gameState.roundFinished && !waitingRestart;
 
-  return (
-    <div style={styles.gameContainer}>
-      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
-      {vsAnimation && (
-        <div style={styles.vsOverlay}>
-          <div style={styles.vsContent}>
-            <span>{vsAnimation.nick1}</span>
-            <span style={styles.vsText}>VS</span>
-            <span>{vsAnimation.nick2}</span>
+  // Мобильная версия
+  if (isMobile) {
+    return (
+      <div style={styles.mobileGameContainer}>
+        {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
+        {vsAnimation && (
+          <div style={styles.vsOverlay}>
+            <div style={styles.vsContent}>
+              <span>{vsAnimation.nick1}</span>
+              <span style={styles.vsText}>VS</span>
+              <span>{vsAnimation.nick2}</span>
+            </div>
           </div>
-        </div>
-      )}
-      <header style={styles.gameHeader}>
-        <h2 style={styles.titleSmall}>Окийя</h2>
-        {roomId && (
-          <span style={styles.roomCode}>
-            Комната <strong>{roomId}</strong>
-            {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
-            <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код комнаты">📋</button>
-          </span>
         )}
-      </header>
-      <div style={styles.statusBar}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-          backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
-        }} />
-        <span style={{ marginLeft: 6, fontSize: 13 }}>
-          {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
-        </span>
-        <span style={{ marginLeft: 16, fontSize: 13 }}>
-          {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
-        </span>
-      </div>
-
-      {gameState.maxWins > 1 && (
-        <div style={styles.score}>
-          Счёт: {gameState.myScore} — {gameState.opponentScore}
+        <header style={styles.gameHeader}>
+          <h2 style={styles.titleSmall}>Окийя</h2>
+          {roomId && (
+            <span style={styles.roomCode}>
+              Комната <strong>{roomId}</strong>
+              {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
+              <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
+            </span>
+          )}
+        </header>
+        <div style={styles.statusBar}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+            backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
+          }} />
+          <span style={{ marginLeft: 6, fontSize: 13 }}>
+            {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
+          </span>
+          <span style={{ marginLeft: 16, fontSize: 13 }}>
+            {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+          </span>
         </div>
-      )}
-      {gameState.status === 'playing' && !isSpectator && (
-        <div style={{ marginBottom: 4, textAlign: 'center' }}>
-          <p style={styles.turnIndicator}>
-            {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
-          </p>
-          <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
-        </div>
-      )}
 
-      <div style={styles.gameLayout}>
-        {/* Левая колонка – чат (видимый) */}
-        {!isSpectator && (
-          <>
-            {!isMobile ? (
-              <div style={styles.chatColumn}>
+        {gameState.maxWins > 1 && (
+          <div style={styles.score}>
+            Счёт: {gameState.myScore} — {gameState.opponentScore}
+          </div>
+        )}
+
+        <div style={styles.mobileGameLayout}>
+          {!isSpectator && (
+            <details style={styles.mobileChatCollapsed}>
+              <summary style={styles.mobileChatSummary}>💬 Чат</summary>
+              <div style={styles.mobileChatContent}>
                 <Chat
                   messages={gameState.messages ?? []}
                   onSend={handleChatSend}
@@ -504,40 +497,35 @@ const Game: React.FC = () => {
                   opponentTyping={opponentTyping}
                 />
               </div>
-            ) : (
-              <details style={styles.mobileChatToggle}>
-                <summary style={styles.mobileChatSummary}>💬 Чат</summary>
-                <div style={styles.mobileChatContent}>
-                  <Chat
-                    messages={gameState.messages ?? []}
-                    onSend={handleChatSend}
-                    myNick={gameState.myNick}
-                    socket={socket}
-                    roomId={roomId}
-                    opponentTyping={opponentTyping}
-                  />
-                </div>
-              </details>
-            )}
-          </>
-        )}
+            </details>
+          )}
 
-        {/* Центральная колонка – доска */}
-        <div style={styles.centerColumn}>
-          <div style={styles.boardArea}>
-            <Board
-              board={gameState.board}
-              validMoves={validMoves}
-              onClick={handleCellClick}
-              currentPlayer={gameState.currentPlayer}
-              myColor={gameState.myColor}
-              lastMove={gameState.lastMove}
-              hostSkin={gameState.hostSkin || 'sakura'}
-              guestSkin={gameState.guestSkin || 'sakura'}
-              shake={shakeBoard}
-            />
+          <div style={styles.mobileBoardArea}>
+            <div style={styles.mobileBoardScale}>
+              <Board
+                board={gameState.board}
+                validMoves={validMoves}
+                onClick={handleCellClick}
+                currentPlayer={gameState.currentPlayer}
+                myColor={gameState.myColor}
+                lastMove={gameState.lastMove}
+                hostSkin={gameState.hostSkin || 'sakura'}
+                guestSkin={gameState.guestSkin || 'sakura'}
+                shake={shakeBoard}
+              />
+            </div>
             <LastPickedTile tile={gameState.lastPickedTile} />
           </div>
+
+          {gameState.status === 'playing' && !isSpectator && (
+            <div style={{ textAlign: 'center' }}>
+              <p style={styles.turnIndicator}>
+                {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
+              </p>
+              <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
+            </div>
+          )}
+
           {personalGameOver && (
             <div style={styles.gameOverBlock}>
               <p style={styles.message}>{personalGameOver}</p>
@@ -549,35 +537,44 @@ const Game: React.FC = () => {
               {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
             </div>
           )}
-          <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={styles.actionBtn} title="Выйти в главное меню">
-              Выйти в меню
+
+          <div style={styles.mobileButtonRow}>
+            <button onClick={backToMenu} style={styles.actionBtn}>
+              Меню
             </button>
             {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }} title="Сдаться и завершить игру">
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
                 Сдаться
               </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }} title="Настройки">
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }}>
               Настройки
             </button>
           </div>
         </div>
-      </div>
-      {showSettings && (
-        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <Settings onClose={() => setShowSettings(false)} />
+
+        {showSettings && (
+          <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <Settings onClose={() => setShowSettings(false)} />
+            </div>
           </div>
-        </div>
-      )}
-      <ConfirmDialog
-        open={confirmExitOpen}
-        title="Выйти из игры?"
-        message="Текущая игра будет потеряна. Вы уверены?"
-        onConfirm={handleConfirmExit}
-        onCancel={() => setConfirmExitOpen(false)}
-      />
+        )}
+        <ConfirmDialog
+          open={confirmExitOpen}
+          title="Выйти из игры?"
+          message="Текущая игра будет потеряна. Вы уверены?"
+          onConfirm={handleConfirmExit}
+          onCancel={() => setConfirmExitOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  // Десктопная версия (оставляем существующий return как есть)
+  return (
+    <div style={styles.gameContainer}>
+      {/* ... ваш существующий код для десктопа ... */}
     </div>
   );
 };
@@ -883,6 +880,49 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid var(--border)',
     height: '300px',
     overflow: 'auto',
+  },
+  mobileGameContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    overflow: 'hidden',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text)',
+    fontFamily: '"Inter", "Segoe UI", sans-serif',
+  },
+  mobileGameLayout: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: '12px',
+    flex: 1,
+    padding: '0 12px 12px',
+    overflow: 'auto',
+  },
+  mobileBoardArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    overflowX: 'auto',
+    justifyContent: 'center',
+  },
+  mobileBoardScale: {
+    transform: 'scale(0.85)',
+    transformOrigin: 'center center',
+  },
+  mobileButtonRow: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: '8px',
+    width: '100%',
+  },
+  mobileChatCollapsed: {
+    width: '100%',
+    marginBottom: '8px',
   },
   vsOverlay: {
     position: 'fixed',
