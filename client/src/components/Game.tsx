@@ -446,11 +446,11 @@ const Game: React.FC = () => {
       <div style={styles.mobileGameContainer}>
         {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
         {vsAnimation && (
-          <div style={styles.vsOverlay}>
-            <div style={styles.vsContent}>
-              <span>{vsAnimation.nick1}</span>
-              <span style={styles.vsText}>VS</span>
-              <span>{vsAnimation.nick2}</span>
+          <div style={styles.vsOverlayMobile}>
+            <div style={styles.vsContentMobile}>
+              <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick1}</span>
+              <span style={{ fontSize: '24px', color: '#c9a96e' }}>VS</span>
+              <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick2}</span>
             </div>
           </div>
         )}
@@ -572,9 +572,129 @@ const Game: React.FC = () => {
   }
 
   // Десктопная версия (оставляем существующий return как есть)
+
   return (
     <div style={styles.gameContainer}>
-      {/* ... ваш существующий код для десктопа ... */}
+      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
+      {vsAnimation && (
+        <div style={styles.vsOverlay}>
+          <div style={styles.vsContent}>
+            <span>{vsAnimation.nick1}</span>
+            <span style={styles.vsText}>VS</span>
+            <span>{vsAnimation.nick2}</span>
+          </div>
+        </div>
+      )}
+      <header style={styles.gameHeader}>
+        <h2 style={styles.titleSmall}>Окийя</h2>
+        {roomId && (
+          <span style={styles.roomCode}>
+            Комната <strong>{roomId}</strong>
+            {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
+            <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
+          </span>
+        )}
+      </header>
+      <div style={styles.statusBar}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+          backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
+        }} />
+        <span style={{ marginLeft: 6, fontSize: 13 }}>
+          {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
+        </span>
+        <span style={{ marginLeft: 16, fontSize: 13 }}>
+          {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+        </span>
+      </div>
+
+      {gameState.maxWins > 1 && (
+        <div style={styles.score}>
+          Счёт: {gameState.myScore} — {gameState.opponentScore}
+        </div>
+      )}
+
+      {gameState.status === 'playing' && !isSpectator && (
+        <div style={{ marginBottom: 4, textAlign: 'center' }}>
+          <p style={styles.turnIndicator}>
+            {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
+          </p>
+          <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
+        </div>
+      )}
+
+      <div style={styles.gameLayoutDesktop}>
+        {!isSpectator && (
+          <div style={styles.chatColumn}>
+            <Chat
+              messages={gameState.messages ?? []}
+              onSend={handleChatSend}
+              myNick={gameState.myNick}
+              socket={socket}
+              roomId={roomId}
+              opponentTyping={opponentTyping}
+            />
+          </div>
+        )}
+
+        <div style={styles.centerColumnDesktop}>
+          <div style={styles.boardArea}>
+            <Board
+              board={gameState.board}
+              validMoves={validMoves}
+              onClick={handleCellClick}
+              currentPlayer={gameState.currentPlayer}
+              myColor={gameState.myColor}
+              lastMove={gameState.lastMove}
+              hostSkin={gameState.hostSkin || 'sakura'}
+              guestSkin={gameState.guestSkin || 'sakura'}
+              shake={shakeBoard}
+            />
+            <LastPickedTile tile={gameState.lastPickedTile} />
+          </div>
+
+          {personalGameOver && (
+            <div style={styles.gameOverBlock}>
+              <p style={styles.message}>{personalGameOver}</p>
+              {canRestart && (
+                <button onClick={handleRestartRound} style={styles.actionBtn}>
+                  Ещё одна игра
+                </button>
+              )}
+              {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
+            </div>
+          )}
+
+          <div style={styles.buttonRow}>
+            <button onClick={backToMenu} style={styles.actionBtn} title="Выйти в главное меню">
+              Выйти в меню
+            </button>
+            {gameState.status === 'playing' && !isSpectator && (
+              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }} title="Сдаться">
+                Сдаться
+              </button>
+            )}
+            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }} title="Настройки">
+              Настройки
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showSettings && (
+        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <Settings onClose={() => setShowSettings(false)} />
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmExitOpen}
+        title="Выйти из игры?"
+        message="Текущая игра будет потеряна. Вы уверены?"
+        onConfirm={handleConfirmExit}
+        onCancel={() => setConfirmExitOpen(false)}
+      />
     </div>
   );
 };
@@ -850,6 +970,22 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     zIndex: 1000,
   },
+  gameLayoutDesktop: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: '20px',
+    flex: 1,
+    padding: '0 20px 20px',
+    overflow: 'hidden',
+  },
+  centerColumnDesktop: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '0 auto',
+  },
   modal: {
     background: 'var(--modal-bg)',
     borderRadius: '24px',
@@ -939,14 +1075,44 @@ const styles: Record<string, React.CSSProperties> = {
   },
   vsContent: {
     display: 'flex',
-    gap: '30px',
-    fontSize: '48px',
+    gap: '20px',
+    fontSize: '32px',
     fontWeight: 700,
     color: '#fff',
     fontFamily: '"Cormorant Garamond", serif',
+    textAlign: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    padding: '20px',
   },
   vsText: {
     color: '#c9a96e',
+    fontSize: '32px',
+  },
+  vsOverlayMobile: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+    animation: 'vsFadeIn 2.5s ease-out forwards',
+    padding: '20px',
+  },
+  vsContentMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    color: '#fff',
+    fontFamily: '"Cormorant Garamond", serif',
+    maxWidth: '90vw',
   },
   reconnectBanner: {
     position: 'fixed',
