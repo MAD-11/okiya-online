@@ -12,7 +12,7 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(4, minmax(55px, 70px))',
+      gridTemplateColumns: 'repeat(4, minmax(60px, 70px))',
       gap: '6px',
       justifyContent: 'center',
       margin: '12px 0',
@@ -22,40 +22,41 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
           const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
           const trimmed = cell.trim();
           
-          // Пустая клетка (обозначена точкой или пустой строкой)
-          if (trimmed === '.' || trimmed === '') {
-            return (
-              <div key={`${r}-${c}`} style={{
-                width: '100%',
-                aspectRatio: '1 / 1',
-                backgroundColor: 'var(--cell-bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '10px',
-              }} />
-            );
-          }
-          
-          // Ищем эмодзи
-          const emojis = trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
-          const firstEmoji = emojis[0] || '🌸';
+          // Определяем, есть ли эмодзи в клетке
+          const emojis = (trimmed === '.' || trimmed === '') 
+            ? [] 
+            : trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
+          const firstEmoji = emojis[0] || '';
           const secondEmoji = emojis[1] || '';
           const hasTwo = emojis.length >= 2;
+          const isEmpty = firstEmoji === '';
           
           return (
-            <div key={`${r}-${c}`} style={{
-              display: 'flex',
-              flexDirection: hasTwo ? 'column' : 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              aspectRatio: '1 / 1',
-              backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '10px',
-              padding: '4px',
-            }}>
-              <span style={{ fontSize: hasTwo ? '26px' : '34px', lineHeight: 1 }}>{firstEmoji}</span>
-              {hasTwo && <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>{secondEmoji}</span>}
+            <div
+              key={`${r}-${c}`}
+              style={{
+                display: 'flex',
+                flexDirection: hasTwo ? 'column' : 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                aspectRatio: '1 / 1',
+                backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '4px',
+              }}
+            >
+              {!isEmpty && (
+                <span style={{ fontSize: hasTwo ? '26px' : '34px', lineHeight: 1 }}>
+                  {firstEmoji}
+                </span>
+              )}
+              {hasTwo && (
+                <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>
+                  {secondEmoji}
+                </span>
+              )}
             </div>
           );
         })
