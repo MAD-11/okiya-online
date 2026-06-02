@@ -9,42 +9,44 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
   const [activeTab, setActiveTab] = useState<'rules' | 'moves' | 'win' | 'block'>('rules');
 
 const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
-    return (
-        <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(55px, 70px))',
-        gap: '6px',
-        justifyContent: 'center',
-        margin: '12px 0',
-        }}>
-        {boardData.map((row, r) =>
-            row.map((cell, c) => {
-            const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
-            // Разбиваем строку на отдельные символы (эмодзи)
-            const symbols = Array.from(cell); // ['🌸', '☀️']
-            const plantEmoji = symbols[0] || '?';
-            const symbolEmoji = symbols[1] || '?';
-            return (
-                <div key={`${r}-${c}`} style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                aspectRatio: '1 / 1',
-                backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '10px',
-                padding: '4px',
-                }}>
-                <span style={{ fontSize: '24px', lineHeight: 1 }}>{plantEmoji}</span>
-                <span style={{ fontSize: '20px', lineHeight: 1, marginTop: '2px' }}>{symbolEmoji}</span>
-                </div>
-            );
-            })
-        )}
-        </div>
-    );
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, minmax(55px, 70px))',
+      gap: '6px',
+      justifyContent: 'center',
+      margin: '12px 0',
+    }}>
+      {boardData.map((row, r) =>
+        row.map((cell, c) => {
+          const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
+          const cleanCell = cell.replace(/\s/g, '');
+          const emojis = cleanCell.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
+          const plantEmoji = emojis[0] || '🌸';
+          const symbolEmoji = emojis[1] || '';
+          const hasTwo = emojis.length >= 2;
+          
+          return (
+            <div key={`${r}-${c}`} style={{
+              display: 'flex',
+              flexDirection: hasTwo ? 'column' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              aspectRatio: '1 / 1',
+              backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '4px',
+            }}>
+              <span style={{ fontSize: hasTwo ? '26px' : '32px', lineHeight: 1 }}>{plantEmoji}</span>
+              {hasTwo && <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>{symbolEmoji}</span>}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
 };
 
   return (

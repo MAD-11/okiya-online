@@ -282,7 +282,7 @@ const Game: React.FC = () => {
 
       let text = '';
       if (data.yourResult === 'win') text = '🎉 Вы выиграли!';
-      else if (data.yourResult === 'lose') text = 'Поражение. Победил ' + (data.winner === 'red' ? '🌸 Красные' : '🐦 Чёрные');
+      else if (data.yourResult === 'lose') text = 'Поражение. Победил соперник';
       else if (data.yourResult === 'draw') text = 'Ничья';
 
       if (data.seriesWinner) {
