@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 
 interface RulesModalProps {
   onClose: () => void;
-  onStartTutorial?: () => void; // позже для тренажёра
+  onStartTutorial?: () => void;
 }
 
 const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => {
   const [activeTab, setActiveTab] = useState<'rules' | 'moves' | 'win' | 'block'>('rules');
 
-  // Иллюстрация: пустая доска 4x4 с углами для первого хода
   const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
     return (
       <div style={{
