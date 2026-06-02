@@ -293,6 +293,12 @@ export class Game {
       const tempHostToken = this.hostToken;
       this.hostToken = this.guestToken;
       this.guestToken = tempHostToken;
+
+      // ===== ОБМЕН СЧЁТА =====
+      const tempScoreHost = this.scores.host;
+      this.scores.host = this.scores.guest;
+      this.scores.guest = tempScoreHost;
+      // ========================
     }
   }
 
