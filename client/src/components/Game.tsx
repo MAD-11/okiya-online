@@ -12,7 +12,6 @@ import Settings from './Settings';
 import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
 import RulesModal from './RulesModal';
-const [showRules, setShowRules] = useState(false);
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -49,7 +48,7 @@ const Game: React.FC = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const joinInputRef = useRef<HTMLInputElement>(null);
-
+  const [showRules, setShowRules] = useState(false);
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
   const { skin: localSkin } = useTheme();

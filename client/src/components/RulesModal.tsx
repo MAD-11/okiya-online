@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 interface RulesModalProps {
   onClose: () => void;
@@ -18,7 +17,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
         justifyContent: 'center',
         margin: '10px 0',
       }}>
-        {boardData.map((row, r) =>
+        {boardData.map((row, r) => (
           row.map((cell, c) => {
             const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
             return (
@@ -37,7 +36,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
               </div>
             );
           })
-        )}
+        ))}
       </div>
     );
   };
