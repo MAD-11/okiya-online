@@ -20,9 +20,23 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
       {boardData.map((row, r) =>
         row.map((cell, c) => {
           const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
-          const cleanCell = cell.replace(/\s/g, '');
-          // Ищем все эмодзи в строке
-          const emojis = cleanCell.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
+          const trimmed = cell.trim();
+          
+          // Пустая клетка (обозначена точкой или пустой строкой)
+          if (trimmed === '.' || trimmed === '') {
+            return (
+              <div key={`${r}-${c}`} style={{
+                width: '100%',
+                aspectRatio: '1 / 1',
+                backgroundColor: 'var(--cell-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+              }} />
+            );
+          }
+          
+          // Ищем эмодзи
+          const emojis = trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
           const firstEmoji = emojis[0] || '🌸';
           const secondEmoji = emojis[1] || '';
           const hasTwo = emojis.length >= 2;
@@ -98,30 +112,30 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
                 <p>👉 <strong>4 в ряд по горизонтали</strong></p>
                 {renderBoardIllustration([
                 ['🌸', '🌸', '🌸', '🌸'],
-                ['', '', '', ''],
-                ['', '', '', ''],
-                ['', '', '', '']
+                ['.', '.', '.', '.'],
+                ['.', '.', '.', '.'],
+                ['.', '.', '.', '.']
                 ])}
                 <p>👉 <strong>4 в ряд по вертикали</strong></p>
                 {renderBoardIllustration([
-                ['🌸', '', '', ''],
-                ['🌸', '', '', ''],
-                ['🌸', '', '', ''],
-                ['🌸', '', '', '']
+                ['🌸', '.', '.', '.'],
+                ['🌸', '.', '.', '.'],
+                ['🌸', '.', '.', '.'],
+                ['🌸', '.', '.', '.']
                 ])}
                 <p>👉 <strong>4 в ряд по диагонали</strong></p>
                 {renderBoardIllustration([
-                ['🌸', '', '', ''],
-                ['', '🌸', '', ''],
-                ['', '', '🌸', ''],
-                ['', '', '', '🌸']
+                ['🌸', '.', '.', '.'],
+                ['.', '🌸', '.', '.'],
+                ['.', '.', '🌸', '.'],
+                ['.', '.', '.', '🌸']
                 ])}
                 <p>👉 <strong>Квадрат 2×2</strong></p>
                 {renderBoardIllustration([
-                ['🌸', '🌸', '', ''],
-                ['🌸', '🌸', '', ''],
-                ['', '', '', ''],
-                ['', '', '', '']
+                ['🌸', '🌸', '.', '.'],
+                ['🌸', '🌸', '.', '.'],
+                ['.', '.', '.', '.'],
+                ['.', '.', '.', '.']
                 ])}
             </div>
             )}
