@@ -21,9 +21,10 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
         row.map((cell, c) => {
           const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
           const cleanCell = cell.replace(/\s/g, '');
+          // Ищем все эмодзи в строке
           const emojis = cleanCell.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
-          const plantEmoji = emojis[0] || '🌸';
-          const symbolEmoji = emojis[1] || '';
+          const firstEmoji = emojis[0] || '🌸';
+          const secondEmoji = emojis[1] || '';
           const hasTwo = emojis.length >= 2;
           
           return (
@@ -39,8 +40,8 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
               borderRadius: '10px',
               padding: '4px',
             }}>
-              <span style={{ fontSize: hasTwo ? '26px' : '32px', lineHeight: 1 }}>{plantEmoji}</span>
-              {hasTwo && <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>{symbolEmoji}</span>}
+              <span style={{ fontSize: hasTwo ? '26px' : '34px', lineHeight: 1 }}>{firstEmoji}</span>
+              {hasTwo && <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>{secondEmoji}</span>}
             </div>
           );
         })
@@ -91,48 +92,48 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
             </div>
           )}
 
-          {activeTab === 'win' && (
+            {activeTab === 'win' && (
             <div>
-              <p><strong>Выигрышные комбинации:</strong></p>
-              <p>👉 <strong>4 в ряд по горизонтали</strong></p>
-              {renderBoardIllustration([
+                <p><strong>Выигрышные комбинации:</strong></p>
+                <p>👉 <strong>4 в ряд по горизонтали</strong></p>
+                {renderBoardIllustration([
                 ['🌸', '🌸', '🌸', '🌸'],
                 ['', '', '', ''],
                 ['', '', '', ''],
                 ['', '', '', '']
-              ])}
-              <p>👉 <strong>4 в ряд по вертикали</strong></p>
-              {renderBoardIllustration([
+                ])}
+                <p>👉 <strong>4 в ряд по вертикали</strong></p>
+                {renderBoardIllustration([
                 ['🌸', '', '', ''],
                 ['🌸', '', '', ''],
                 ['🌸', '', '', ''],
                 ['🌸', '', '', '']
-              ])}
-              <p>👉 <strong>4 в ряд по диагонали</strong></p>
-              {renderBoardIllustration([
+                ])}
+                <p>👉 <strong>4 в ряд по диагонали</strong></p>
+                {renderBoardIllustration([
                 ['🌸', '', '', ''],
                 ['', '🌸', '', ''],
                 ['', '', '🌸', ''],
                 ['', '', '', '🌸']
-              ])}
-              <p>👉 <strong>Квадрат 2×2</strong></p>
-              {renderBoardIllustration([
+                ])}
+                <p>👉 <strong>Квадрат 2×2</strong></p>
+                {renderBoardIllustration([
                 ['🌸', '🌸', '', ''],
                 ['🌸', '🌸', '', ''],
                 ['', '', '', ''],
                 ['', '', '', '']
-              ])}
+                ])}
             </div>
-          )}
+            )}
 
           {activeTab === 'block' && (
             <div>
               <p><strong>Как блокировать соперника?</strong></p>
               <p>Если соперник уже имеет 3 камня в ряд, поставьте свой камень на свободную клетку, чтобы завершить этот ряд — тогда он не сможет выиграть на этом направлении.</p>
               {renderBoardIllustration([
-                ['🌸', '🌸', '🌸', ''],
+                ['🌸', '🌸', '🌸', '!'],
                 ['', '⚫', '', ''],
-                ['', '', '', ''],
+                ['', '', '⚫', ''],
                 ['', '', '', '']
               ], [[0,3]])}
               <p style={{ fontSize: '12px', color: 'var(--secondary-text)' }}>✨ Подсвеченная клетка — блокирующий ход чёрных.</p>
