@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
+import { initBoard } from '../game/Board';
 
 // Санитизация и валидация
 function sanitize(str: string): string {
@@ -396,57 +397,98 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     });
 
     // Выход из комнаты (явный)
-    socket.on('leave_room', (roomId: string) => {
-      logger.info(`leave_room from ${socket.id} in ${roomId}`);
-      const game = games.get(roomId);
-      if (!game) return;
-      const isRed = game.players.red === socket.id;
-      const isBlack = game.players.black === socket.id;
-      if (!isRed && !isBlack) return;
+  socket.on('leave_room', (roomId: string) => {
+    logger.info(`leave_room from ${socket.id} in ${roomId}`);
+    const game = games.get(roomId);
+    if (!game) return;
+    const isRed = game.players.red === socket.id;
+    const isBlack = game.players.black === socket.id;
+    if (!isRed && !isBlack) return;
 
-      const maxWins = game.maxWins;
-      const hostSkin = game.hostSkin;
-      const nickRed = game.nickRed;
-      const nickBlack = game.nickBlack;
-      const hostPlayerId = game.hostPlayerId;
-      const guestPlayerId = game.guestPlayerId;
+    // Сохраняем данные комнаты до удаления
+    const maxWins = game.maxWins;
+    const hostSkin = game.hostSkin;
+    const guestSkin = game.guestSkin;
+    const nickRed = game.nickRed;
+    const nickBlack = game.nickBlack;
+    const hostPlayerId = game.hostPlayerId;
+    const guestPlayerId = game.guestPlayerId;
+
+    // Удаляем игрока из текущей игры
+    if (isRed) {
+      game.players.red = undefined;
+      game.hostSocketId = null;
+    } else {
+      game.players.black = undefined;
+      game.guestSocketId = null;
+    }
+
+    // Если комната стала пустой – удаляем её
+    if (!game.players.red && !game.players.black) {
+      // уменьшаем счётчик комнат пользователя
       const hostId = game.hostPlayerId;
-
-      if (isRed) game.players.red = undefined;
-      else game.players.black = undefined;
-
-      if (!game.players.red && !game.players.black) {
-        // комната становится пустой – удаляем
-        if (hostId) {
-          const count = userRoomCount.get(hostId) || 0;
-          if (count > 0) userRoomCount.set(hostId, count - 1);
-        }
-        cleanupRoomTimers(roomId);
-        games.delete(roomId);
-        deleteGame(roomId);
-        logger.info(`Room ${roomId} deleted (empty)`);
-      } else {
-        // остался один игрок – пересоздаём игру
-        const newGame = new Game(maxWins);
-        newGame.roomId = roomId;
-        newGame.hostSkin = hostSkin;
-        newGame.nickRed = nickRed;
-        newGame.nickBlack = nickBlack;
-        newGame.hostPlayerId = hostPlayerId;
-        newGame.guestPlayerId = guestPlayerId;
-        const remainingSocketId = game.players.red || game.players.black!;
-        newGame.addPlayer(remainingSocketId);
-        newGame.hostToken = generatePlayerToken();
-        newGame.guestToken = null;
-        games.set(roomId, newGame);
-        saveGame(roomId, newGame);
-        const remainingSocket = io.sockets.sockets.get(remainingSocketId);
-        if (remainingSocket) {
-          remainingSocket.emit('game_state', getClientGameState(newGame, remainingSocketId, io));
-        }
-        logger.info(`Room ${roomId} restarted after player left`);
+      if (hostId) {
+        const count = userRoomCount.get(hostId) || 0;
+        if (count > 0) userRoomCount.set(hostId, count - 1);
       }
-    });
+      cleanupRoomTimers(roomId);
+      games.delete(roomId);
+      deleteGame(roomId);
+      logger.info(`Room ${roomId} deleted (empty)`);
+      return;
+    }
+
+    // Остался один игрок – пересоздаём игру с правильными никами
+    const remainingSocketId = game.players.red || game.players.black!;
+    const isRemainingRed = game.players.red === remainingSocketId;
+
+    const newGame = new Game(maxWins);
+    newGame.roomId = roomId;
+    newGame.hostSkin = hostSkin;
+    newGame.guestSkin = guestSkin;
+    newGame.hostToken = generatePlayerToken();
+    newGame.guestToken = null;
+
+    // Устанавливаем данные оставшегося игрока
+    if (isRemainingRed) {
+      newGame.players.red = remainingSocketId;
+      newGame.hostSocketId = remainingSocketId;
+      newGame.nickRed = nickRed;
+      newGame.hostPlayerId = hostPlayerId;
+      newGame.nickBlack = 'Ожидание...';          // сбрасываем ник ушедшего
+      newGame.guestPlayerId = '';
+      newGame.guestSkin = 'sakura';
+    } else {
+      newGame.players.black = remainingSocketId;
+      newGame.guestSocketId = remainingSocketId;
+      newGame.nickBlack = nickBlack;
+      newGame.guestPlayerId = guestPlayerId;
+      newGame.nickRed = 'Ожидание...';            // сбрасываем ник ушедшего
+      newGame.hostPlayerId = '';
+      newGame.hostSkin = 'sakura';
+    }
+
+    newGame.status = 'waiting';
+    newGame.currentPlayer = 'red';
+    newGame.turnStartedAt = Date.now();
+    newGame.turnDuration = game.turnDuration;
+    newGame.scores = { host: 0, guest: 0 };
+    newGame.roundFinished = false;
+    newGame.seriesWinner = null;
+    newGame.lastMove = null;
+    newGame.lastPickedTile = null;
+    newGame.board = initBoard();
+
+    games.set(roomId, newGame);
+    saveGame(roomId, newGame);
+
+    // Оповещаем оставшегося игрока
+    const remainingSocket = io.sockets.sockets.get(remainingSocketId);
+    if (remainingSocket) {
+      remainingSocket.emit('game_state', getClientGameState(newGame, remainingSocketId, io));
+    }
+    logger.info(`Room ${roomId} restarted after player left`);
+  });
 
     // Отключение (автоматическое)
     socket.on('disconnect', () => {
@@ -525,7 +567,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         if (game.players.red && !io.sockets.sockets.has(game.players.red)) game.players.red = undefined;
         if (game.players.black && !io.sockets.sockets.has(game.players.black)) game.players.black = undefined;
 
-        // Показываем только публичные, непустые комнаты
         if (!game.isPrivate && (game.players.red || game.players.black)) {
           rooms.push({
             roomId,
@@ -536,7 +577,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           });
         }
       }
-      logger.info(`Returning ${rooms.length} public rooms`);
       callback(rooms);
     });
     
