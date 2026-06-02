@@ -11,6 +11,8 @@ import RoomList from './RoomList';
 import Settings from './Settings';
 import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
+import RulesModal from './RulesModal';
+const [showRules, setShowRules] = useState(false);
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -374,6 +376,7 @@ const Game: React.FC = () => {
           <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
             <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
             <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
+            <button onClick={() => setShowRules(true)} style={styles.textBtn} title="Правила игры">📖 Правила</button>
           </div>
           {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
@@ -425,6 +428,16 @@ const Game: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+        {showRules && (
+          <RulesModal
+            onClose={() => setShowRules(false)}
+            onStartTutorial={() => {
+              setShowRules(false);
+              // позже: открыть тренажёр
+              alert('Обучающий режим скоро появится!');
+            }}
+          />
         )}
         <ConfirmDialog
           open={confirmExitOpen}
