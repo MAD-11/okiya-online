@@ -8,11 +8,11 @@ interface RulesModalProps {
 const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => {
   const [activeTab, setActiveTab] = useState<'rules' | 'moves' | 'win' | 'block'>('rules');
 
-  const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
+const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
     return (
         <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(50px, 65px))',
+        gridTemplateColumns: 'repeat(4, minmax(55px, 70px))',
         gap: '6px',
         justifyContent: 'center',
         margin: '12px 0',
@@ -20,13 +20,14 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
         {boardData.map((row, r) =>
             row.map((cell, c) => {
             const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
-            // Разбиваем строку на два символа (растение и особенность)
-            const plantEmoji = cell[0];
-            const symbolEmoji = cell[1];
+            // Разбиваем строку на отдельные символы (эмодзи)
+            const symbols = Array.from(cell); // ['🌸', '☀️']
+            const plantEmoji = symbols[0] || '?';
+            const symbolEmoji = symbols[1] || '?';
             return (
                 <div key={`${r}-${c}`} style={{
                 display: 'flex',
-                flexDirection: 'column', // эмодзи вертикально
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
@@ -34,19 +35,17 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
                 backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
                 border: '1px solid var(--border)',
                 borderRadius: '10px',
-                fontSize: '22px',
-                lineHeight: 1.2,
                 padding: '4px',
                 }}>
-                <span style={{ fontSize: '24px' }}>{plantEmoji}</span>
-                <span style={{ fontSize: '20px' }}>{symbolEmoji}</span>
+                <span style={{ fontSize: '24px', lineHeight: 1 }}>{plantEmoji}</span>
+                <span style={{ fontSize: '20px', lineHeight: 1, marginTop: '2px' }}>{symbolEmoji}</span>
                 </div>
             );
             })
         )}
         </div>
     );
-  };
+};
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -71,7 +70,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
                 <li>Взятая фишка заменяется вашим камнем (🌸 или 🌑).</li>
               </ul>
               <p><strong>🏆 Выигрыш:</strong> после размещения камня проверяется, образовался ли ряд/квадрат из ваших камней. Если да – вы победили.</p>
-              <p><strong>🤝 Ничья:</strong> если поле заполнено, а победителя нет.</p>
+              <p><strong>🤝 Ничья:</strong> если поле полностью заполнено (все 16 клеток заняты камнями), а победитель не определён – игра заканчивается ничьей. В сериях счёт не меняется.</p>
               <p><strong>⚙️ Режимы:</strong> Одна игра (до 1 победы), серии до 3 или 5 побед (со сменой цветов каждый раунд).</p>
               <p><strong>💡 Совет:</strong> блокируйте возможные ряды соперника – не давайте ему выстроить 3 камня в линию.</p>
             </div>

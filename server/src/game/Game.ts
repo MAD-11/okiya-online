@@ -92,6 +92,13 @@ export class Game {
   skipTurn() {
     if (this.status !== 'playing') return;
     const opponent = this.currentPlayer === 'red' ? 'black' : 'red';
+    
+    if (this.isBoardFull()) {
+      this.winner = 'draw';
+      this.handleGameOver();
+      return;
+    }
+    
     if (!this.hasValidMove()) {
       this.winner = opponent;
       this.handleGameOver();
@@ -126,15 +133,15 @@ export class Game {
       return true;
     }
 
-    const opponent = playerColor === 'red' ? 'black' : 'red';
-    if (!this.hasValidMove()) {
-      this.winner = playerColor;
+    if (this.isBoardFull()) {
+      this.winner = 'draw';
       this.handleGameOver();
       return true;
     }
 
-    if (this.isBoardFull()) {
-      this.winner = 'draw';
+    const opponent = playerColor === 'red' ? 'black' : 'red';
+    if (!this.hasValidMove()) {
+      this.winner = playerColor;
       this.handleGameOver();
       return true;
     }
