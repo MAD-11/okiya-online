@@ -10,34 +10,41 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
 
   const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
     return (
-      <div style={{
+        <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 40px)',
-        gap: '4px',
+        gridTemplateColumns: 'repeat(4, minmax(50px, 65px))',
+        gap: '6px',
         justifyContent: 'center',
-        margin: '10px 0',
-      }}>
-        {boardData.map((row, r) => (
-          row.map((cell, c) => {
+        margin: '12px 0',
+        }}>
+        {boardData.map((row, r) =>
+            row.map((cell, c) => {
             const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
+            // Разбиваем строку на два символа (растение и особенность)
+            const plantEmoji = cell[0];
+            const symbolEmoji = cell[1];
             return (
-              <div key={`${r}-${c}`} style={{
-                width: '40px',
-                height: '40px',
+                <div key={`${r}-${c}`} style={{
                 display: 'flex',
+                flexDirection: 'column', // эмодзи вертикально
                 alignItems: 'center',
                 justifyContent: 'center',
+                width: '100%',
+                aspectRatio: '1 / 1',
                 backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
                 border: '1px solid var(--border)',
-                borderRadius: '8px',
-                fontSize: '24px',
-              }}>
-                {cell}
-              </div>
+                borderRadius: '10px',
+                fontSize: '22px',
+                lineHeight: 1.2,
+                padding: '4px',
+                }}>
+                <span style={{ fontSize: '24px' }}>{plantEmoji}</span>
+                <span style={{ fontSize: '20px' }}>{symbolEmoji}</span>
+                </div>
             );
-          })
-        ))}
-      </div>
+            })
+        )}
+        </div>
     );
   };
 
@@ -59,7 +66,7 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
               <p><strong>🌸 Цель:</strong> выложить 4 своих камня в ряд (горизонталь, вертикаль, диагональ) или квадрат 2×2.</p>
               <p><strong>🎲 Как ходить:</strong></p>
               <ul>
-                <li>Первый ход: можно взять любую фишку из <strong>углов</strong> (0,0), (0,3), (3,0), (3,3).</li>
+                <li>Первый ход: можно взять любую карточку <strong>с края поля</strong> (то есть из первого или последнего ряда/столбца), кроме центральных четырёх клеток.</li>
                 <li>Следующие ходы: нужно взять фишку, у которой совпадает хотя бы один символ (растение <em>или</em> явление) с <strong>предыдущей взятой фишкой</strong>.</li>
                 <li>Взятая фишка заменяется вашим камнем (🌸 или 🌑).</li>
               </ul>
@@ -189,7 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '20px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '15px',
     color: 'var(--secondary-text)',
     transition: 'all 0.2s',
   },
@@ -201,8 +208,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '24px',
     lineHeight: '1.5',
     color: 'var(--text)',
-    fontSize: '14px',
-  },
+    fontSize: '16px',
+    },
   buttonsRow: {
     display: 'flex',
     gap: '12px',

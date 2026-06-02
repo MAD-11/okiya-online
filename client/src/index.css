@@ -213,3 +213,20 @@ body {
   90% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.2); }
 }
+
+/* Адаптация иллюстраций правил для мобильных */
+@media (max-width: 550px) {
+  .rules-illustration-grid {
+    grid-template-columns: repeat(4, minmax(40px, 50px)) !important;
+    gap: 4px !important;
+  }
+  .rules-illustration-cell {
+    font-size: 18px !important;
+  }
+  .rules-illustration-cell span:first-child {
+    font-size: 20px !important;
+  }
+  .rules-illustration-cell span:last-child {
+    font-size: 16px !important;
+  }
+}
