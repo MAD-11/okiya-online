@@ -55,7 +55,7 @@ const Game: React.FC = () => {
   const { skin: localSkin } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showTutorial, setShowTutorial] = useState(false);
-  // Добавьте useEffect для отслеживания
+
   useEffect(() => {
     console.log('showTutorial changed:', showTutorial);
   }, [showTutorial]);
@@ -113,7 +113,6 @@ const Game: React.FC = () => {
     }
   };
 
-  // Мониторинг потери соединения
   useEffect(() => {
     if (!connected && roomId && !reconnecting) {
       setReconnecting(true);
@@ -281,7 +280,6 @@ const Game: React.FC = () => {
       else if (data.yourResult === 'lose') playLoseSound();
       else if (data.yourResult === 'draw') playDrawSound();
 
-      // Тряска доски
       setShakeBoard(true);
       setTimeout(() => setShakeBoard(false), 500);
 
@@ -330,17 +328,17 @@ const Game: React.FC = () => {
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins, roomId]);
 
+  let content = null;
+
   if (!connected) {
-    return (
+    content = (
       <div style={styles.centered}>
         <div className="spinner"></div>
         <p>Подключение к серверу...</p>
       </div>
     );
-  }
-
-  if (!gameState) {
-    return (
+  } else if (!gameState) {
+    content = (
       <div style={styles.lobbyContainer}>
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
@@ -371,12 +369,8 @@ const Game: React.FC = () => {
             </label>
           </div>
           <div style={styles.separator} />
-          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>
-            Войти по коду
-          </button>
-          <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>
-            Открытые комнаты
-          </button>
+          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>Войти по коду</button>
+          <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>Открытые комнаты</button>
           <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
             <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
             <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
@@ -423,12 +417,8 @@ const Game: React.FC = () => {
                 maxLength={4}
               />
               <div style={styles.joinModalButtons}>
-                <button onClick={() => setShowJoinModal(false)} style={styles.joinModalBtnCancel}>
-                  Отмена
-                </button>
-                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.joinModalBtnConfirm}>
-                  Войти
-                </button>
+                <button onClick={() => setShowJoinModal(false)} style={styles.joinModalBtnCancel}>Отмена</button>
+                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.joinModalBtnConfirm}>Войти</button>
               </div>
             </div>
           </div>
@@ -452,59 +442,156 @@ const Game: React.FC = () => {
         />
       </div>
     );
-  }
+  } else {
+    const isSpectator = !gameState.myColor;
+    const canRestart = gameState.roundFinished && !waitingRestart;
 
-  const isSpectator = !gameState.myColor;
-  const canRestart = gameState.roundFinished && !waitingRestart;
-
-  // Мобильная версия
-  if (isMobile) {
-    return (
-      <div style={styles.mobileGameContainer}>
-        {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
-        {vsAnimation && (
-          <div style={styles.vsOverlayMobile}>
-            <div style={styles.vsContentMobile}>
-              <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick1}</span>
-              <span style={{ fontSize: '24px', color: '#c9a96e' }}>VS</span>
-              <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick2}</span>
+    if (isMobile) {
+      content = (
+        <div style={styles.mobileGameContainer}>
+          {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
+          {vsAnimation && (
+            <div style={styles.vsOverlayMobile}>
+              <div style={styles.vsContentMobile}>
+                <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick1}</span>
+                <span style={{ fontSize: '24px', color: '#c9a96e' }}>VS</span>
+                <span style={{ fontSize: '20px', wordBreak: 'break-word' }}>{vsAnimation.nick2}</span>
+              </div>
+            </div>
+          )}
+          <header style={styles.gameHeader}>
+            <h2 style={styles.titleSmall}>Окийя</h2>
+            {roomId && (
+              <span style={styles.roomCode}>
+                Комната <strong>{roomId}</strong>
+                {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
+                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
+              </span>
+            )}
+          </header>
+          <div style={styles.statusBar}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+              backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
+            }} />
+            <span style={{ marginLeft: 6, fontSize: 13 }}>{gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}</span>
+            <span style={{ marginLeft: 16, fontSize: 13 }}>
+              {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+            </span>
+          </div>
+          {gameState.maxWins > 1 && <div style={styles.score}>Счёт: {gameState.myScore} — {gameState.opponentScore}</div>}
+          <div style={styles.mobileGameLayout}>
+            {!isSpectator && (
+              <details style={styles.mobileChatCollapsed}>
+                <summary style={styles.mobileChatSummary}>💬 Чат</summary>
+                <div style={styles.mobileChatContent}>
+                  <Chat
+                    messages={gameState.messages ?? []}
+                    onSend={handleChatSend}
+                    myNick={gameState.myNick}
+                    socket={socket}
+                    roomId={roomId}
+                    opponentTyping={opponentTyping}
+                  />
+                </div>
+              </details>
+            )}
+            <div style={styles.mobileBoardArea}>
+              <div style={styles.mobileBoardScale}>
+                <Board
+                  board={gameState.board}
+                  validMoves={validMoves}
+                  onClick={handleCellClick}
+                  currentPlayer={gameState.currentPlayer}
+                  myColor={gameState.myColor}
+                  lastMove={gameState.lastMove}
+                  hostSkin={gameState.hostSkin || 'sakura'}
+                  guestSkin={gameState.guestSkin || 'sakura'}
+                  shake={shakeBoard}
+                />
+              </div>
+              <LastPickedTile tile={gameState.lastPickedTile} />
+            </div>
+            {gameState.status === 'playing' && !isSpectator && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={styles.turnIndicator}>{gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}</p>
+                <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
+              </div>
+            )}
+            {personalGameOver && (
+              <div style={styles.gameOverBlock}>
+                <p style={styles.message}>{personalGameOver}</p>
+                {canRestart && <button onClick={handleRestartRound} style={styles.actionBtn}>Ещё одна игра</button>}
+                {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
+              </div>
+            )}
+            <div style={styles.mobileButtonRow}>
+              <button onClick={backToMenu} style={styles.actionBtn}>Меню</button>
+              {gameState.status === 'playing' && !isSpectator && (
+                <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>Сдаться</button>
+              )}
+              <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }}>Настройки</button>
             </div>
           </div>
-        )}
-        <header style={styles.gameHeader}>
-          <h2 style={styles.titleSmall}>Окийя</h2>
-          {roomId && (
-            <span style={styles.roomCode}>
-              Комната <strong>{roomId}</strong>
-              {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
-              <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
-            </span>
+          {showSettings && (
+            <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+              <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <Settings onClose={() => setShowSettings(false)} />
+              </div>
+            </div>
           )}
-        </header>
-        <div style={styles.statusBar}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-            backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
-          }} />
-          <span style={{ marginLeft: 6, fontSize: 13 }}>
-            {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
-          </span>
-          <span style={{ marginLeft: 16, fontSize: 13 }}>
-            {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
-          </span>
+          <ConfirmDialog
+            open={confirmExitOpen}
+            title="Выйти из игры?"
+            message="Текущая игра будет потеряна. Вы уверены?"
+            onConfirm={handleConfirmExit}
+            onCancel={() => setConfirmExitOpen(false)}
+          />
         </div>
-
-        {gameState.maxWins > 1 && (
-          <div style={styles.score}>
-            Счёт: {gameState.myScore} — {gameState.opponentScore}
+      );
+    } else {
+      content = (
+        <div style={styles.gameContainer}>
+          {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
+          {vsAnimation && (
+            <div style={styles.vsOverlay}>
+              <div style={styles.vsContent}>
+                <span>{vsAnimation.nick1}</span>
+                <span style={styles.vsText}>VS</span>
+                <span>{vsAnimation.nick2}</span>
+              </div>
+            </div>
+          )}
+          <header style={styles.gameHeader}>
+            <h2 style={styles.titleSmall}>Окийя</h2>
+            {roomId && (
+              <span style={styles.roomCode}>
+                Комната <strong>{roomId}</strong>
+                {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
+                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
+              </span>
+            )}
+          </header>
+          <div style={styles.statusBar}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+              backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
+            }} />
+            <span style={{ marginLeft: 6, fontSize: 13 }}>{gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}</span>
+            <span style={{ marginLeft: 16, fontSize: 13 }}>
+              {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+            </span>
           </div>
-        )}
-
-        <div style={styles.mobileGameLayout}>
-          {!isSpectator && (
-            <details style={styles.mobileChatCollapsed}>
-              <summary style={styles.mobileChatSummary}>💬 Чат</summary>
-              <div style={styles.mobileChatContent}>
+          {gameState.maxWins > 1 && <div style={styles.score}>Счёт: {gameState.myScore} — {gameState.opponentScore}</div>}
+          {gameState.status === 'playing' && !isSpectator && (
+            <div style={{ marginBottom: 4, textAlign: 'center' }}>
+              <p style={styles.turnIndicator}>{gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}</p>
+              <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
+            </div>
+          )}
+          <div style={styles.gameLayoutDesktop}>
+            {!isSpectator && (
+              <div style={styles.chatColumn}>
                 <Chat
                   messages={gameState.messages ?? []}
                   onSend={handleChatSend}
@@ -514,206 +601,62 @@ const Game: React.FC = () => {
                   opponentTyping={opponentTyping}
                 />
               </div>
-            </details>
-          )}
-
-          <div style={styles.mobileBoardArea}>
-            <div style={styles.mobileBoardScale}>
-              <Board
-                board={gameState.board}
-                validMoves={validMoves}
-                onClick={handleCellClick}
-                currentPlayer={gameState.currentPlayer}
-                myColor={gameState.myColor}
-                lastMove={gameState.lastMove}
-                hostSkin={gameState.hostSkin || 'sakura'}
-                guestSkin={gameState.guestSkin || 'sakura'}
-                shake={shakeBoard}
-              />
-            </div>
-            <LastPickedTile tile={gameState.lastPickedTile} />
-          </div>
-
-          {gameState.status === 'playing' && !isSpectator && (
-            <div style={{ textAlign: 'center' }}>
-              <p style={styles.turnIndicator}>
-                {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
-              </p>
-              <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
-            </div>
-          )}
-
-          {personalGameOver && (
-            <div style={styles.gameOverBlock}>
-              <p style={styles.message}>{personalGameOver}</p>
-              {canRestart && (
-                <button onClick={handleRestartRound} style={styles.actionBtn}>
-                  Ещё одна игра
-                </button>
-              )}
-              {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
-            </div>
-          )}
-
-          <div style={styles.mobileButtonRow}>
-            <button onClick={backToMenu} style={styles.actionBtn}>
-              Меню
-            </button>
-            {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }}>
-                Сдаться
-              </button>
             )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }}>
-              Настройки
-            </button>
-          </div>
-        </div>
-
-        {showSettings && (
-          <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <Settings onClose={() => setShowSettings(false)} />
+            <div style={styles.centerColumnDesktop}>
+              <div style={styles.boardArea}>
+                <Board
+                  board={gameState.board}
+                  validMoves={validMoves}
+                  onClick={handleCellClick}
+                  currentPlayer={gameState.currentPlayer}
+                  myColor={gameState.myColor}
+                  lastMove={gameState.lastMove}
+                  hostSkin={gameState.hostSkin || 'sakura'}
+                  guestSkin={gameState.guestSkin || 'sakura'}
+                  shake={shakeBoard}
+                />
+                <LastPickedTile tile={gameState.lastPickedTile} />
+              </div>
+              {personalGameOver && (
+                <div style={styles.gameOverBlock}>
+                  <p style={styles.message}>{personalGameOver}</p>
+                  {canRestart && <button onClick={handleRestartRound} style={styles.actionBtn}>Ещё одна игра</button>}
+                  {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
+                </div>
+              )}
+              <div style={styles.buttonRow}>
+                <button onClick={backToMenu} style={styles.actionBtn} title="Выйти в главное меню">Выйти в меню</button>
+                {gameState.status === 'playing' && !isSpectator && (
+                  <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }} title="Сдаться">Сдаться</button>
+                )}
+                <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }} title="Настройки">Настройки</button>
+              </div>
             </div>
           </div>
-        )}
-        <ConfirmDialog
-          open={confirmExitOpen}
-          title="Выйти из игры?"
-          message="Текущая игра будет потеряна. Вы уверены?"
-          onConfirm={handleConfirmExit}
-          onCancel={() => setConfirmExitOpen(false)}
-        />
-      </div>
-    );
+          {showSettings && (
+            <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+              <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <Settings onClose={() => setShowSettings(false)} />
+              </div>
+            </div>
+          )}
+          <ConfirmDialog
+            open={confirmExitOpen}
+            title="Выйти из игры?"
+            message="Текущая игра будет потеряна. Вы уверены?"
+            onConfirm={handleConfirmExit}
+            onCancel={() => setConfirmExitOpen(false)}
+          />
+        </div>
+      );
+    }
   }
 
-  // ДЕСКТОПНАЯ ВЕРСИЯ (ПОЛНОСТЬЮ РАБОЧАЯ)
   return (
-    <div style={styles.gameContainer}>
-      {reconnecting && <div style={styles.reconnectBanner}>Переподключение...</div>}
-      {vsAnimation && (
-        <div style={styles.vsOverlay}>
-          <div style={styles.vsContent}>
-            <span>{vsAnimation.nick1}</span>
-            <span style={styles.vsText}>VS</span>
-            <span>{vsAnimation.nick2}</span>
-          </div>
-        </div>
-      )}
-      <header style={styles.gameHeader}>
-        <h2 style={styles.titleSmall}>Окийя</h2>
-        {roomId && (
-          <span style={styles.roomCode}>
-            Комната <strong>{roomId}</strong>
-            {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
-            <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
-          </span>
-        )}
-      </header>
-      <div style={styles.statusBar}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-          backgroundColor: gameState.opponentConnected ? 'var(--opponent-online)' : 'var(--opponent-offline)'
-        }} />
-        <span style={{ marginLeft: 6, fontSize: 13 }}>
-          {gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}
-        </span>
-        <span style={{ marginLeft: 16, fontSize: 13 }}>
-          {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
-        </span>
-      </div>
-
-      {gameState.maxWins > 1 && (
-        <div style={styles.score}>
-          Счёт: {gameState.myScore} — {gameState.opponentScore}
-        </div>
-      )}
-
-      {gameState.status === 'playing' && !isSpectator && (
-        <div style={{ marginBottom: 4, textAlign: 'center' }}>
-          <p style={styles.turnIndicator}>
-            {gameState.currentPlayer === gameState.myColor ? '☀️ Ваш ход' : '🌙 Ход противника'}
-          </p>
-          <Timer turnStartedAt={gameState.turnStartedAt} turnDuration={gameState.turnDuration} />
-        </div>
-      )}
-
-      <div style={styles.gameLayoutDesktop}>
-        {!isSpectator && (
-          <div style={styles.chatColumn}>
-            <Chat
-              messages={gameState.messages ?? []}
-              onSend={handleChatSend}
-              myNick={gameState.myNick}
-              socket={socket}
-              roomId={roomId}
-              opponentTyping={opponentTyping}
-            />
-          </div>
-        )}
-
-        <div style={styles.centerColumnDesktop}>
-          <div style={styles.boardArea}>
-            <Board
-              board={gameState.board}
-              validMoves={validMoves}
-              onClick={handleCellClick}
-              currentPlayer={gameState.currentPlayer}
-              myColor={gameState.myColor}
-              lastMove={gameState.lastMove}
-              hostSkin={gameState.hostSkin || 'sakura'}
-              guestSkin={gameState.guestSkin || 'sakura'}
-              shake={shakeBoard}
-            />
-            <LastPickedTile tile={gameState.lastPickedTile} />
-          </div>
-
-          {personalGameOver && (
-            <div style={styles.gameOverBlock}>
-              <p style={styles.message}>{personalGameOver}</p>
-              {canRestart && (
-                <button onClick={handleRestartRound} style={styles.actionBtn}>
-                  Ещё одна игра
-                </button>
-              )}
-              {waitingRestart && <p style={{ fontSize: 13, color: 'var(--secondary-text)' }}>Ожидание соперника…</p>}
-            </div>
-          )}
-
-          <div style={styles.buttonRow}>
-            <button onClick={backToMenu} style={styles.actionBtn} title="Выйти в главное меню">
-              Выйти в меню
-            </button>
-            {gameState.status === 'playing' && !isSpectator && (
-              <button onClick={handleForfeit} style={{ ...styles.actionBtn, backgroundColor: '#b5651d' }} title="Сдаться">
-                Сдаться
-              </button>
-            )}
-            <button onClick={() => setShowSettings(true)} style={{ ...styles.actionBtn, backgroundColor: 'var(--game-btn-bg)' }} title="Настройки">
-              Настройки
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {showSettings && (
-        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <Settings onClose={() => setShowSettings(false)} />
-          </div>
-        </div>
-      )}
-      <ConfirmDialog
-        open={confirmExitOpen}
-        title="Выйти из игры?"
-        message="Текущая игра будет потеряна. Вы уверены?"
-        onConfirm={handleConfirmExit}
-        onCancel={() => setConfirmExitOpen(false)}
-      />
-      console.log('Before render, showTutorial =', showTutorial);
+    <>
+      {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
-    </div>
+    </>
   );
 };
 
@@ -920,7 +863,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameLayoutDesktop: {
     display: 'grid',
-    gridTemplateColumns: '400px auto 400px', // чат | доска | пустая (симметрия)
+    gridTemplateColumns: '400px auto 400px',
     alignItems: 'start',
     gap: '20px',
     flex: 1,
@@ -929,7 +872,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
   },
   chatColumn: {
-    width: '100%',        // заполняет первую колонку
+    width: '100%',
     height: '70vh',
     marginLeft: '100px',
   },
@@ -938,16 +881,16 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    gridColumn: '2 / 3',  // явно во второй колонке
-    justifySelf: 'center', // центрирование доски внутри своей колонки
+    gridColumn: '2 / 3',
+    justifySelf: 'center',
   },
   centerColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-    justifySelf: 'center', // центрирование доски внутри средней колонки
-    gridColumn: '2 / 3',   // явно указываем, что это вторая колонка
+    justifySelf: 'center',
+    gridColumn: '2 / 3',
   },
   gameOverBlock: {
     background: 'var(--card-bg)',
@@ -1139,8 +1082,6 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 2000,
     fontWeight: 'bold',
   },
-
-  // В объект styles добавить:
   joinModal: {
     background: 'var(--modal-bg)',
     borderRadius: '24px',
