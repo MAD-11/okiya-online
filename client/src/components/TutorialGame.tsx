@@ -5,6 +5,8 @@ import { initBoard, isValidMove, checkWin } from '../game/gameLogic';
 import { Tile, Board as BoardType } from '../types/game';
 import { playMoveSound, playWinSound } from '../utils/sound';
 
+console.log('TutorialGame component rendering');
+
 interface TutorialStep {
   id: number;
   title: string;
@@ -230,7 +232,7 @@ const TutorialGame: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setShowHint(false);
     setCompleted(false);
   };
-
+  console.log('stepIndex', stepIndex, 'steps.length', steps.length);
   if (!currentStep) return null;
 
   return (

@@ -55,6 +55,10 @@ const Game: React.FC = () => {
   const { skin: localSkin } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showTutorial, setShowTutorial] = useState(false);
+  // Добавьте useEffect для отслеживания
+  useEffect(() => {
+    console.log('showTutorial changed:', showTutorial);
+  }, [showTutorial]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -433,6 +437,7 @@ const Game: React.FC = () => {
           <RulesModal
             onClose={() => setShowRules(false)}
             onStartTutorial={() => {
+              console.log('onStartTutorial called');
               setShowRules(false);
               setShowTutorial(true);
             }}
