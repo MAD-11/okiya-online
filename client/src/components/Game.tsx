@@ -12,6 +12,7 @@ import Settings from './Settings';
 import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
 import RulesModal from './RulesModal';
+import TutorialGame from './TutorialGame';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -52,8 +53,8 @@ const Game: React.FC = () => {
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [nick, setNick] = useState(() => getSavedNick() || '');
   const { skin: localSkin } = useTheme();
-
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -433,8 +434,7 @@ const Game: React.FC = () => {
             onClose={() => setShowRules(false)}
             onStartTutorial={() => {
               setShowRules(false);
-              // позже: открыть тренажёр
-              alert('Обучающий режим скоро появится!');
+              setShowTutorial(true);
             }}
           />
         )}
@@ -698,6 +698,9 @@ const Game: React.FC = () => {
             <Settings onClose={() => setShowSettings(false)} />
           </div>
         </div>
+      )}
+      {showTutorial && (
+        <TutorialGame onClose={() => setShowTutorial(false)} />
       )}
       <ConfirmDialog
         open={confirmExitOpen}
