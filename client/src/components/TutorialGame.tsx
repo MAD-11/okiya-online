@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Board from './Board';
 import LastPickedTile from './LastPickedTile';
-import { initBoard, isValidMove, checkWin } from '../game/Board';
+import { initBoard, isValidMove, checkWin } from '../game/gameLogic';
 import { Tile, Board as BoardType } from '../types/game';
 import { playMoveSound, playWinSound } from '../utils/sound';
 
