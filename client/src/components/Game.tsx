@@ -13,6 +13,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { useTheme } from '../contexts/ThemeContext';
 import RulesModal from './RulesModal';
 import TutorialGame from './TutorialGame';
+import BotGame from './BotGame';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -55,6 +56,7 @@ const Game: React.FC = () => {
   const { skin: localSkin } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showBotGame, setShowBotGame] = useState(false);
 
   useEffect(() => {
     console.log('showTutorial changed:', showTutorial);
@@ -348,6 +350,7 @@ const Game: React.FC = () => {
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
+            <button onClick={() => setShowBotGame(true)} style={styles.primaryBtn}>🤖 Игра с ботом</button>
           </div>
           <div style={styles.privateToggle}>
             <label style={styles.checkboxLabel}>
@@ -640,6 +643,7 @@ const Game: React.FC = () => {
               </div>
             </div>
           )}
+          {showBotGame && <BotGame onClose={() => setShowBotGame(false)} />}
           <ConfirmDialog
             open={confirmExitOpen}
             title="Выйти из игры?"
