@@ -711,7 +711,7 @@ const Game: React.FC = () => {
         onConfirm={handleConfirmExit}
         onCancel={() => setConfirmExitOpen(false)}
       />
-      console.log('showTutorial in render:', showTutorial);
+      console.log('Before render, showTutorial =', showTutorial);
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
     </div>
   );
