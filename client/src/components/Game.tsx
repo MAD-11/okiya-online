@@ -704,9 +704,6 @@ const Game: React.FC = () => {
           </div>
         </div>
       )}
-      {showTutorial && (
-        <TutorialGame onClose={() => setShowTutorial(false)} />
-      )}
       <ConfirmDialog
         open={confirmExitOpen}
         title="Выйти из игры?"
@@ -714,6 +711,8 @@ const Game: React.FC = () => {
         onConfirm={handleConfirmExit}
         onCancel={() => setConfirmExitOpen(false)}
       />
+      console.log('showTutorial in render:', showTutorial);
+      {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
     </div>
   );
 };
