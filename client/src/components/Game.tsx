@@ -643,7 +643,6 @@ const Game: React.FC = () => {
               </div>
             </div>
           )}
-          {showBotGame && <BotGame onClose={() => setShowBotGame(false)} />}
           <ConfirmDialog
             open={confirmExitOpen}
             title="Выйти из игры?"
@@ -660,6 +659,7 @@ const Game: React.FC = () => {
     <>
       {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
+      {showBotGame && <BotGame onClose={() => setShowBotGame(false)} />}
     </>
   );
 };
