@@ -8,62 +8,72 @@ interface RulesModalProps {
 const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => {
   const [activeTab, setActiveTab] = useState<'rules' | 'moves' | 'win' | 'block'>('rules');
 
-const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, minmax(60px, 70px))',
-      gap: '6px',
-      justifyContent: 'center',
-      margin: '12px 0',
-    }}>
-      {boardData.map((row, r) =>
-        row.map((cell, c) => {
-          const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
-          const trimmed = cell.trim();
-          
-          // Определяем, есть ли эмодзи в клетке
-          const emojis = (trimmed === '.' || trimmed === '') 
-            ? [] 
-            : trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
-          const firstEmoji = emojis[0] || '';
-          const secondEmoji = emojis[1] || '';
-          const hasTwo = emojis.length >= 2;
-          const isEmpty = firstEmoji === '';
-          
-          return (
-            <div
-              key={`${r}-${c}`}
-              style={{
-                display: 'flex',
-                flexDirection: hasTwo ? 'column' : 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                aspectRatio: '1 / 1',
-                backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '10px',
-                padding: '4px',
-              }}
-            >
-              {!isEmpty && (
-                <span style={{ fontSize: hasTwo ? '26px' : '34px', lineHeight: 1 }}>
-                  {firstEmoji}
-                </span>
-              )}
-              {hasTwo && (
-                <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '4px' }}>
-                  {secondEmoji}
-                </span>
-              )}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-};
+  const renderBoardIllustration = (boardData: string[][], highlight?: [number, number][]) => {
+    return (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 65px)',   // фиксированная ширина 65px
+        gap: '6px',
+        justifyContent: 'center',
+        margin: '12px auto',
+        overflowX: 'auto',
+        maxWidth: '100%',
+      }}>
+        {boardData.map((row, r) =>
+          row.map((cell, c) => {
+            const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
+            const trimmed = cell.trim();
+            const emojis = (trimmed === '.' || trimmed === '')
+              ? []
+              : trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
+            const firstEmoji = emojis[0] || '';
+            const secondEmoji = emojis[1] || '';
+            const hasTwo = emojis.length >= 2;
+            const isEmpty = firstEmoji === '';
+
+            return (
+              <div
+                key={`${r}-${c}`}
+                style={{
+                  display: 'flex',
+                  flexDirection: hasTwo ? 'column' : 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '65px',
+                  height: '65px',
+                  backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '4px',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {!isEmpty && (
+                  <span style={{
+                    fontSize: hasTwo ? '26px' : '34px',
+                    lineHeight: 1,
+                    fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
+                  }}>
+                    {firstEmoji}
+                  </span>
+                )}
+                {hasTwo && (
+                  <span style={{
+                    fontSize: '22px',
+                    lineHeight: 1,
+                    marginTop: '4px',
+                    fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
+                  }}>
+                    {secondEmoji}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -107,39 +117,39 @@ const renderBoardIllustration = (boardData: string[][], highlight?: [number, num
             </div>
           )}
 
-            {activeTab === 'win' && (
+          {activeTab === 'win' && (
             <div>
-                <p><strong>Выигрышные комбинации:</strong></p>
-                <p>👉 <strong>4 в ряд по горизонтали</strong></p>
-                {renderBoardIllustration([
+              <p><strong>Выигрышные комбинации:</strong></p>
+              <p>👉 <strong>4 в ряд по горизонтали</strong></p>
+              {renderBoardIllustration([
                 ['🌸', '🌸', '🌸', '🌸'],
                 ['.', '.', '.', '.'],
                 ['.', '.', '.', '.'],
                 ['.', '.', '.', '.']
-                ])}
-                <p>👉 <strong>4 в ряд по вертикали</strong></p>
-                {renderBoardIllustration([
+              ])}
+              <p>👉 <strong>4 в ряд по вертикали</strong></p>
+              {renderBoardIllustration([
                 ['🌸', '.', '.', '.'],
                 ['🌸', '.', '.', '.'],
                 ['🌸', '.', '.', '.'],
                 ['🌸', '.', '.', '.']
-                ])}
-                <p>👉 <strong>4 в ряд по диагонали</strong></p>
-                {renderBoardIllustration([
+              ])}
+              <p>👉 <strong>4 в ряд по диагонали</strong></p>
+              {renderBoardIllustration([
                 ['🌸', '.', '.', '.'],
                 ['.', '🌸', '.', '.'],
                 ['.', '.', '🌸', '.'],
                 ['.', '.', '.', '🌸']
-                ])}
-                <p>👉 <strong>Квадрат 2×2</strong></p>
-                {renderBoardIllustration([
+              ])}
+              <p>👉 <strong>Квадрат 2×2</strong></p>
+              {renderBoardIllustration([
                 ['🌸', '🌸', '.', '.'],
                 ['🌸', '🌸', '.', '.'],
                 ['.', '.', '.', '.'],
                 ['.', '.', '.', '.']
-                ])}
+              ])}
             </div>
-            )}
+          )}
 
           {activeTab === 'block' && (
             <div>
@@ -186,7 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
   modal: {
     background: 'var(--modal-bg)',
     borderRadius: '24px',
-    maxWidth: '600px',
+    maxWidth: '700px',
     width: '90%',
     maxHeight: '85vh',
     overflow: 'auto',
@@ -226,7 +236,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: '1.5',
     color: 'var(--text)',
     fontSize: '16px',
-    },
+  },
   buttonsRow: {
     display: 'flex',
     gap: '12px',

@@ -230,3 +230,13 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Единый шрифт для эмодзи */
+body, .emoji-font {
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Twemoji Mozilla", "EmojiOne Color", sans-serif;
+}
+
+/* Для всех ячеек с эмодзи в правилах и игре */
+.board-cell-emoji {
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}

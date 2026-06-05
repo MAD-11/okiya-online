@@ -138,8 +138,20 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     transition: 'all 0.2s',
   },
-  tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
-  stone: { fontSize: '34px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' },
+  tileEmoji: { 
+  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+  fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
+  },
+  stone: {
+    fontSize: '38px',
+    filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))',
+    textShadow: '0 0 2px rgba(0,0,0,0.5)',
+    transition: 'transform 0.1s ease',
+    display: 'inline-block',
+    fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
+  },
+
 };
+
 
 export default Board;
