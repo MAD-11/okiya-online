@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { initBoard, isValidMove, checkWin } from '../game/gameLogic';
+import { initBoard, checkWin } from '../game/gameLogic';
 import { Tile, Board as BoardType, GameStatus } from '../types/game';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
 import ConfirmDialog from './ConfirmDialog';
@@ -11,10 +11,71 @@ interface BotGameProps {
   onClose: () => void;
 }
 
-// Проверка, может ли игрок выиграть следующим ходом (или уже есть 3 в ряд)
-const getThreatLevel = (board: BoardType, color: 'red' | 'black', lastTile: Tile | null): number => {
-  let threat = 0;
-  // Проверка всех возможных ходов для указанного цвета
+// Константы весов эвристики
+const WIN_SCORE = 100000;
+const BLOCK_WIN_SCORE = 90000;
+const CREATE_THREE_SCORE = 1000;
+const BLOCK_THREE_SCORE = 800;
+const CREATE_TWO_SCORE = 40;
+const BLOCK_TWO_SCORE = 30;
+const CENTER_BONUS = 8;
+const FLEXIBILITY_BONUS = 2;
+const RANDOM_FACTOR = 15;
+
+// Подсчёт количества линий (горизонталь, вертикаль, диагональ, квадрат), где есть ровно count камней цвета color и нет камней противника
+// Возвращает количество таких линий
+const countLines = (board: BoardType, color: 'red' | 'black', count: number): number => {
+  let result = 0;
+  // Горизонтали
+  for (let i = 0; i < 4; i++) {
+    const row = board[i];
+    const colorCount = row.filter(cell => cell === color).length;
+    const opponentCount = row.filter(cell => cell !== color && typeof cell !== 'string').length;
+    if (colorCount === count && opponentCount === 0) result++;
+  }
+  // Вертикали
+  for (let j = 0; j < 4; j++) {
+    let colorCnt = 0, oppCnt = 0;
+    for (let i = 0; i < 4; i++) {
+      if (board[i][j] === color) colorCnt++;
+      else if (board[i][j] !== null && typeof board[i][j] !== 'string') oppCnt++;
+    }
+    if (colorCnt === count && oppCnt === 0) result++;
+  }
+  // Главная диагональ
+  const diag1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
+  let d1color = 0, d1opp = 0;
+  diag1.forEach(cell => {
+    if (cell === color) d1color++;
+    else if (cell !== null && typeof cell !== 'string') d1opp++;
+  });
+  if (d1color === count && d1opp === 0) result++;
+  // Побочная диагональ
+  const diag2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
+  let d2color = 0, d2opp = 0;
+  diag2.forEach(cell => {
+    if (cell === color) d2color++;
+    else if (cell !== null && typeof cell !== 'string') d2opp++;
+  });
+  if (d2color === count && d2opp === 0) result++;
+  // Квадраты 2x2 (для count = 2, 3? Для победы в квадрате нужно 4 камня, но для оценки промежуточных – учитываем количество камней в квадрате)
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const cells = [board[r][c], board[r][c+1], board[r+1][c], board[r+1][c+1]];
+      let colorCnt = 0, oppCnt = 0;
+      cells.forEach(cell => {
+        if (cell === color) colorCnt++;
+        else if (cell !== null && typeof cell !== 'string') oppCnt++;
+      });
+      if (colorCnt === count && oppCnt === 0) result++;
+    }
+  }
+  return result;
+};
+
+// Проверка, может ли игрок выиграть следующим ходом (наличие линии из 3 или квадрата 3/4)
+const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile | null): boolean => {
+  // Перебираем все возможные ходы для цвета
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       const cell = board[r][c];
@@ -31,45 +92,115 @@ const getThreatLevel = (board: BoardType, color: 'red' | 'black', lastTile: Tile
         }
       }
       if (!canMove) continue;
-      // Симулируем ход
       const newBoard = board.map(row => [...row]);
       newBoard[r][c] = color;
-      if (checkWin(newBoard, color)) {
-        threat = Math.max(threat, 1000);
+      if (checkWin(newBoard, color)) return true;
+    }
+  }
+  return false;
+};
+
+// Генерация всех допустимых ходов для заданного цвета
+const getValidMoves = (board: BoardType, lastTile: Tile | null, color: 'red' | 'black'): { row: number; col: number; tile: Tile }[] => {
+  const moves: { row: number; col: number; tile: Tile }[] = [];
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const cell = board[r][c];
+      if (!cell || typeof cell === 'string') continue;
+      let isValid = false;
+      if (!lastTile) {
+        if ((r === 0 || r === 3 || c === 0 || c === 3) && !(r === 1 && c === 1) && !(r === 1 && c === 2) && !(r === 2 && c === 1) && !(r === 2 && c === 2)) {
+          isValid = true;
+        }
       } else {
-        // Подсчёт линий из 3
-        const line3 = countLinesOfThree(newBoard, color);
-        threat = Math.max(threat, line3 * 200);
+        const tile = cell as Tile;
+        if (tile.plant === lastTile.plant || tile.symbol === lastTile.symbol) {
+          isValid = true;
+        }
+      }
+      if (isValid) {
+        moves.push({ row: r, col: c, tile: cell as Tile });
       }
     }
   }
-  return threat;
+  return moves;
 };
 
-// Подсчёт количества линий (горизонталь, вертикаль, диагональ, квадрат), где есть 3 камня цвета color
-const countLinesOfThree = (board: BoardType, color: 'red' | 'black'): number => {
-  let count = 0;
-  // Горизонтали
-  for (let i = 0; i < 4; i++) {
-    const row = board[i];
-    const redCount = row.filter(cell => cell === color).length;
-    if (redCount === 3 && row.some(cell => cell !== color && typeof cell !== 'string')) count++;
+// Оценка позиции (чем выше, тем лучше для бота)
+const evaluatePosition = (
+  board: BoardType,
+  botColor: 'red' | 'black',
+  playerColor: 'red' | 'black',
+  lastTile: Tile | null
+): number => {
+  let score = 0;
+  // 1. Победа бота
+  if (checkWin(board, botColor)) return WIN_SCORE;
+  // 2. Возможность победы игрока (если игрок может выиграть следующим ходом, то это очень плохо для бота)
+  if (canWinNextMove(board, playerColor, lastTile)) {
+    // Бот должен предотвратить это, оценим штраф
+    score -= BLOCK_WIN_SCORE;
   }
-  // Вертикали
-  for (let j = 0; j < 4; j++) {
-    let cnt = 0;
-    for (let i = 0; i < 4; i++) if (board[i][j] === color) cnt++;
-    if (cnt === 3) {
-      for (let i = 0; i < 4; i++) if (board[i][j] !== color && typeof board[i][j] !== 'string') count++;
+  // 3. Свои линии из 2 и 3
+  const bot3 = countLines(board, botColor, 3);
+  const bot2 = countLines(board, botColor, 2);
+  score += bot3 * CREATE_THREE_SCORE;
+  score += bot2 * CREATE_TWO_SCORE;
+  // 4. Линии игрока (чем больше, тем хуже для бота)
+  const player3 = countLines(board, playerColor, 3);
+  const player2 = countLines(board, playerColor, 2);
+  score -= player3 * BLOCK_THREE_SCORE;
+  score -= player2 * BLOCK_TWO_SCORE;
+  // 5. Бонус за центральные клетки (если на них стоят камни бота)
+  const centerCells = [[1,1],[1,2],[2,1],[2,2]];
+  for (const [r,c] of centerCells) {
+    if (board[r][c] === botColor) score += CENTER_BONUS;
+    else if (board[r][c] === playerColor) score -= CENTER_BONUS/2;
+  }
+  // 6. Гибкость (количество возможных ходов после текущей позиции – влияет на тактическое разнообразие)
+  const nextMovesBot = getValidMoves(board, lastTile, botColor).length;
+  score += nextMovesBot * FLEXIBILITY_BONUS;
+  return score;
+};
+
+// Минимакс на глубину 2 (бот -> игрок)
+const minimax = (
+  board: BoardType,
+  depth: number,
+  isBotTurn: boolean,
+  botColor: 'red' | 'black',
+  playerColor: 'red' | 'black',
+  lastTile: Tile | null
+): number => {
+  if (depth === 0) {
+    return evaluatePosition(board, botColor, playerColor, lastTile);
+  }
+  const currentColor = isBotTurn ? botColor : playerColor;
+  const moves = getValidMoves(board, lastTile, currentColor);
+  if (moves.length === 0) {
+    // Нет ходов – текущий игрок проигрывает (противник побеждает)
+    if (isBotTurn) return -WIN_SCORE; // бот не может ходить – плохо
+    else return WIN_SCORE; // игрок не может ходить – хорошо для бота
+  }
+  if (isBotTurn) {
+    let best = -Infinity;
+    for (const move of moves) {
+      const newBoard = board.map(row => [...row]);
+      newBoard[move.row][move.col] = botColor;
+      const value = minimax(newBoard, depth - 1, false, botColor, playerColor, move.tile);
+      best = Math.max(best, value);
     }
+    return best;
+  } else {
+    let worst = Infinity;
+    for (const move of moves) {
+      const newBoard = board.map(row => [...row]);
+      newBoard[move.row][move.col] = playerColor;
+      const value = minimax(newBoard, depth - 1, true, botColor, playerColor, move.tile);
+      worst = Math.min(worst, value);
+    }
+    return worst;
   }
-  // Диагонали
-  const diag1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
-  if (diag1.filter(cell => cell === color).length === 3 && diag1.some(cell => cell !== color && typeof cell !== 'string')) count++;
-  const diag2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
-  if (diag2.filter(cell => cell === color).length === 3 && diag2.some(cell => cell !== color && typeof cell !== 'string')) count++;
-  // Квадраты 2x2 (не оцениваем для 3, но можно пропустить)
-  return count;
 };
 
 const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
@@ -87,91 +218,13 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   const playerColor: 'red' | 'black' = 'red';
   const botColor: 'red' | 'black' = 'black';
 
-  // Получить список всех допустимых ходов для заданного цвета и текущей доски
-  const getValidMoves = useCallback((boardState: BoardType, lastTile: Tile | null, color: 'red' | 'black') => {
-    const moves: { row: number; col: number; tile: Tile }[] = [];
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        const cell = boardState[r][c];
-        if (!cell || typeof cell === 'string') continue;
-        let isValid = false;
-        if (!lastTile) {
-          if ((r === 0 || r === 3 || c === 0 || c === 3) && !(r === 1 && c === 1) && !(r === 1 && c === 2) && !(r === 2 && c === 1) && !(r === 2 && c === 2)) {
-            isValid = true;
-          }
-        } else {
-          const tile = cell as Tile;
-          if (tile.plant === lastTile.plant || tile.symbol === lastTile.symbol) {
-            isValid = true;
-          }
-        }
-        if (isValid) {
-          moves.push({ row: r, col: c, tile: cell as Tile });
-        }
-      }
-    }
-    return moves;
-  }, []);
-
-  // Оценка хода для бота (чем выше, тем лучше)
-  const evaluateMove = useCallback((
-    boardState: BoardType,
-    row: number,
-    col: number,
-    tile: Tile,
-    botColorArg: 'red' | 'black',
-    playerColorArg: 'red' | 'black',
-    currentLastTile: Tile | null
-  ): number => {
-    // Симулируем ход бота
-    const simulatedBoard = boardState.map(r => [...r]);
-    simulatedBoard[row][col] = botColorArg;
-    const newLastTile = tile;
-
-    let score = 0;
-
-    // 1. Победа бота
-    if (checkWin(simulatedBoard, botColorArg)) {
-      score += 10000;
-    }
-
-    // 2. Блокировка победы игрока (если игрок следующим ходом может выиграть)
-    const playerThreat = getThreatLevel(simulatedBoard, playerColorArg, newLastTile);
-    if (playerThreat >= 1000) {
-      score += 800;
-    }
-
-    // 3. Создание своей угрозы (линии из 3)
-    const botLines3 = countLinesOfThree(simulatedBoard, botColorArg);
-    score += botLines3 * 300;
-
-    // 4. Блокировка угроз игрока (линии из 2 – не очень точно, но добавим)
-    // Для простоты не будем перебирать все возможные ходы игрока, оставим базовую эвристику
-
-    // 5. Бонус за центральные клетки (больше возможностей)
-    if ((row === 1 || row === 2) && (col === 1 || col === 2)) {
-      score += 15;
-    }
-
-    // 6. Бонус за клетки, которые дают больше вариантов следующего хода (оценка разнообразия)
-    // Проверим, сколько допустимых ходов останется у бота после этого хода
-    const nextMoves = getValidMoves(simulatedBoard, newLastTile, botColorArg);
-    score += nextMoves.length * 2;
-
-    // 7. Случайный фактор (±20), чтобы бот не был полностью детерминированным
-    score += (Math.random() * 40 - 20);
-
-    return score;
-  }, [getValidMoves]);
-
-  // Ход бота (умный выбор)
+  // Ход бота (минимакс)
   const makeBotMove = useCallback(() => {
     if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
     setWaitingBot(true);
     setTimeout(() => {
-      const validMoves = getValidMoves(board, lastPickedTile, botColor);
-      if (validMoves.length === 0) {
-        // Нет ходов – бот проигрывает
+      const moves = getValidMoves(board, lastPickedTile, botColor);
+      if (moves.length === 0) {
         setWinner(playerColor);
         setStatus('finished');
         setGameOver(true);
@@ -180,23 +233,27 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
         setWaitingBot(false);
         return;
       }
-      // Оцениваем каждый ход
-      let bestMove = validMoves[0];
+      let bestMoves: typeof moves = [];
       let bestScore = -Infinity;
-      for (const move of validMoves) {
-        const score = evaluateMove(board, move.row, move.col, move.tile, botColor, playerColor, lastPickedTile);
+      for (const move of moves) {
+        const newBoard = board.map(row => [...row]);
+        newBoard[move.row][move.col] = botColor;
+        const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
         if (score > bestScore) {
           bestScore = score;
-          bestMove = move;
+          bestMoves = [move];
+        } else if (Math.abs(score - bestScore) < 0.1) {
+          bestMoves.push(move);
         }
       }
-      const { row, col, tile } = bestMove;
+      // Добавляем случайность среди лучших ходов
+      const randomIndex = Math.floor(Math.random() * bestMoves.length);
+      const { row, col, tile } = bestMoves[randomIndex];
       const newBoard = board.map(r => [...r]);
       newBoard[row][col] = botColor;
       setBoard(newBoard);
       playMoveSound();
 
-      // Проверка победы бота
       if (checkWin(newBoard, botColor)) {
         setWinner(botColor);
         setStatus('finished');
@@ -207,8 +264,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
         return;
       }
 
-      // Проверка ничьи/блокировки
-      // Сначала проверим, остались ли ходы у игрока
       const playerMoves = getValidMoves(newBoard, tile, playerColor);
       if (playerMoves.length === 0) {
         setWinner(botColor);
@@ -224,15 +279,14 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       setCurrentPlayer(playerColor);
       setTurnStartedAt(Date.now());
       setWaitingBot(false);
-    }, 350);
-  }, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor, getValidMoves, evaluateMove]);
+    }, 400);
+  }, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor]);
 
   // Ход игрока
   const handlePlayerMove = useCallback((row: number, col: number) => {
     if (status !== 'playing' || currentPlayer !== playerColor || gameOver) return;
     const cell = board[row][col];
     if (!cell || typeof cell === 'string') return;
-    // Проверка допустимости
     let isValid = false;
     if (!lastPickedTile) {
       if ((row === 0 || row === 3 || col === 0 || col === 3) && !(row === 1 && col === 1) && !(row === 1 && col === 2) && !(row === 2 && col === 1) && !(row === 2 && col === 2)) {
@@ -265,7 +319,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       return;
     }
 
-    // Проверка, остались ли ходы у бота
     const botMoves = getValidMoves(newBoard, pickedTile, botColor);
     if (botMoves.length === 0) {
       setWinner(playerColor);
@@ -279,9 +332,9 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     setLastPickedTile(pickedTile);
     setCurrentPlayer(botColor);
     setTurnStartedAt(Date.now());
-  }, [board, currentPlayer, lastPickedTile, status, gameOver, playerColor, botColor, getValidMoves]);
+  }, [board, currentPlayer, lastPickedTile, status, gameOver, playerColor, botColor]);
 
-  // Запуск хода бота после смены игрока
+  // Запуск хода бота
   useEffect(() => {
     if (status === 'playing' && currentPlayer === botColor && !gameOver && !waitingBot) {
       makeBotMove();
@@ -306,7 +359,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     onClose();
   };
 
-  // Вычисление допустимых ходов для подсветки игрока
+  // Подсветка допустимых ходов для игрока
   const validMovesForDisplay = (() => {
     if (currentPlayer !== playerColor || status !== 'playing' || gameOver) return Array(4).fill(null).map(() => Array(4).fill(false));
     const moves = getValidMoves(board, lastPickedTile, playerColor);

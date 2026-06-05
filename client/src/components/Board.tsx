@@ -73,8 +73,36 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && <span style={styles.stone}>{getStoneEmoji('red')}</span>}
-                {cell === 'black' && <span style={styles.stone}>{getStoneEmoji('black')}</span>}
+                {cell === 'red' && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--stone-red-bg)',
+                    boxShadow: 'inset 0 0 0 2px rgba(220,80,60,0.4), 0 2px 8px rgba(0,0,0,0.2)',
+                    transition: 'all 0.1s ease',
+                  }}>
+                    <span style={styles.stone}>{getStoneEmoji('red')}</span>
+                  </div>
+                )}
+                {cell === 'black' && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--stone-black-bg)',
+                    boxShadow: 'inset 0 0 0 2px rgba(80,80,100,0.4), 0 2px 8px rgba(0,0,0,0.2)',
+                    transition: 'all 0.1s ease',
+                  }}>
+                    <span style={styles.stone}>{getStoneEmoji('black')}</span>
+                  </div>
+                )}
               </div>
             );
           })
