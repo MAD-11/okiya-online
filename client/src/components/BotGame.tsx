@@ -220,67 +220,92 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
 
   // Ход бота (минимакс)
   const makeBotMove = useCallback(() => {
-    if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
-    setWaitingBot(true);
-    setTimeout(() => {
-      const moves = getValidMoves(board, lastPickedTile, botColor);
-      if (moves.length === 0) {
-        setWinner(playerColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🎉 Вы победили (бот заблокирован)!');
-        playWinSound();
-        setWaitingBot(false);
-        return;
+  if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
+  setWaitingBot(true);
+  setTimeout(() => {
+    const moves = getValidMoves(board, lastPickedTile, botColor);
+    if (moves.length === 0) {
+      setWinner(playerColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🎉 Вы победили (бот заблокирован)!');
+      playWinSound();
+      setWaitingBot(false);
+      return;
+    }
+    let bestMoves: typeof moves = [];
+    let bestScore = -Infinity;
+    for (const move of moves) {
+      const newBoard = board.map(row => [...row]);
+      newBoard[move.row][move.col] = botColor;
+      const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMoves = [move];
+      } else if (Math.abs(score - bestScore) < 0.1) {
+        bestMoves.push(move);
       }
-      let bestMoves: typeof moves = [];
-      let bestScore = -Infinity;
-      for (const move of moves) {
-        const newBoard = board.map(row => [...row]);
-        newBoard[move.row][move.col] = botColor;
-        const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
-        if (score > bestScore) {
-          bestScore = score;
-          bestMoves = [move];
-        } else if (Math.abs(score - bestScore) < 0.1) {
-          bestMoves.push(move);
-        }
-      }
-      // Добавляем случайность среди лучших ходов
-      const randomIndex = Math.floor(Math.random() * bestMoves.length);
-      const { row, col, tile } = bestMoves[randomIndex];
-      const newBoard = board.map(r => [...r]);
-      newBoard[row][col] = botColor;
-      setBoard(newBoard);
-      playMoveSound();
+    }
+    const randomIndex = Math.floor(Math.random() * bestMoves.length);
+    const { row, col, tile } = bestMoves[randomIndex];
+    const newBoard = board.map(r => [...r]);
+    newBoard[row][col] = botColor;
+    setBoard(newBoard);
+    playMoveSound();
 
-      if (checkWin(newBoard, botColor)) {
-        setWinner(botColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🤖 Бот победил!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
-      }
+    if (checkWin(newBoard, botColor)) {
+      setWinner(botColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🤖 Бот победил!');
+      playLoseSound();
+      setWaitingBot(false);
+      return;
+    }
 
-      const playerMoves = getValidMoves(newBoard, tile, playerColor);
-      if (playerMoves.length === 0) {
-        setWinner(botColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🤖 Бот победил (вы заблокированы)!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
-      }
-
+    // --- НАДЁЖНАЯ ПРОВЕРКА ХОДОВ ИГРОКА ---
+    // Убедимся, что tile не null и имеет нужные поля
+    if (!tile || typeof tile !== 'object') {
+      console.error('Bot move: invalid tile', tile);
+      // Продолжаем игру как обычно
       setLastPickedTile(tile);
       setCurrentPlayer(playerColor);
       setTurnStartedAt(Date.now());
       setWaitingBot(false);
-    }, 400);
-  }, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor]);
+      return;
+    }
+
+    let hasPlayerMove = false;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const cell = newBoard[r][c];
+        if (!cell || typeof cell === 'string') continue;
+        const tileCell = cell as Tile;
+        if (tileCell.plant === tile.plant || tileCell.symbol === tile.symbol) {
+          hasPlayerMove = true;
+          break;
+        }
+      }
+      if (hasPlayerMove) break;
+    }
+
+    if (!hasPlayerMove) {
+      setWinner(botColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🤖 Бот победил (вы заблокированы)!');
+      playLoseSound();
+      setWaitingBot(false);
+      return;
+    }
+    // ------------------------------------
+
+    setLastPickedTile(tile);
+    setCurrentPlayer(playerColor);
+    setTurnStartedAt(Date.now());
+    setWaitingBot(false);
+  }, 400);
+}, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor, getValidMoves, minimax]);
 
   // Ход игрока
   const handlePlayerMove = useCallback((row: number, col: number) => {
