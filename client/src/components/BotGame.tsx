@@ -20,20 +20,15 @@ const CREATE_TWO_SCORE = 40;
 const BLOCK_TWO_SCORE = 30;
 const CENTER_BONUS = 8;
 const FLEXIBILITY_BONUS = 2;
-const RANDOM_FACTOR = 15;
 
-// Подсчёт количества линий (горизонталь, вертикаль, диагональ, квадрат), где есть ровно count камней цвета color и нет камней противника
-// Возвращает количество таких линий
 const countLines = (board: BoardType, color: 'red' | 'black', count: number): number => {
   let result = 0;
-  // Горизонтали
   for (let i = 0; i < 4; i++) {
     const row = board[i];
     const colorCount = row.filter(cell => cell === color).length;
     const opponentCount = row.filter(cell => cell !== color && typeof cell !== 'string').length;
     if (colorCount === count && opponentCount === 0) result++;
   }
-  // Вертикали
   for (let j = 0; j < 4; j++) {
     let colorCnt = 0, oppCnt = 0;
     for (let i = 0; i < 4; i++) {
@@ -42,7 +37,6 @@ const countLines = (board: BoardType, color: 'red' | 'black', count: number): nu
     }
     if (colorCnt === count && oppCnt === 0) result++;
   }
-  // Главная диагональ
   const diag1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
   let d1color = 0, d1opp = 0;
   diag1.forEach(cell => {
@@ -50,7 +44,6 @@ const countLines = (board: BoardType, color: 'red' | 'black', count: number): nu
     else if (cell !== null && typeof cell !== 'string') d1opp++;
   });
   if (d1color === count && d1opp === 0) result++;
-  // Побочная диагональ
   const diag2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
   let d2color = 0, d2opp = 0;
   diag2.forEach(cell => {
@@ -58,7 +51,6 @@ const countLines = (board: BoardType, color: 'red' | 'black', count: number): nu
     else if (cell !== null && typeof cell !== 'string') d2opp++;
   });
   if (d2color === count && d2opp === 0) result++;
-  // Квадраты 2x2 (для count = 2, 3? Для победы в квадрате нужно 4 камня, но для оценки промежуточных – учитываем количество камней в квадрате)
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       const cells = [board[r][c], board[r][c+1], board[r+1][c], board[r+1][c+1]];
@@ -73,9 +65,7 @@ const countLines = (board: BoardType, color: 'red' | 'black', count: number): nu
   return result;
 };
 
-// Проверка, может ли игрок выиграть следующим ходом (наличие линии из 3 или квадрата 3/4)
 const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile | null): boolean => {
-  // Перебираем все возможные ходы для цвета
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       const cell = board[r][c];
@@ -100,7 +90,6 @@ const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile
   return false;
 };
 
-// Генерация всех допустимых ходов для заданного цвета
 const getValidMoves = (board: BoardType, lastTile: Tile | null, color: 'red' | 'black'): { row: number; col: number; tile: Tile }[] => {
   const moves: { row: number; col: number; tile: Tile }[] = [];
   for (let r = 0; r < 4; r++) {
@@ -126,7 +115,6 @@ const getValidMoves = (board: BoardType, lastTile: Tile | null, color: 'red' | '
   return moves;
 };
 
-// Оценка позиции (чем выше, тем лучше для бота)
 const evaluatePosition = (
   board: BoardType,
   botColor: 'red' | 'black',
@@ -134,36 +122,26 @@ const evaluatePosition = (
   lastTile: Tile | null
 ): number => {
   let score = 0;
-  // 1. Победа бота
   if (checkWin(board, botColor)) return WIN_SCORE;
-  // 2. Возможность победы игрока (если игрок может выиграть следующим ходом, то это очень плохо для бота)
-  if (canWinNextMove(board, playerColor, lastTile)) {
-    // Бот должен предотвратить это, оценим штраф
-    score -= BLOCK_WIN_SCORE;
-  }
-  // 3. Свои линии из 2 и 3
+  if (canWinNextMove(board, playerColor, lastTile)) score -= BLOCK_WIN_SCORE;
   const bot3 = countLines(board, botColor, 3);
   const bot2 = countLines(board, botColor, 2);
   score += bot3 * CREATE_THREE_SCORE;
   score += bot2 * CREATE_TWO_SCORE;
-  // 4. Линии игрока (чем больше, тем хуже для бота)
   const player3 = countLines(board, playerColor, 3);
   const player2 = countLines(board, playerColor, 2);
   score -= player3 * BLOCK_THREE_SCORE;
   score -= player2 * BLOCK_TWO_SCORE;
-  // 5. Бонус за центральные клетки (если на них стоят камни бота)
   const centerCells = [[1,1],[1,2],[2,1],[2,2]];
   for (const [r,c] of centerCells) {
     if (board[r][c] === botColor) score += CENTER_BONUS;
     else if (board[r][c] === playerColor) score -= CENTER_BONUS/2;
   }
-  // 6. Гибкость (количество возможных ходов после текущей позиции – влияет на тактическое разнообразие)
   const nextMovesBot = getValidMoves(board, lastTile, botColor).length;
   score += nextMovesBot * FLEXIBILITY_BONUS;
   return score;
 };
 
-// Минимакс на глубину 2 (бот -> игрок)
 const minimax = (
   board: BoardType,
   depth: number,
@@ -172,15 +150,12 @@ const minimax = (
   playerColor: 'red' | 'black',
   lastTile: Tile | null
 ): number => {
-  if (depth === 0) {
-    return evaluatePosition(board, botColor, playerColor, lastTile);
-  }
+  if (depth === 0) return evaluatePosition(board, botColor, playerColor, lastTile);
   const currentColor = isBotTurn ? botColor : playerColor;
   const moves = getValidMoves(board, lastTile, currentColor);
   if (moves.length === 0) {
-    // Нет ходов – текущий игрок проигрывает (противник побеждает)
-    if (isBotTurn) return -WIN_SCORE; // бот не может ходить – плохо
-    else return WIN_SCORE; // игрок не может ходить – хорошо для бота
+    if (isBotTurn) return -WIN_SCORE;
+    else return WIN_SCORE;
   }
   if (isBotTurn) {
     let best = -Infinity;
@@ -218,96 +193,71 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   const playerColor: 'red' | 'black' = 'red';
   const botColor: 'red' | 'black' = 'black';
 
-  // Ход бота (минимакс)
   const makeBotMove = useCallback(() => {
-  if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
-  setWaitingBot(true);
-  setTimeout(() => {
-    const moves = getValidMoves(board, lastPickedTile, botColor);
-    if (moves.length === 0) {
-      setWinner(playerColor);
-      setStatus('finished');
-      setGameOver(true);
-      setMessage('🎉 Вы победили (бот заблокирован)!');
-      playWinSound();
-      setWaitingBot(false);
-      return;
-    }
-    let bestMoves: typeof moves = [];
-    let bestScore = -Infinity;
-    for (const move of moves) {
-      const newBoard = board.map(row => [...row]);
-      newBoard[move.row][move.col] = botColor;
-      const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMoves = [move];
-      } else if (Math.abs(score - bestScore) < 0.1) {
-        bestMoves.push(move);
+    if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
+    setWaitingBot(true);
+    setTimeout(() => {
+      const moves = getValidMoves(board, lastPickedTile, botColor);
+      if (moves.length === 0) {
+        setWinner(playerColor);
+        setStatus('finished');
+        setGameOver(true);
+        setMessage('🎉 Вы победили (бот заблокирован)!');
+        playWinSound();
+        setWaitingBot(false);
+        return;
       }
-    }
-    const randomIndex = Math.floor(Math.random() * bestMoves.length);
-    const { row, col, tile } = bestMoves[randomIndex];
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = botColor;
-    setBoard(newBoard);
-    playMoveSound();
+      let bestMoves: typeof moves = [];
+      let bestScore = -Infinity;
+      for (const move of moves) {
+        const newBoard = board.map(row => [...row]);
+        newBoard[move.row][move.col] = botColor;
+        const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMoves = [move];
+        } else if (Math.abs(score - bestScore) < 0.1) {
+          bestMoves.push(move);
+        }
+      }
+      const randomIndex = Math.floor(Math.random() * bestMoves.length);
+      const { row, col, tile } = bestMoves[randomIndex];
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][col] = botColor;
+      setBoard(newBoard);
+      playMoveSound();
 
-    if (checkWin(newBoard, botColor)) {
-      setWinner(botColor);
-      setStatus('finished');
-      setGameOver(true);
-      setMessage('🤖 Бот победил!');
-      playLoseSound();
-      setWaitingBot(false);
-      return;
-    }
+      // Проверка на ничью (заполнена ли доска)
+      const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
+      if (isFull) {
+        setWinner('draw');
+        setStatus('finished');
+        setGameOver(true);
+        setMessage('Ничья!');
+        playDrawSound();
+        setWaitingBot(false);
+        return;
+      }
 
-    // --- НАДЁЖНАЯ ПРОВЕРКА ХОДОВ ИГРОКА ---
-    // Убедимся, что tile не null и имеет нужные поля
-    if (!tile || typeof tile !== 'object') {
-      console.error('Bot move: invalid tile', tile);
-      // Продолжаем игру как обычно
+      if (checkWin(newBoard, botColor)) {
+        setWinner(botColor);
+        setStatus('finished');
+        setGameOver(true);
+        setMessage('🤖 Бот победил!');
+        playLoseSound();
+        setWaitingBot(false);
+        return;
+      }
+
+      // === УДАЛЯЕМ ПРОВЕРКУ НА БЛОКИРОВКУ ИГРОКА ===
+      // Просто передаём ход игроку, даже если бот считает, что у него нет ходов
       setLastPickedTile(tile);
       setCurrentPlayer(playerColor);
       setTurnStartedAt(Date.now());
       setWaitingBot(false);
-      return;
-    }
+    }, 400);
+  }, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor]);
 
-    let hasPlayerMove = false;
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        const cell = newBoard[r][c];
-        if (!cell || typeof cell === 'string') continue;
-        const tileCell = cell as Tile;
-        if (tileCell.plant === tile.plant || tileCell.symbol === tile.symbol) {
-          hasPlayerMove = true;
-          break;
-        }
-      }
-      if (hasPlayerMove) break;
-    }
-
-    if (!hasPlayerMove) {
-      setWinner(botColor);
-      setStatus('finished');
-      setGameOver(true);
-      setMessage('🤖 Бот победил (вы заблокированы)!');
-      playLoseSound();
-      setWaitingBot(false);
-      return;
-    }
-    // ------------------------------------
-
-    setLastPickedTile(tile);
-    setCurrentPlayer(playerColor);
-    setTurnStartedAt(Date.now());
-    setWaitingBot(false);
-  }, 400);
-}, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor, getValidMoves, minimax]);
-
-  // Ход игрока
   const handlePlayerMove = useCallback((row: number, col: number) => {
     if (status !== 'playing' || currentPlayer !== playerColor || gameOver) return;
     const cell = board[row][col];
@@ -344,13 +294,14 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       return;
     }
 
-    const botMoves = getValidMoves(newBoard, pickedTile, botColor);
-    if (botMoves.length === 0) {
-      setWinner(playerColor);
+    // Проверка на ничью
+    const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
+    if (isFull) {
+      setWinner('draw');
       setStatus('finished');
       setGameOver(true);
-      setMessage('🎉 Вы победили (бот заблокирован)!');
-      playWinSound();
+      setMessage('Ничья!');
+      playDrawSound();
       return;
     }
 
@@ -359,7 +310,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     setTurnStartedAt(Date.now());
   }, [board, currentPlayer, lastPickedTile, status, gameOver, playerColor, botColor]);
 
-  // Запуск хода бота
   useEffect(() => {
     if (status === 'playing' && currentPlayer === botColor && !gameOver && !waitingBot) {
       makeBotMove();
@@ -384,7 +334,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     onClose();
   };
 
-  // Подсветка допустимых ходов для игрока
   const validMovesForDisplay = (() => {
     if (currentPlayer !== playerColor || status !== 'playing' || gameOver) return Array(4).fill(null).map(() => Array(4).fill(false));
     const moves = getValidMoves(board, lastPickedTile, playerColor);
