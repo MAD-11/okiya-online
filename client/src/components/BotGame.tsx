@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
-import { initBoard, checkWin } from '../game/gameLogic';
+import { initBoard, checkWin, isValidMove } from '../game/gameLogic';
 import { Tile, Board as BoardType, GameStatus } from '../types/game';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound, initAudio } from '../utils/sound';
 import ConfirmDialog from './ConfirmDialog';
@@ -70,18 +70,7 @@ const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile
     for (let c = 0; c < 4; c++) {
       const cell = board[r][c];
       if (!cell || typeof cell === 'string') continue;
-      let canMove = false;
-      if (!lastTile) {
-        if ((r === 0 || r === 3 || c === 0 || c === 3) && !(r === 1 && c === 1) && !(r === 1 && c === 2) && !(r === 2 && c === 1) && !(r === 2 && c === 2)) {
-          canMove = true;
-        }
-      } else {
-        const tile = cell as Tile;
-        if (tile.plant === lastTile.plant || tile.symbol === lastTile.symbol) {
-          canMove = true;
-        }
-      }
-      if (!canMove) continue;
+      if (!isValidMove(board, r, c, lastTile)) continue;
       const newBoard = board.map(row => [...row]);
       newBoard[r][c] = color;
       if (checkWin(newBoard, color)) return true;
@@ -90,26 +79,15 @@ const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile
   return false;
 };
 
+// Генерация всех допустимых ходов с использованием единой функции isValidMove
 const getValidMoves = (board: BoardType, lastTile: Tile | null, color: 'red' | 'black'): { row: number; col: number; tile: Tile }[] => {
   const moves: { row: number; col: number; tile: Tile }[] = [];
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       const cell = board[r][c];
       if (!cell || typeof cell === 'string') continue;
-      let isValid = false;
-      if (!lastTile) {
-        if ((r === 0 || r === 3 || c === 0 || c === 3) && !(r === 1 && c === 1) && !(r === 1 && c === 2) && !(r === 2 && c === 1) && !(r === 2 && c === 2)) {
-          isValid = true;
-        }
-      } else {
-        const tile = cell as Tile;
-        if (tile.plant === lastTile.plant || tile.symbol === lastTile.symbol) {
-          isValid = true;
-        }
-      }
-      if (isValid) {
-        moves.push({ row: r, col: c, tile: cell as Tile });
-      }
+      if (!isValidMove(board, r, c, lastTile)) continue;
+      moves.push({ row: r, col: c, tile: cell as Tile });
     }
   }
   return moves;
@@ -227,7 +205,16 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       setBoard(newBoard);
       playMoveSound();
 
-      // Проверка на ничью (заполнена ли доска)
+      if (checkWin(newBoard, botColor)) {
+        setWinner(botColor);
+        setStatus('finished');
+        setGameOver(true);
+        setMessage('🤖 Бот победил!');
+        playLoseSound();
+        setWaitingBot(false);
+        return;
+      }
+
       const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
       if (isFull) {
         setWinner('draw');
@@ -239,18 +226,18 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
         return;
       }
 
-      if (checkWin(newBoard, botColor)) {
+      // Проверка, есть ли у игрока ходы (через getValidMoves)
+      const playerMoves = getValidMoves(newBoard, tile, playerColor);
+      if (playerMoves.length === 0) {
         setWinner(botColor);
         setStatus('finished');
         setGameOver(true);
-        setMessage('🤖 Бот победил!');
+        setMessage('🤖 Бот победил (вы заблокированы)!');
         playLoseSound();
         setWaitingBot(false);
         return;
       }
 
-      // === УДАЛЯЕМ ПРОВЕРКУ НА БЛОКИРОВКУ ИГРОКА ===
-      // Просто передаём ход игроку, даже если бот считает, что у него нет ходов
       setLastPickedTile(tile);
       setCurrentPlayer(playerColor);
       setTurnStartedAt(Date.now());
@@ -262,18 +249,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     if (status !== 'playing' || currentPlayer !== playerColor || gameOver) return;
     const cell = board[row][col];
     if (!cell || typeof cell === 'string') return;
-    let isValid = false;
-    if (!lastPickedTile) {
-      if ((row === 0 || row === 3 || col === 0 || col === 3) && !(row === 1 && col === 1) && !(row === 1 && col === 2) && !(row === 2 && col === 1) && !(row === 2 && col === 2)) {
-        isValid = true;
-      }
-    } else {
-      const tile = cell as Tile;
-      if (tile.plant === lastPickedTile.plant || tile.symbol === lastPickedTile.symbol) {
-        isValid = true;
-      }
-    }
-    if (!isValid) {
+    if (!isValidMove(board, row, col, lastPickedTile)) {
       setMessage('❌ Неправильный ход');
       setTimeout(() => setMessage(''), 1000);
       return;
@@ -294,7 +270,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       return;
     }
 
-    // Проверка на ничью
     const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
     if (isFull) {
       setWinner('draw');
