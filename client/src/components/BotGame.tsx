@@ -172,78 +172,120 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   const botColor: 'red' | 'black' = 'black';
 
   const makeBotMove = useCallback(() => {
-    if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
-    setWaitingBot(true);
-    setTimeout(() => {
-      const moves = getValidMoves(board, lastPickedTile, botColor);
-      if (moves.length === 0) {
-        setWinner(playerColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🎉 Вы победили (бот заблокирован)!');
-        playWinSound();
-        setWaitingBot(false);
-        return;
-      }
-      let bestMoves: typeof moves = [];
-      let bestScore = -Infinity;
-      for (const move of moves) {
-        const newBoard = board.map(row => [...row]);
-        newBoard[move.row][move.col] = botColor;
-        const score = minimax(newBoard, 1, false, botColor, playerColor, move.tile);
-        if (score > bestScore) {
-          bestScore = score;
-          bestMoves = [move];
-        } else if (Math.abs(score - bestScore) < 0.1) {
-          bestMoves.push(move);
+  if (status !== 'playing' || currentPlayer !== botColor || gameOver) return;
+  setWaitingBot(true);
+  
+  setTimeout(() => {
+    // === 1. Найти все допустимые ходы для бота (ручной перебор) ===
+    const botMoves: { row: number; col: number; tile: Tile }[] = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const cell = board[r][c];
+        if (!cell || typeof cell === 'string') continue;
+        if (isValidMove(board, r, c, lastPickedTile)) {
+          botMoves.push({ row: r, col: c, tile: cell as Tile });
         }
       }
-      const randomIndex = Math.floor(Math.random() * bestMoves.length);
-      const { row, col, tile } = bestMoves[randomIndex];
-      const newBoard = board.map(r => [...r]);
-      newBoard[row][col] = botColor;
-      setBoard(newBoard);
-      playMoveSound();
+    }
 
-      if (checkWin(newBoard, botColor)) {
-        setWinner(botColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🤖 Бот победил!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
-      }
-
-      const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
-      if (isFull) {
-        setWinner('draw');
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('Ничья!');
-        playDrawSound();
-        setWaitingBot(false);
-        return;
-      }
-
-      // Проверка, есть ли у игрока ходы (через getValidMoves)
-      const playerMoves = getValidMoves(newBoard, tile, playerColor);
-      if (playerMoves.length === 0) {
-        setWinner(botColor);
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('🤖 Бот победил (вы заблокированы)!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
-      }
-
-      setLastPickedTile(tile);
-      setCurrentPlayer(playerColor);
-      setTurnStartedAt(Date.now());
+    // === 2. Если у бота нет ходов – победа игрока ===
+    if (botMoves.length === 0) {
+      setWinner(playerColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🎉 Вы победили (бот заблокирован)!');
+      playWinSound();
       setWaitingBot(false);
-    }, 400);
-  }, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor]);
+      return;
+    }
+
+    // === 3. Выбрать лучший ход через минимакс ===
+    let bestMoves: typeof botMoves = [];
+    let bestScore = -Infinity;
+    for (const move of botMoves) {
+      const testBoard = board.map(r => [...r]);
+      testBoard[move.row][move.col] = botColor;
+      const score = minimax(testBoard, 1, false, botColor, playerColor, move.tile);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMoves = [move];
+      } else if (Math.abs(score - bestScore) < 0.1) {
+        bestMoves.push(move);
+      }
+    }
+
+    // === 4. Случайный выбор среди лучших ===
+    const randomIndex = Math.floor(Math.random() * bestMoves.length);
+    const { row, col, tile } = bestMoves[randomIndex];
+
+    // === 5. Применить ход бота ===
+    const newBoard = board.map(r => [...r]);
+    newBoard[row][col] = botColor;
+    setBoard(newBoard);
+    playMoveSound();
+
+    // === 6. Проверка победы бота по линии/квадрату ===
+    if (checkWin(newBoard, botColor)) {
+      setWinner(botColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🤖 Бот победил!');
+      playLoseSound();
+      setWaitingBot(false);
+      return;
+    }
+
+    // === 7. Проверка ничьей (доска заполнена) ===
+    const isFull = newBoard.every(row => row.every(cell => typeof cell === 'string'));
+    if (isFull) {
+      setWinner('draw');
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('Ничья!');
+      playDrawSound();
+      setWaitingBot(false);
+      return;
+    }
+
+    // === 8. Проверка, есть ли ходы у игрока (ручной перебор) ===
+    let hasPlayerMove = false;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (isValidMove(newBoard, r, c, tile)) {
+          hasPlayerMove = true;
+          break;
+        }
+      }
+      if (hasPlayerMove) break;
+    }
+
+    // === 9. Если у игрока нет ходов – победа бота ===
+    if (!hasPlayerMove) {
+      // Отладка: если баг повторится – увидите в консоли точные данные
+      console.warn('[BotGame] Player is declared blocked. Debug info:');
+      console.warn('lastPickedTile:', tile);
+      console.warn('Board:', newBoard.map(row => row.map(cell => {
+        if (!cell) return 'empty';
+        if (typeof cell === 'string') return cell;
+        return `${cell.plant}/${cell.symbol}`;
+      })));
+      
+      setWinner(botColor);
+      setStatus('finished');
+      setGameOver(true);
+      setMessage('🤖 Бот победил (вы заблокированы)!');
+      playLoseSound();
+      setWaitingBot(false);
+      return;
+    }
+
+    // === 10. Передать ход игроку ===
+    setLastPickedTile(tile);
+    setCurrentPlayer(playerColor);
+    setTurnStartedAt(Date.now());
+    setWaitingBot(false);
+  }, 400);
+}, [board, currentPlayer, lastPickedTile, status, gameOver, botColor, playerColor]);
 
   const handlePlayerMove = useCallback((row: number, col: number) => {
     if (status !== 'playing' || currentPlayer !== playerColor || gameOver) return;
