@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Board from './Board';
 import Timer from './Timer';
 import LastPickedTile from './LastPickedTile';
@@ -158,7 +158,13 @@ const minimax = (
 
 const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   const [board, setBoard] = useState<BoardType>(() => initBoard());
-  const [lastPickedTile, setLastPickedTile] = useState<Tile | null>(null);
+const [lastPickedTile, setLastPickedTile] = useState<Tile | null>(null);
+const lastPickedTileRef = useRef<Tile | null>(null);
+
+const updateLastPickedTile = (tile: Tile | null) => {
+  lastPickedTileRef.current = tile;
+  setLastPickedTile(tile);
+};
   const [currentPlayer, setCurrentPlayer] = useState<'red' | 'black'>('red');
   const [status, setStatus] = useState<GameStatus>('playing');
   const [winner, setWinner] = useState<'red' | 'black' | 'draw' | null>(null);
@@ -280,7 +286,11 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     }
 
     // === 10. Передать ход игроку ===
+    console.log('[BOT] tile from bestMoves:', tile);
+    console.log('[BOT] lastPickedTile before set:', lastPickedTile);
     setLastPickedTile(tile);
+    console.log('[BOT] setLastPickedTile called with:', tile);
+
     setCurrentPlayer(playerColor);
     setTurnStartedAt(Date.now());
     setWaitingBot(false);
@@ -322,6 +332,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       return;
     }
 
+    console.log('[PLAYER] pickedTile:', pickedTile);
     setLastPickedTile(pickedTile);
     setCurrentPlayer(botColor);
     setTurnStartedAt(Date.now());
@@ -381,6 +392,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
             guestSkin="sakura"
             shake={false}
           />
+          console.log('[RENDER] lastPickedTile value:', lastPickedTile);
           <LastPickedTile tile={lastPickedTile} />
         </div>
         <div style={styles.infoPanel}>
