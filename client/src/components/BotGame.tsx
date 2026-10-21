@@ -9,9 +9,9 @@ import ConfirmDialog from './ConfirmDialog';
 
 interface BotGameProps {
   onClose: () => void;
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// Константы весов эвристики
 const WIN_SCORE = 100000;
 const BLOCK_WIN_SCORE = 90000;
 const CREATE_THREE_SCORE = 1000;
@@ -20,6 +20,12 @@ const CREATE_TWO_SCORE = 40;
 const BLOCK_TWO_SCORE = 30;
 const CENTER_BONUS = 8;
 const FLEXIBILITY_BONUS = 2;
+
+const difficultyLabel: Record<'easy' | 'medium' | 'hard', string> = {
+  easy: '🟢 Лёгкий',
+  medium: '🟡 Средний',
+  hard: '🔴 Сложный',
+};
 
 const countLines = (board: BoardType, color: 'red' | 'black', count: number): number => {
   let result = 0;
@@ -77,7 +83,7 @@ const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile
   return false;
 };
 
-const getValidMoves = (board: BoardType, lastTile: Tile | null): { row: number; col: number; tile: Tile }[] => {
+const getValidMoves = (board: BoardType, lastTile: Tile | null) => {
   const moves: { row: number; col: number; tile: Tile }[] = [];
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
@@ -140,7 +146,7 @@ const minimax = (
   }
 };
 
-const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
+const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
   const [board, setBoard] = useState<BoardType>(() => initBoard());
   const [lastPickedTile, setLastPickedTile] = useState<Tile | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<'red' | 'black'>('red');
@@ -160,7 +166,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { lastPickedTileRef.current = lastPickedTile; }, [lastPickedTile]);
 
-  // ---- Ход бота ----
   useEffect(() => {
     if (currentPlayer !== botColor || status !== 'playing' || gameOver) return;
 
@@ -168,8 +173,6 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
     const timer = setTimeout(() => {
       const currentBoard = boardRef.current;
       const currentLastTile = lastPickedTileRef.current;
-
-      console.log('[BOT] Using board from ref, lastTile:', currentLastTile);
 
       const moves = getValidMoves(currentBoard, currentLastTile);
       if (moves.length === 0) {
@@ -181,21 +184,31 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
         return;
       }
 
-      let bestMoves: typeof moves = [];
-      let bestScore = -Infinity;
-      for (const move of moves) {
-        const testBoard = currentBoard.map(r => [...r]);
-        testBoard[move.row][move.col] = botColor;
-        const score = minimax(testBoard, 1, false, botColor, playerColor, move.tile);
-        if (score > bestScore) {
-          bestScore = score;
-          bestMoves = [move];
-        } else if (Math.abs(score - bestScore) < 0.1) {
-          bestMoves.push(move);
+      let chosenMove: { row: number; col: number; tile: Tile };
+
+      if (difficulty === 'easy') {
+        chosenMove = moves[Math.floor(Math.random() * moves.length)];
+      } else {
+        const depth = difficulty === 'hard' ? 1 : 0;
+        let bestMoves = [moves[0]];
+        let bestScore = -Infinity;
+        for (const move of moves) {
+          const testBoard = currentBoard.map(r => [...r]);
+          testBoard[move.row][move.col] = botColor;
+          const score = depth === 0
+            ? evaluatePosition(testBoard, botColor, playerColor, move.tile)
+            : minimax(testBoard, depth, false, botColor, playerColor, move.tile);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMoves = [move];
+          } else if (Math.abs(score - bestScore) < 0.1) {
+            bestMoves.push(move);
+          }
         }
+        chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
       }
 
-      const { row, col, tile } = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+      const { row, col, tile } = chosenMove;
       const newBoard = currentBoard.map(r => [...r]);
       newBoard[row][col] = botColor;
 
@@ -222,25 +235,15 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
         return;
       }
 
-      // Проверка блокировки игрока – ручной перебор
       let hasPlayerMove = false;
       for (let r = 0; r < 4; r++) {
         for (let c = 0; c < 4; c++) {
-          if (isValidMove(newBoard, r, c, tile)) {
-            hasPlayerMove = true;
-            break;
-          }
+          if (isValidMove(newBoard, r, c, tile)) { hasPlayerMove = true; break; }
         }
         if (hasPlayerMove) break;
       }
 
       if (!hasPlayerMove) {
-        console.warn('[BOT] Player blocked. lastTile:', tile);
-        console.warn('[BOT] Board:', newBoard.map(row => row.map(cell => {
-          if (!cell) return 'null';
-          if (typeof cell === 'string') return cell;
-          return `${cell.plant}/${cell.symbol}`;
-        })));
         setStatus('finished');
         setGameOver(true);
         setMessage('🤖 Бот победил (вы заблокированы)!');
@@ -258,9 +261,8 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
       clearTimeout(timer);
       setWaitingBot(false);
     };
-  }, [currentPlayer, status, gameOver, botColor, playerColor]);
+  }, [currentPlayer, status, gameOver, botColor, playerColor, difficulty]);
 
-  // ---- Ход игрока ----
   const handlePlayerMove = useCallback((row: number, col: number) => {
     if (status !== 'playing' || currentPlayer !== playerColor || gameOver) return;
     const cell = board[row][col];
@@ -310,10 +312,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   };
 
   const handleExit = () => setConfirmExitOpen(true);
-  const confirmExit = () => {
-    setConfirmExitOpen(false);
-    onClose();
-  };
+  const confirmExit = () => { setConfirmExitOpen(false); onClose(); };
 
   const validMovesForDisplay = (() => {
     if (currentPlayer !== playerColor || status !== 'playing' || gameOver) {
@@ -328,7 +327,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h2 style={styles.title}>🤖 Игра с ботом</h2>
+        <h2 style={styles.title}>🤖 Игра с ботом — {difficultyLabel[difficulty]}</h2>
         <button onClick={handleExit} style={styles.closeBtn}>✕</button>
       </header>
       <div style={styles.statusBar}>
@@ -383,102 +382,21 @@ const BotGame: React.FC<BotGameProps> = ({ onClose }) => {
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'var(--bg)',
-    zIndex: 2000,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'auto',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 24px',
-    backgroundColor: 'var(--card-bg)',
-    borderBottom: '1px solid var(--border)',
-  },
-  title: {
-    margin: 0,
-    fontSize: '24px',
-    color: 'var(--text)',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '24px',
-    cursor: 'pointer',
-    color: 'var(--secondary-text)',
-  },
-  statusBar: {
-    textAlign: 'center',
-    padding: '8px',
-    backgroundColor: 'var(--card-bg)',
-    borderBottom: '1px solid var(--border)',
-  },
-  gameArea: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-    gap: '20px',
-  },
-  boardWrapper: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  infoPanel: {
-    textAlign: 'center',
-  },
-  turnInfo: {
-    marginBottom: '16px',
-  },
-  gameOverPanel: {
-    marginBottom: '16px',
-  },
-  message: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '12px',
-    color: 'var(--text)',
-  },
-  playAgainBtn: {
-    padding: '8px 20px',
-    borderRadius: '30px',
-    border: 'none',
-    background: '#4a6741',
-    color: 'white',
-    cursor: 'pointer',
-  },
-  buttons: {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'center',
-  },
-  resetBtn: {
-    padding: '8px 20px',
-    borderRadius: '30px',
-    border: '1px solid var(--border)',
-    background: 'transparent',
-    color: 'var(--text)',
-    cursor: 'pointer',
-  },
-  exitBtn: {
-    padding: '8px 20px',
-    borderRadius: '30px',
-    border: 'none',
-    background: 'var(--btn-bg)',
-    color: 'var(--btn-text)',
-    cursor: 'pointer',
-  },
+  container: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'var(--bg)', zIndex: 2000, display: 'flex', flexDirection: 'column', overflow: 'auto' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border)' },
+  title: { margin: 0, fontSize: '20px', color: 'var(--text)' },
+  closeBtn: { background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--secondary-text)' },
+  statusBar: { textAlign: 'center', padding: '8px', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border)' },
+  gameArea: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', gap: '20px' },
+  boardWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  infoPanel: { textAlign: 'center' },
+  turnInfo: { marginBottom: '16px' },
+  gameOverPanel: { marginBottom: '16px' },
+  message: { fontSize: '18px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text)' },
+  playAgainBtn: { padding: '8px 20px', borderRadius: '30px', border: 'none', background: '#4a6741', color: 'white', cursor: 'pointer' },
+  buttons: { display: 'flex', gap: '12px', justifyContent: 'center' },
+  resetBtn: { padding: '8px 20px', borderRadius: '30px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' },
+  exitBtn: { padding: '8px 20px', borderRadius: '30px', border: 'none', background: 'var(--btn-bg)', color: 'var(--btn-text)', cursor: 'pointer' },
 };
 
 export default BotGame;

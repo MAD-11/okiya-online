@@ -57,16 +57,39 @@ const Game: React.FC = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showBotGame, setShowBotGame] = useState(false);
+  const [botDifficulty, setBotDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
 
   useEffect(() => {
     console.log('showTutorial changed:', showTutorial);
   }, [showTutorial]);
 
   useEffect(() => {
+    if (gameState && gameState.status === 'playing' && gameState.myColor) {
+      document.title = gameState.currentPlayer === gameState.myColor
+        ? '☀️ Ваш ход — Окийя'
+        : '🌙 Ход соперника — Окийя';
+    } else {
+      document.title = 'Окийя — онлайн';
+    }
+    return () => { document.title = 'Окийя — онлайн'; };
+  }, [gameState?.currentPlayer, gameState?.myColor, gameState?.status]);
+
+  useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomFromUrl = params.get('room');
+    if (roomFromUrl && roomFromUrl.length === 4) {
+      setJoinCode(roomFromUrl.toUpperCase());
+      setShowJoinModal(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
 
   useEffect(() => {
     if (showJoinModal && joinInputRef.current) {
@@ -109,8 +132,9 @@ const Game: React.FC = () => {
 
   const copyRoomCode = () => {
     if (roomId) {
-      navigator.clipboard.writeText(roomId);
-      setMessage('Код комнаты скопирован!');
+      const url = `${window.location.origin}?room=${roomId}`;
+      navigator.clipboard.writeText(url);
+      setMessage('Ссылка на комнату скопирована!');
       setTimeout(() => setMessage(''), 2000);
     }
   };
@@ -350,7 +374,27 @@ const Game: React.FC = () => {
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
-            <button onClick={() => setShowBotGame(true)} style={styles.primaryBtn}>🤖 Игра с ботом</button>
+            <p style={{ fontSize: 12, color: 'var(--secondary-text)', marginBottom: '4px' }}>🤖 Бот:</p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                onClick={() => { setBotDifficulty('easy'); setShowBotGame(true); }}
+                style={{ ...styles.primaryBtn, backgroundColor: '#4a6741', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+              >
+                🟢 Лёгкий
+              </button>
+              <button
+                onClick={() => { setBotDifficulty('medium'); setShowBotGame(true); }}
+                style={{ ...styles.primaryBtn, backgroundColor: '#d4a373', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+              >
+                🟡 Средний
+              </button>
+              <button
+                onClick={() => { setBotDifficulty('hard'); setShowBotGame(true); }}
+                style={{ ...styles.primaryBtn, backgroundColor: '#c0392b', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+              >
+                🔴 Сложный
+              </button>
+            </div>
           </div>
           <div style={styles.privateToggle}>
             <label style={styles.checkboxLabel}>
@@ -659,7 +703,7 @@ const Game: React.FC = () => {
     <>
       {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
-      {showBotGame && <BotGame onClose={() => setShowBotGame(false)} />}
+      {showBotGame && <BotGame difficulty={botDifficulty} onClose={() => setShowBotGame(false)} />}
     </>
   );
 };

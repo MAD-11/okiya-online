@@ -1,11 +1,11 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
-import { setupSocket, clearAllDisconnectTimers } from './socket/handler';
 import { pubClient, subClient, loadAllGames, closeRedisConnections } from './redis';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { logger } from './logger';
 import rateLimit from 'express-rate-limit';
+import { setupSocket, clearAllDisconnectTimers, getActiveGamesCount } from './socket/handler';
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +15,19 @@ const limiter = rateLimit({
   max: 100,
 });
 app.use(limiter);
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    timestamp: Date.now(),
+    activeGames: getActiveGamesCount(),
+    memory: {
+      rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB',
+      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+    },
+  });
+});
 
 const allowedOrigin = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
 

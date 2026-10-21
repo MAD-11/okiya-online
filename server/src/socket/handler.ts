@@ -8,6 +8,10 @@ import { Mutex } from 'async-mutex';
 import { z } from 'zod';
 import { initBoard } from '../game/Board';
 
+export function getActiveGamesCount(): number {
+  return games ? games.size : 0;
+}
+
 // Санитизация и валидация
 function sanitize(str: string): string {
   return str.replace(/[<>]/g, '').slice(0, 200);

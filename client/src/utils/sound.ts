@@ -1,5 +1,16 @@
 let audioCtx: AudioContext | null = null;
 
+const SOUND_KEY = 'okiya_soundEnabled';
+
+export function getSoundEnabled(): boolean {
+  const stored = localStorage.getItem(SOUND_KEY);
+  return stored === null ? true : stored === 'true';
+}
+
+export function setSoundEnabled(enabled: boolean): void {
+  localStorage.setItem(SOUND_KEY, String(enabled));
+}
+
 function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new AudioContext();
@@ -8,6 +19,7 @@ function getAudioContext() {
 }
 
 export function initAudio() {
+  if (!getSoundEnabled()) return;
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') {
     ctx.resume().catch(e => console.warn('AudioContext resume failed', e));
@@ -15,6 +27,7 @@ export function initAudio() {
 }
 
 function playTone(frequency: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.3) {
+  if (!getSoundEnabled()) return;
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') ctx.resume();
   try {

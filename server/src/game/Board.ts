@@ -43,7 +43,14 @@ export function isValidMove(
 ): boolean {
   const cell = board[row][col];
   if (!cell || typeof cell === 'string') return false;
-  if (!lastPickedTile) return true; // первый ход без проверки совпадения
+
+  if (!lastPickedTile) {
+    // Первый ход: только крайние строки/столбцы, кроме центрального квадрата 2×2
+    const isEdge = row === 0 || row === 3 || col === 0 || col === 3;
+    const isCenter = (row === 1 || row === 2) && (col === 1 || col === 2);
+    return isEdge && !isCenter;
+  }
+
   const tile = cell as Tile;
   return tile.plant === lastPickedTile.plant || tile.symbol === lastPickedTile.symbol;
 }

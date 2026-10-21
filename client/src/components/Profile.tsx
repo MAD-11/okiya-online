@@ -13,6 +13,7 @@ interface Stats {
   games: number;
   wins: number;
   draws: number;
+  rating: number;
   history: GameResult[];
 }
 
@@ -24,28 +25,22 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
     if (socket && playerId) {
       setLoading(true);
       socket.emit('get_profile', playerId, (data: Stats) => {
-        setStats(data || { games: 0, wins: 0, draws: 0, history: [] });
+        setStats(data || { games: 0, wins: 0, draws: 0, rating: 1000, history: [] });
         setLoading(false);
       });
     } else {
-      setStats({ games: 0, wins: 0, draws: 0, history: [] });
+      setStats({ games: 0, wins: 0, draws: 0, rating: 1000, history: [] });
       setLoading(false);
     }
   }, [socket, playerId]);
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (timestamp: number) =>
+    new Date(timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   const getResultText = (game: GameResult, isHost: boolean) => {
     if (game.winner === 'draw') return { text: 'Ничья', emoji: '🤝', color: 'var(--secondary-text)' };
     const isWin = (game.winner === 'host' && isHost) || (game.winner === 'guest' && !isHost);
-    return isWin 
+    return isWin
       ? { text: 'Победа', emoji: '🏆', color: '#27ae60' }
       : { text: 'Поражение', emoji: '💔', color: '#c0392b' };
   };
@@ -53,11 +48,16 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
   return (
     <div style={styles.container}>
       <h3 style={styles.title}>📊 Профиль</h3>
-      
+
       {loading ? (
         <p style={{ color: 'var(--secondary-text)', textAlign: 'center' }}>Загрузка...</p>
       ) : stats ? (
         <>
+          <div style={styles.ratingBadge}>
+            <span style={styles.ratingLabel}>Рейтинг ELO</span>
+            <span style={styles.ratingValue}>{stats.rating}</span>
+          </div>
+
           <div style={styles.statsGrid}>
             <div style={styles.statCard}>
               <div style={styles.statValue}>{stats.games}</div>
@@ -92,9 +92,6 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
                         </div>
                       </div>
                       <div style={styles.historyRight}>
-                        <span style={styles.historyScore}>
-                          {game.winner !== 'draw' ? `${game.maxWins === 1 ? '1' : `до ${Math.ceil(game.maxWins / 2)}`} победа` : ''}
-                        </span>
                         <span style={styles.historyDate}>{formatDate(game.timestamp)}</span>
                       </div>
                     </div>
@@ -114,127 +111,28 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    padding: '24px',
-    background: 'var(--modal-bg)',
-    color: 'var(--text)',
-    fontFamily: '"Inter", sans-serif',
-    borderRadius: '24px',
-    maxHeight: '80vh',
-    overflowY: 'auto',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: 500,
-    margin: '0 0 20px',
-    color: 'var(--text)',
-    fontFamily: '"Cormorant Garamond", serif',
-    textAlign: 'center',
-  },
-  statsGrid: {
-    display: 'flex',
-    justifyContent: 'space-around',
-    marginBottom: '24px',
-    gap: '16px',
-  },
-  statCard: {
-    textAlign: 'center',
-    flex: 1,
-    background: 'var(--card-bg)',
-    borderRadius: '16px',
-    padding: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-  },
-  statValue: {
-    fontSize: '32px',
-    fontWeight: 700,
-    color: 'var(--text)',
-  },
-  statLabel: {
-    fontSize: '12px',
-    color: 'var(--secondary-text)',
-    marginTop: '4px',
-  },
-  historySection: {
-    marginTop: '20px',
-    borderTop: '1px solid var(--border)',
-    paddingTop: '16px',
-  },
-  historyTitle: {
-    fontSize: '16px',
-    fontWeight: 500,
-    marginBottom: '12px',
-    color: 'var(--text)',
-  },
-  historyList: {
-    maxHeight: '300px',
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  historyItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 12px',
-    borderRadius: '12px',
-    background: 'var(--card-bg)',
-    border: '1px solid var(--border)',
-    fontSize: '13px',
-  },
-  historyLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-  },
-  historyEmoji: {
-    fontSize: '20px',
-  },
-  historyInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  historyResult: {
-    fontWeight: 600,
-  },
-  historyOpponent: {
-    fontSize: '11px',
-    color: 'var(--secondary-text)',
-  },
-  historyRight: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: '2px',
-  },
-  historyScore: {
-    fontSize: '11px',
-    color: 'var(--secondary-text)',
-  },
-  historyDate: {
-    fontSize: '10px',
-    color: 'var(--secondary-text)',
-  },
-  noHistory: {
-    textAlign: 'center',
-    color: 'var(--secondary-text)',
-    padding: '20px',
-    fontStyle: 'italic',
-  },
-  closeBtn: {
-    display: 'block',
-    margin: '24px auto 0',
-    background: 'var(--btn-bg)',
-    border: 'none',
-    borderRadius: '30px',
-    padding: '10px 32px',
-    color: 'var(--btn-text)',
-    fontWeight: 500,
-    cursor: 'pointer',
-    fontSize: '14px',
-    transition: 'background-color 0.2s',
-  },
+  container: { padding: '24px', background: 'var(--modal-bg)', color: 'var(--text)', fontFamily: '"Inter", sans-serif', borderRadius: '24px', maxHeight: '80vh', overflowY: 'auto' },
+  title: { fontSize: '24px', fontWeight: 500, margin: '0 0 20px', color: 'var(--text)', fontFamily: '"Cormorant Garamond", serif', textAlign: 'center' },
+  ratingBadge: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', marginBottom: '20px', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border)' },
+  ratingLabel: { fontSize: '14px', color: 'var(--secondary-text)', fontWeight: 500 },
+  ratingValue: { fontSize: '28px', fontWeight: 700, color: '#d4a373' },
+  statsGrid: { display: 'flex', justifyContent: 'space-around', marginBottom: '24px', gap: '12px' },
+  statCard: { textAlign: 'center', flex: 1, background: 'var(--card-bg)', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+  statValue: { fontSize: '28px', fontWeight: 700, color: 'var(--text)' },
+  statLabel: { fontSize: '12px', color: 'var(--secondary-text)', marginTop: '4px' },
+  historySection: { marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' },
+  historyTitle: { fontSize: '16px', fontWeight: 500, marginBottom: '12px', color: 'var(--text)' },
+  historyList: { maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
+  historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: 'var(--card-bg)', border: '1px solid var(--border)', fontSize: '13px' },
+  historyLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
+  historyEmoji: { fontSize: '20px' },
+  historyInfo: { display: 'flex', flexDirection: 'column' },
+  historyResult: { fontWeight: 600 },
+  historyOpponent: { fontSize: '11px', color: 'var(--secondary-text)' },
+  historyRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
+  historyDate: { fontSize: '10px', color: 'var(--secondary-text)' },
+  noHistory: { textAlign: 'center', color: 'var(--secondary-text)', padding: '20px', fontStyle: 'italic' },
+  closeBtn: { display: 'block', margin: '24px auto 0', background: 'var(--btn-bg)', border: 'none', borderRadius: '30px', padding: '10px 32px', color: 'var(--btn-text)', fontWeight: 500, cursor: 'pointer', fontSize: '14px' },
 };
 
 export default Profile;
