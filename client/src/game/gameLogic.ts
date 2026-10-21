@@ -43,25 +43,25 @@ export function isValidMove(
 ): boolean {
   const cell = board[row][col];
   if (!cell || typeof cell === 'string') return false;
-  if (!lastPickedTile) return true;
+  if (!lastPickedTile) {
+    // Первый ход: только с края, не из центрального квадрата 2×2
+    if (!(row === 0 || row === 3 || col === 0 || col === 3)) return false;
+    if ((row === 1 || row === 2) && (col === 1 || col === 2)) return false;
+    return true;
+  }
   const tile = cell as Tile;
   return tile.plant === lastPickedTile.plant || tile.symbol === lastPickedTile.symbol;
 }
 
 export function checkWin(board: Board, player: 'red' | 'black'): boolean {
-  // 4 в ряд горизонтально
   for (let i = 0; i < 4; i++) {
     if (board[i].every(cell => cell === player)) return true;
   }
-  // 4 в ряд вертикально
   for (let i = 0; i < 4; i++) {
     if (board.every(row => row[i] === player)) return true;
   }
-  // главная диагональ
   if (board.every((row, idx) => row[idx] === player)) return true;
-  // побочная диагональ
   if (board.every((row, idx) => row[3 - idx] === player)) return true;
-  // квадрат 2x2
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       if (
