@@ -8,8 +8,49 @@ import { Mutex } from 'async-mutex';
 import { z } from 'zod';
 import { initBoard } from '../game/Board';
 
+// ============================================================
+// RATE LIMITING
+// ============================================================
+const moveRateLimits = new Map<string, number[]>();   // socketId -> timestamps
+const chatRateLimits = new Map<string, number[]>();   // socketId -> timestamps
+
+const MOVE_LIMIT_MS = 1000;                           // 1 ход в секунду
+const CHAT_LIMIT_COUNT = 5;                           // 5 сообщений...
+const CHAT_LIMIT_WINDOW_MS = 10_000;                  // ...за 10 секунд
+
+function checkMoveRate(socketId: string): boolean {
+  const now = Date.now();
+  const ts = moveRateLimits.get(socketId) || [];
+  const recent = ts.filter(t => now - t < MOVE_LIMIT_MS);
+  if (recent.length > 0) return false;
+  recent.push(now);
+  moveRateLimits.set(socketId, recent);
+  return true;
+}
+
+function checkChatRate(socketId: string): boolean {
+  const now = Date.now();
+  const ts = chatRateLimits.get(socketId) || [];
+  const recent = ts.filter(t => now - t < CHAT_LIMIT_WINDOW_MS);
+  if (recent.length >= CHAT_LIMIT_COUNT) return false;
+  recent.push(now);
+  chatRateLimits.set(socketId, recent);
+  return true;
+}
+
+function cleanupRateLimits(socketId: string) {
+  moveRateLimits.delete(socketId);
+  chatRateLimits.delete(socketId);
+}
+// ============================================================
+
+
 export function getActiveGamesCount(): number {
   return games ? games.size : 0;
+}
+
+export function getAllActiveGames(): Map<string, Game> {
+  return games || new Map();
 }
 
 // Санитизация и валидация
@@ -323,6 +364,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Ход с мьютексом
     socket.on('move', async (roomId: string, row: number, col: number, callback) => {
+      if (!checkMoveRate(socket.id)) {
+        logger.warn(`Rate limit: move from ${socket.id}`);
+        return callback({ error: 'Слишком быстро. Подождите секунду.' });
+      }
       const validation = MoveSchema.safeParse({ roomId, row, col });
       if (!validation.success) {
         return callback({ error: 'Недопустимые координаты' });
@@ -497,6 +542,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
     // Отключение (автоматическое)
     socket.on('disconnect', () => {
       logger.info(`User disconnected: ${socket.id}`);
+      cleanupRateLimits(socket.id);
       for (const [roomId, game] of games.entries()) {
         if (game.players.red === socket.id || game.players.black === socket.id) {
           sendPersonalGameState(io, game);
@@ -534,6 +580,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
 
     // Отправка сообщения в чат
     socket.on('chat_message', (roomId: string, text: string) => {
+      if (!checkChatRate(socket.id)) {
+        logger.warn(`Rate limit: chat from ${socket.id}`);
+        return;
+      }
       let sanitizedText = sanitize(text).slice(0, 200);
       if (!sanitizedText) return;
       const game = games.get(roomId);

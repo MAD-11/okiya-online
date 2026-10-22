@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Окийя — нет соединения</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0f0f14;
+    background-image:
+      radial-gradient(ellipse at top left, rgba(232,165,192,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(126,232,199,0.06) 0%, transparent 50%);
+    color: #e8e8f0;
+    padding: 20px;
+    text-align: center;
+  }
+  .container {
+    max-width: 420px;
+    background: rgba(30, 30, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 48px 32px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .emoji {
+    font-size: 64px;
+    margin-bottom: 24px;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 200;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #e8a5c0, #7ee8c7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #7a7a90;
+    margin-bottom: 32px;
+  }
+  button {
+    padding: 14px 32px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #e8a5c0, #b57edc);
+    color: #1a1a24;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(232, 165, 192, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(232, 165, 192, 0.4);
+  }
+  .status {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #7a7a90;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .status::before {
+    content: '●';
+    color: #e74c3c;
+    margin-right: 6px;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <span class="emoji">🌙</span>
+    <h1>НЕТ СЕТИ</h1>
+    <p>Похоже, соединение с интернетом потеряно. Проверьте подключение и попробуйте снова.</p>
+    <button onclick="location.reload()">Попробовать снова</button>
+    <div class="status">Ожидание соединения</div>
+  </div>
+  <script>
+    window.addEventListener('online', () => location.reload());
+  </script>
+</body>
+</html>

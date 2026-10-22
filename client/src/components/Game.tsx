@@ -31,7 +31,7 @@ function getSavedNick(): string | null {
 }
 
 const Game: React.FC = () => {
-  const { socket, connected } = useSocket(SERVER_URL);
+  const { socket, connected, isOnline } = useSocket(SERVER_URL);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -356,7 +356,19 @@ const Game: React.FC = () => {
 
   let content = null;
 
-  if (!connected) {
+  if (!isOnline) {
+    content = (
+      <div style={styles.centered}>
+        <span style={{ fontSize: '64px', marginBottom: '20px' }}>🌙</span>
+        <h2 style={{ fontSize: '24px', fontWeight: 300, letterSpacing: '4px', marginBottom: '12px' }}>
+          НЕТ СЕТИ
+        </h2>
+        <p style={{ color: 'var(--secondary-text)', fontSize: '14px', maxWidth: '340px', textAlign: 'center' }}>
+          Проверьте подключение к интернету. Мы переподключимся автоматически.
+        </p>
+      </div>
+    );
+  } else if (!connected) {
     content = (
       <div style={styles.centered}>
         <div className="spinner"></div>
@@ -722,6 +734,12 @@ const Game: React.FC = () => {
 
   return (
     <>
+      {!isOnline && (
+        <div style={styles.offlineBanner}>
+          <span style={{ fontSize: '16px', marginRight: '8px' }}>📡</span>
+          Нет подключения — игра приостановлена
+        </div>
+      )}
       {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
       {showBotGame && <BotGame difficulty={botDifficulty} onClose={() => setShowBotGame(false)} />}
@@ -1315,6 +1333,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
     flex: 1,
+  },
+  offlineBanner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    padding: '10px 16px',
+    background: 'linear-gradient(90deg, rgba(231,76,60,0.9), rgba(232,165,192,0.9))',
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: '13px',
+    fontWeight: 600,
+    letterSpacing: '1px',
+    zIndex: 5000,
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
   },
 };
 

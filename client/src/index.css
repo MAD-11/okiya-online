@@ -173,3 +173,13 @@ button.link-btn:not(:disabled):hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
+
+/* === Стили для offline.html (используется и в index.html если подключить) === */
+.offline-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
