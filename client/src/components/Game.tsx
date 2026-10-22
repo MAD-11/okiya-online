@@ -439,9 +439,9 @@ const Game: React.FC = () => {
           <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>Войти по коду</button>
           <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>Открытые комнаты</button>
           <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
-            <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
-            <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
-            <button onClick={() => setShowRules(true)} style={styles.textBtn} title="Правила игры">📖 Правила</button>
+            <button onClick={() => setShowProfile(true)} className="link-btn" style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
+            <button onClick={() => setShowSettings(true)} className="link-btn" style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
+            <button onClick={() => setShowRules(true)} className="link-btn" style={styles.textBtn} title="Правила игры">📖 Правила</button>
           </div>
           {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>

@@ -129,15 +129,25 @@ button[title]:hover {
   transform: translateY(-1px);
 }
 
-/* === Hover для всех кнопок (п.4) === */
-button {
-  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+/* === Hover для всех кнопок === */
+button:not(:disabled) {
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
-button:hover:not(:disabled) {
-  filter: brightness(1.1);
+button:not(:disabled):hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(232, 165, 192, 0.25);
 }
-button:active:not(:disabled) {
-  transform: scale(0.97);
+button:not(:disabled):active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Кнопки-ссылки (Профиль, Настройки, Правила) — подсветка цветом */
+button.link-btn:not(:disabled):hover {
+  color: var(--accent) !important;
+  filter: none;
+  transform: none;
+  box-shadow: none;
 }
 
 /* === Доска в игре с ботом (п.5) === */

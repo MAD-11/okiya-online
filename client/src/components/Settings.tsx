@@ -45,7 +45,6 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 background: themeMode === m.value ? 'var(--btn-bg)' : 'transparent',
                 color: themeMode === m.value ? 'var(--btn-text)' : 'var(--text)',
                 borderColor: themeMode === m.value ? 'transparent' : 'var(--border)',
-                fontWeight: themeMode === m.value ? 600 : 500,
                 boxShadow: themeMode === m.value ? '0 4px 16px rgba(232,165,192,0.3)' : 'none',
               }}
             >
@@ -55,12 +54,25 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
       </div>
 
-      <div style={styles.option}>
-        <label style={styles.checkLabel}>
-          <input type="checkbox" checked={soundOn} onChange={toggleSound} style={styles.checkbox} />
-          <span>🔔 Звуки</span>
-        </label>
-      </div>
+      <label style={{
+        ...styles.cardLabel,
+        borderColor: soundOn ? 'rgba(232,165,192,0.6)' : 'var(--border)',
+        background: soundOn ? 'rgba(232,165,192,0.08)' : 'rgba(255,255,255,0.03)',
+      }}>
+        <input type="checkbox" checked={soundOn} onChange={toggleSound} style={styles.hiddenCheckbox} />
+        <span style={styles.cardIcon}>{soundOn ? '🔔' : '🔕'}</span>
+        <div style={styles.cardText}>
+          <span style={styles.cardTitle}>Звуки</span>
+          <span style={styles.cardHint}>Ходы, победа, подключение соперника</span>
+        </div>
+        <span style={{
+          ...styles.toggleDot,
+          background: soundOn ? 'var(--accent)' : 'transparent',
+          borderColor: soundOn ? 'var(--accent)' : 'var(--border)',
+        }}>
+          {soundOn && <span style={styles.toggleDotInner} />}
+        </span>
+      </label>
 
       <div style={styles.option}>
         <p style={styles.label}>Скин камней</p>
@@ -74,7 +86,6 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 background: skin === s.value ? 'var(--btn-bg)' : 'transparent',
                 color: skin === s.value ? 'var(--btn-text)' : 'var(--text)',
                 borderColor: skin === s.value ? 'transparent' : 'var(--border)',
-                fontWeight: skin === s.value ? 600 : 500,
                 boxShadow: skin === s.value ? '0 4px 16px rgba(232,165,192,0.3)' : 'none',
               }}
             >
@@ -104,28 +115,76 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
   },
   option: { marginBottom: '24px' },
+  hiddenCheckbox: { display: 'none' },
+  cardLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '14px 16px',
+    marginBottom: '20px',
+    borderRadius: '14px',
+    border: '1px solid var(--border)',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  },
+  cardIcon: {
+    fontSize: '22px',
+    lineHeight: 1,
+  },
+  cardText: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '2px',
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'var(--text)',
+  },
+  cardHint: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    letterSpacing: '0.3px',
+  },
+  toggleDot: {
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    border: '2px solid',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+    flexShrink: 0,
+  },
+  toggleDotInner: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    background: '#fff',
+    display: 'block',
+  },
   label: {
     fontSize: '13px', color: 'var(--secondary-text)',
     marginBottom: '10px',
     fontWeight: 500, textTransform: 'uppercase', letterSpacing: '1px',
   },
-  checkLabel: {
-    fontSize: '14px', color: 'var(--text)',
-    display: 'flex', alignItems: 'center', gap: '10px',
-    cursor: 'pointer', padding: '10px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid var(--border)',
-    borderRadius: '12px',
-  },
-  checkbox: { width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent)' },
   group: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   chip: {
     padding: '9px 16px',
     borderRadius: '12px',
-    border: '1px solid',
+    border: '1px solid var(--border)',
     cursor: 'pointer',
     fontSize: '13px',
+    fontWeight: 600,          // ← всегда 600, не меняется
     transition: 'all 0.2s',
+    minWidth: '92px',         // ← фиксированная минимальная ширина
+    textAlign: 'center',
+    boxSizing: 'border-box',
   },
   closeBtn: {
     display: 'block', margin: '20px auto 0',
