@@ -369,7 +369,11 @@ const Game: React.FC = () => {
         <div style={styles.lobbyCard}>
           <h1 style={styles.title}>Окийя</h1>
           <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && <p style={{ color: 'var(--secondary-text)', marginBottom: 24, fontSize: 14 }}>Вы: <strong>{nick}</strong></p>}
+          {nick && (
+            <p style={styles.playerName}>
+              Вы: <strong style={styles.playerNameStrong}>{nick}</strong>
+            </p>
+          )}
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
@@ -407,25 +411,30 @@ const Game: React.FC = () => {
               </button>
             </div>
           </div>
-          <div style={styles.privateToggle}>
-            <label style={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => setIsPrivate(e.target.checked)}
-                style={styles.hiddenCheckbox}
-              />
-              <span style={{
-                ...styles.customCheckbox,
-                backgroundColor: isPrivate ? '#f1c40f' : 'var(--btn-bg)',
-                color: isPrivate ? '#000' : 'var(--btn-text)',
-                border: isPrivate ? '1px solid #f1c40f' : 'none',
-              }}>
-                {isPrivate ? '🔒' : '🔓'}
-              </span>
-              <span style={styles.privateText}>Приватная комната (только по коду)</span>
-            </label>
-          </div>
+          <label style={{
+            ...styles.privateCard,
+            borderColor: isPrivate ? 'rgba(232,165,192,0.6)' : 'var(--border)',
+            background: isPrivate ? 'rgba(232,165,192,0.08)' : 'rgba(255,255,255,0.03)',
+          }}>
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+              style={styles.hiddenCheckbox}
+            />
+            <span style={styles.privateCardIcon}>{isPrivate ? '🔒' : '🔓'}</span>
+            <div style={styles.privateCardText}>
+              <span style={styles.privateCardTitle}>Приватная комната</span>
+              <span style={styles.privateCardHint}>Только по коду — не видна в списке</span>
+            </div>
+            <span style={{
+              ...styles.privateToggleDot,
+              background: isPrivate ? 'var(--accent)' : 'transparent',
+              borderColor: isPrivate ? 'var(--accent)' : 'var(--border)',
+            }}>
+              {isPrivate && <span style={styles.privateToggleDotInner} />}
+            </span>
+          </label>
           <div style={styles.separator} />
           <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>Войти по коду</button>
           <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>Открытые комнаты</button>
@@ -520,11 +529,11 @@ const Game: React.FC = () => {
           <header style={styles.gameHeader}>
             <h2 style={styles.titleSmall}>Окийя</h2>
             {roomId && (
-              <span style={styles.roomCode}>
-                Комната <strong>{roomId}</strong>
+              <div style={styles.roomBadge}>
+                <strong style={styles.roomBadgeCode}>{roomId}</strong>
                 {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
-                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
-              </span>
+                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать ссылку">📋</button>
+              </div>
             )}
           </header>
           <div style={styles.statusBar}>
@@ -623,11 +632,12 @@ const Game: React.FC = () => {
           <header style={styles.gameHeader}>
             <h2 style={styles.titleSmall}>Окийя</h2>
             {roomId && (
-              <span style={styles.roomCode}>
-                Комната <strong>{roomId}</strong>
+              <div style={styles.roomBadge}>
+                <span style={styles.roomBadgeLabel}>Комната</span>
+                <strong style={styles.roomBadgeCode}>{roomId}</strong>
                 {gameState?.isPrivate && <span style={styles.lockIcon}>🔒</span>}
-                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать код">📋</button>
-              </span>
+                <button onClick={copyRoomCode} style={styles.copyBtn} title="Скопировать ссылку">📋</button>
+              </div>
             )}
           </header>
           <div style={styles.statusBar}>
@@ -757,6 +767,19 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     fontWeight: 400,
   },
+  playerName: {
+    color: 'var(--secondary-text)',
+    marginBottom: '28px',
+    fontSize: '14px',
+    letterSpacing: '0.5px',
+  },
+  playerNameStrong: {
+    color: 'var(--text)',
+    fontSize: '18px',
+    fontWeight: 600,
+    marginLeft: '4px',
+    letterSpacing: '0.3px',
+  },
   buttonGroup: {
     display: 'flex',
     gap: '10px',
@@ -782,7 +805,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '10px',
   },
   difficultyCard: {
-    padding: '14px 8px',
+    padding: '16px 8px',
     borderRadius: '14px',
     border: '1px solid var(--border)',
     background: 'rgba(255,255,255,0.03)',
@@ -791,24 +814,24 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '6px',
+    gap: '8px',
     transition: 'all 0.2s',
     fontFamily: '"Inter", sans-serif',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
   },
   difficultyEmoji: {
-    fontSize: '22px',
+    fontSize: '24px',
     lineHeight: 1,
   },
   difficultyName: {
-    fontSize: '12px',
+    fontSize: '13px',
     fontWeight: 600,
     letterSpacing: '0.5px',
   },
   primaryBtn: {
-    padding: '14px 28px',
-    fontSize: '14px',
+    padding: '16px 26px',
+    fontSize: '15px',
     fontWeight: 600,
     border: 'none',
     borderRadius: '14px',
@@ -817,7 +840,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
     boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
-    minWidth: '110px',
+    minWidth: '130px',
     transition: 'transform 0.2s, box-shadow 0.2s',
   },
   secondaryBtn: {
@@ -835,35 +858,59 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '10px',
     transition: 'all 0.2s',
   },
-  privateToggle: {
-    margin: '18px 0 10px',
-    textAlign: 'center',
-  },
-  checkboxLabel: {
-    display: 'inline-flex',
+  privateCard: {
+    display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '14px',
+    padding: '14px 16px',
+    margin: '16px 0 10px',
+    borderRadius: '14px',
+    border: '1px solid var(--border)',
     cursor: 'pointer',
+    transition: 'all 0.2s',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  },
+  privateCardIcon: {
+    fontSize: '22px',
+    lineHeight: 1,
+  },
+  privateCardText: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '2px',
+    flex: 1,
+  },
+  privateCardTitle: {
     fontSize: '14px',
+    fontWeight: 600,
     color: 'var(--text)',
   },
-  hiddenCheckbox: { display: 'none' },
-  customCheckbox: {
-    width: '36px',
-    height: '36px',
+  privateCardHint: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    letterSpacing: '0.3px',
+  },
+  privateToggleDot: {
+    width: '22px',
+    height: '22px',
     borderRadius: '50%',
+    border: '2px solid',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
     transition: 'all 0.2s',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    flexShrink: 0,
   },
-  privateText: {
-    fontSize: '14px',
-    fontWeight: 500,
-    color: 'var(--text)',
+  privateToggleDotInner: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    background: '#fff',
+    display: 'block',
   },
+  hiddenCheckbox: { display: 'none' },
   separator: {
     height: '1px',
     background: 'linear-gradient(90deg, transparent, var(--border), transparent)',
@@ -902,10 +949,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameHeader: {
     display: 'flex',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: '20px',
-    padding: '20px 24px 10px',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--border)',
+    marginBottom: '6px',
   },
   titleSmall: {
     fontSize: '28px',
@@ -917,13 +965,28 @@ const styles: Record<string, React.CSSProperties> = {
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
   },
-  roomCode: {
-    fontSize: '13px',
-    color: 'var(--secondary-text)',
-    display: 'inline-flex',
+  roomBadge: {
+    display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '10px',
+    padding: '8px 14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid var(--border)',
+    borderRadius: '12px',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  },
+  roomBadgeLabel: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    textTransform: 'uppercase',
     letterSpacing: '1px',
+  },
+  roomBadgeCode: {
+    fontSize: '16px',
+    fontWeight: 700,
+    letterSpacing: '2px',
+    color: 'var(--accent)',
   },
   copyBtn: {
     background: 'none',
@@ -971,9 +1034,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameLayoutDesktop: {
     display: 'grid',
-    gridTemplateColumns: '380px auto 380px',
+    gridTemplateColumns: 'minmax(340px, 1fr) minmax(auto, 560px) minmax(340px, 1fr)',
     alignItems: 'start',
-    gap: '20px',
+    gap: '0',
     flex: 1,
     padding: '0 24px 24px',
     overflow: 'hidden',
@@ -981,7 +1044,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chatColumn: {
     width: '100%',
+    maxWidth: '360px',
     height: '70vh',
+    justifySelf: 'end',
+    marginRight: '24px',
   },
   centerColumnDesktop: {
     display: 'flex',

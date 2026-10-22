@@ -129,9 +129,37 @@ button[title]:hover {
   transform: translateY(-1px);
 }
 
-/* Для карточек сложности — подсветка рамки при наведении */
+/* === Hover для всех кнопок (п.4) === */
+button {
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* === Доска в игре с ботом (п.5) === */
+:root .board-grid {
+  background-color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+.dark .board-grid {
+  background-color: rgba(25, 25, 35, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+              inset 0 0 40px rgba(232, 165, 192, 0.03);
+}
+
+/* === Карточки сложности — hover === */
 .difficulty-hover:hover {
-  background: rgba(255,255,255,0.06) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
