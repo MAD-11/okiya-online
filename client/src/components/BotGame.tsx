@@ -5,6 +5,7 @@ import LastPickedTile from './LastPickedTile';
 import { initBoard, checkWin, isValidMove } from '../game/gameLogic';
 import { Tile, Board as BoardType, GameStatus } from '../types/game';
 import { playMoveSound, playWinSound, playLoseSound, playDrawSound } from '../utils/sound';
+import { useTheme } from '../contexts/ThemeContext';
 import ConfirmDialog from './ConfirmDialog';
 
 interface BotGameProps {
@@ -31,124 +32,97 @@ const countLines = (board: BoardType, color: 'red' | 'black', count: number): nu
   let result = 0;
   for (let i = 0; i < 4; i++) {
     const row = board[i];
-    const colorCount = row.filter(cell => cell === color).length;
-    const opponentCount = row.filter(cell => cell !== color && typeof cell !== 'string').length;
-    if (colorCount === count && opponentCount === 0) result++;
+    if (row.filter(c => c === color).length === count &&
+        row.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
   }
   for (let j = 0; j < 4; j++) {
-    let colorCnt = 0, oppCnt = 0;
+    let cc = 0, oo = 0;
     for (let i = 0; i < 4; i++) {
-      if (board[i][j] === color) colorCnt++;
-      else if (board[i][j] !== null && typeof board[i][j] !== 'string') oppCnt++;
+      if (board[i][j] === color) cc++;
+      else if (board[i][j] !== null && typeof board[i][j] !== 'string') oo++;
     }
-    if (colorCnt === count && oppCnt === 0) result++;
+    if (cc === count && oo === 0) result++;
   }
-  const diag1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
-  let d1color = 0, d1opp = 0;
-  diag1.forEach(cell => {
-    if (cell === color) d1color++;
-    else if (cell !== null && typeof cell !== 'string') d1opp++;
-  });
-  if (d1color === count && d1opp === 0) result++;
-  const diag2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
-  let d2color = 0, d2opp = 0;
-  diag2.forEach(cell => {
-    if (cell === color) d2color++;
-    else if (cell !== null && typeof cell !== 'string') d2opp++;
-  });
-  if (d2color === count && d2opp === 0) result++;
+  const d1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
+  if (d1.filter(c => c === color).length === count &&
+      d1.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
+  const d2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
+  if (d2.filter(c => c === color).length === count &&
+      d2.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       const cells = [board[r][c], board[r][c + 1], board[r + 1][c], board[r + 1][c + 1]];
-      let colorCnt = 0, oppCnt = 0;
-      cells.forEach(cell => {
-        if (cell === color) colorCnt++;
-        else if (cell !== null && typeof cell !== 'string') oppCnt++;
-      });
-      if (colorCnt === count && oppCnt === 0) result++;
+      if (cells.filter(c2 => c2 === color).length === count &&
+          cells.filter(c2 => c2 !== color && typeof c2 !== 'string').length === 0) result++;
     }
   }
   return result;
 };
 
-const canWinNextMove = (board: BoardType, color: 'red' | 'black', lastTile: Tile | null): boolean => {
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      if (!isValidMove(board, r, c, lastTile)) continue;
-      const newBoard = board.map(row => [...row]);
-      newBoard[r][c] = color;
-      if (checkWin(newBoard, color)) return true;
-    }
+const canWinNextMove = (board: BoardType, color: 'red' | 'black', last: Tile | null): boolean => {
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    if (!isValidMove(board, r, c, last)) continue;
+    const nb = board.map(row => [...row]);
+    nb[r][c] = color;
+    if (checkWin(nb, color)) return true;
   }
   return false;
 };
 
-const getValidMoves = (board: BoardType, lastTile: Tile | null) => {
+const getValidMoves = (board: BoardType, last: Tile | null) => {
   const moves: { row: number; col: number; tile: Tile }[] = [];
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      if (!isValidMove(board, r, c, lastTile)) continue;
-      moves.push({ row: r, col: c, tile: board[r][c] as Tile });
-    }
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    if (!isValidMove(board, r, c, last)) continue;
+    moves.push({ row: r, col: c, tile: board[r][c] as Tile });
   }
   return moves;
 };
 
-const evaluatePosition = (
-  board: BoardType,
-  botColor: 'red' | 'black',
-  playerColor: 'red' | 'black',
-  lastTile: Tile | null
-): number => {
+const evaluatePosition = (board: BoardType, bot: 'red' | 'black', player: 'red' | 'black', last: Tile | null): number => {
   let score = 0;
-  if (checkWin(board, botColor)) return WIN_SCORE;
-  if (canWinNextMove(board, playerColor, lastTile)) score -= BLOCK_WIN_SCORE;
-  score += countLines(board, botColor, 3) * CREATE_THREE_SCORE;
-  score += countLines(board, botColor, 2) * CREATE_TWO_SCORE;
-  score -= countLines(board, playerColor, 3) * BLOCK_THREE_SCORE;
-  score -= countLines(board, playerColor, 2) * BLOCK_TWO_SCORE;
-  const centerCells = [[1, 1], [1, 2], [2, 1], [2, 2]];
-  for (const [r, c] of centerCells) {
-    if (board[r][c] === botColor) score += CENTER_BONUS;
-    else if (board[r][c] === playerColor) score -= CENTER_BONUS / 2;
+  if (checkWin(board, bot)) return WIN_SCORE;
+  if (canWinNextMove(board, player, last)) score -= BLOCK_WIN_SCORE;
+  score += countLines(board, bot, 3) * CREATE_THREE_SCORE;
+  score += countLines(board, bot, 2) * CREATE_TWO_SCORE;
+  score -= countLines(board, player, 3) * BLOCK_THREE_SCORE;
+  score -= countLines(board, player, 2) * BLOCK_TWO_SCORE;
+  for (const [r, c] of [[1, 1], [1, 2], [2, 1], [2, 2]]) {
+    if (board[r][c] === bot) score += CENTER_BONUS;
+    else if (board[r][c] === player) score -= CENTER_BONUS / 2;
   }
-  score += getValidMoves(board, lastTile).length * FLEXIBILITY_BONUS;
+  score += getValidMoves(board, last).length * FLEXIBILITY_BONUS;
   return score;
 };
 
-const minimax = (
-  board: BoardType,
-  depth: number,
-  isBotTurn: boolean,
-  botColor: 'red' | 'black',
-  playerColor: 'red' | 'black',
-  lastTile: Tile | null
-): number => {
-  if (depth === 0) return evaluatePosition(board, botColor, playerColor, lastTile);
-  const moves = getValidMoves(board, lastTile);
-  if (moves.length === 0) return isBotTurn ? -WIN_SCORE : WIN_SCORE;
-  if (isBotTurn) {
+const minimax = (board: BoardType, depth: number, isBot: boolean, bot: 'red' | 'black', player: 'red' | 'black', last: Tile | null): number => {
+  if (depth === 0) return evaluatePosition(board, bot, player, last);
+  const moves = getValidMoves(board, last);
+  if (moves.length === 0) return isBot ? -WIN_SCORE : WIN_SCORE;
+  if (isBot) {
     let best = -Infinity;
-    for (const move of moves) {
-      const newBoard = board.map(row => [...row]);
-      newBoard[move.row][move.col] = botColor;
-      best = Math.max(best, minimax(newBoard, depth - 1, false, botColor, playerColor, move.tile));
+    for (const m of moves) {
+      const nb = board.map(row => [...row]);
+      nb[m.row][m.col] = bot;
+      best = Math.max(best, minimax(nb, depth - 1, false, bot, player, m.tile));
     }
     return best;
   } else {
     let worst = Infinity;
-    for (const move of moves) {
-      const newBoard = board.map(row => [...row]);
-      newBoard[move.row][move.col] = playerColor;
-      worst = Math.min(worst, minimax(newBoard, depth - 1, true, botColor, playerColor, move.tile));
+    for (const m of moves) {
+      const nb = board.map(row => [...row]);
+      nb[m.row][m.col] = player;
+      worst = Math.min(worst, minimax(nb, depth - 1, true, bot, player, m.tile));
     }
     return worst;
   }
 };
 
 const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
+  const { skin } = useTheme();
+
   const [board, setBoard] = useState<BoardType>(() => initBoard());
   const [lastPickedTile, setLastPickedTile] = useState<Tile | null>(null);
+  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<'red' | 'black'>('red');
   const [status, setStatus] = useState<GameStatus>('playing');
   const [message, setMessage] = useState('');
@@ -162,105 +136,70 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
 
   const boardRef = useRef(board);
   const lastPickedTileRef = useRef(lastPickedTile);
-
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { lastPickedTileRef.current = lastPickedTile; }, [lastPickedTile]);
 
   useEffect(() => {
     if (currentPlayer !== botColor || status !== 'playing' || gameOver) return;
-
     setWaitingBot(true);
     const timer = setTimeout(() => {
-      const currentBoard = boardRef.current;
-      const currentLastTile = lastPickedTileRef.current;
-
-      const moves = getValidMoves(currentBoard, currentLastTile);
+      const cb = boardRef.current;
+      const cl = lastPickedTileRef.current;
+      const moves = getValidMoves(cb, cl);
       if (moves.length === 0) {
-        setStatus('finished');
-        setGameOver(true);
+        setStatus('finished'); setGameOver(true);
         setMessage('🎉 Вы победили (бот заблокирован)!');
-        playWinSound();
-        setWaitingBot(false);
-        return;
+        playWinSound(); setWaitingBot(false); return;
       }
-
       let chosenMove: { row: number; col: number; tile: Tile };
-
       if (difficulty === 'easy') {
         chosenMove = moves[Math.floor(Math.random() * moves.length)];
       } else {
         const depth = difficulty === 'hard' ? 1 : 0;
         let bestMoves = [moves[0]];
         let bestScore = -Infinity;
-        for (const move of moves) {
-          const testBoard = currentBoard.map(r => [...r]);
-          testBoard[move.row][move.col] = botColor;
-          const score = depth === 0
-            ? evaluatePosition(testBoard, botColor, playerColor, move.tile)
-            : minimax(testBoard, depth, false, botColor, playerColor, move.tile);
-          if (score > bestScore) {
-            bestScore = score;
-            bestMoves = [move];
-          } else if (Math.abs(score - bestScore) < 0.1) {
-            bestMoves.push(move);
-          }
+        for (const m of moves) {
+          const tb = cb.map(r => [...r]);
+          tb[m.row][m.col] = botColor;
+          const sc = depth === 0
+            ? evaluatePosition(tb, botColor, playerColor, m.tile)
+            : minimax(tb, depth, false, botColor, playerColor, m.tile);
+          if (sc > bestScore) { bestScore = sc; bestMoves = [m]; }
+          else if (Math.abs(sc - bestScore) < 0.1) bestMoves.push(m);
         }
         chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
       }
-
       const { row, col, tile } = chosenMove;
-      const newBoard = currentBoard.map(r => [...r]);
-      newBoard[row][col] = botColor;
-
-      setBoard(newBoard);
+      const nb = cb.map(r => [...r]);
+      nb[row][col] = botColor;
+      setBoard(nb);
       setLastPickedTile(tile);
+      setLastMove({ row, col });
       playMoveSound();
-
-      if (checkWin(newBoard, botColor)) {
-        setStatus('finished');
-        setGameOver(true);
+      if (checkWin(nb, botColor)) {
+        setStatus('finished'); setGameOver(true);
         setMessage('🤖 Бот победил!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
+        playLoseSound(); setWaitingBot(false); return;
       }
-
-      const isFull = newBoard.every(r => r.every(c => typeof c === 'string'));
+      const isFull = nb.every(r => r.every(c => typeof c === 'string'));
       if (isFull) {
-        setStatus('finished');
-        setGameOver(true);
-        setMessage('Ничья!');
-        playDrawSound();
-        setWaitingBot(false);
-        return;
+        setStatus('finished'); setGameOver(true);
+        setMessage('Ничья!'); playDrawSound(); setWaitingBot(false); return;
       }
-
       let hasPlayerMove = false;
-      for (let r = 0; r < 4; r++) {
-        for (let c = 0; c < 4; c++) {
-          if (isValidMove(newBoard, r, c, tile)) { hasPlayerMove = true; break; }
-        }
-        if (hasPlayerMove) break;
+      for (let r = 0; r < 4 && !hasPlayerMove; r++) for (let c = 0; c < 4 && !hasPlayerMove; c++) {
+        if (isValidMove(nb, r, c, tile)) hasPlayerMove = true;
       }
-
       if (!hasPlayerMove) {
-        setStatus('finished');
-        setGameOver(true);
+        setStatus('finished'); setGameOver(true);
         setMessage('🤖 Бот победил (вы заблокированы)!');
-        playLoseSound();
-        setWaitingBot(false);
-        return;
+        playLoseSound(); setWaitingBot(false); return;
       }
-
       setCurrentPlayer(playerColor);
       setTurnStartedAt(Date.now());
       setWaitingBot(false);
     }, 400);
-
-    return () => {
-      clearTimeout(timer);
-      setWaitingBot(false);
-    };
+    return () => { clearTimeout(timer); setWaitingBot(false); };
   }, [currentPlayer, status, gameOver, botColor, playerColor, difficulty]);
 
   const handlePlayerMove = useCallback((row: number, col: number) => {
@@ -272,30 +211,21 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
       setTimeout(() => setMessage(''), 1000);
       return;
     }
-
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = playerColor;
-    setBoard(newBoard);
+    const nb = board.map(r => [...r]);
+    nb[row][col] = playerColor;
+    setBoard(nb);
     setLastPickedTile(cell as Tile);
+    setLastMove({ row, col });
     playMoveSound();
-
-    if (checkWin(newBoard, playerColor)) {
-      setStatus('finished');
-      setGameOver(true);
-      setMessage('🎉 Вы победили!');
-      playWinSound();
-      return;
+    if (checkWin(nb, playerColor)) {
+      setStatus('finished'); setGameOver(true);
+      setMessage('🎉 Вы победили!'); playWinSound(); return;
     }
-
-    const isFull = newBoard.every(r => r.every(c => typeof c === 'string'));
+    const isFull = nb.every(r => r.every(c => typeof c === 'string'));
     if (isFull) {
-      setStatus('finished');
-      setGameOver(true);
-      setMessage('Ничья!');
-      playDrawSound();
-      return;
+      setStatus('finished'); setGameOver(true);
+      setMessage('Ничья!'); playDrawSound(); return;
     }
-
     setCurrentPlayer(botColor);
     setTurnStartedAt(Date.now());
   }, [board, currentPlayer, lastPickedTile, status, gameOver, playerColor, botColor]);
@@ -303,6 +233,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
   const resetGame = () => {
     setBoard(initBoard());
     setLastPickedTile(null);
+    setLastMove(null);
     setCurrentPlayer('red');
     setStatus('playing');
     setMessage('');
@@ -341,9 +272,9 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
             onClick={handlePlayerMove}
             currentPlayer={currentPlayer}
             myColor={playerColor}
-            lastMove={null}
-            hostSkin="sakura"
-            guestSkin="sakura"
+            lastMove={lastMove}
+            hostSkin={skin}
+            guestSkin={skin}
             shake={false}
           />
           <LastPickedTile tile={lastPickedTile} />
@@ -352,9 +283,7 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
           {status === 'playing' && (
             <div style={styles.turnInfo}>
               <p>{currentPlayer === playerColor ? '☀️ Ваш ход' : '🌙 Ход бота...'}</p>
-              {currentPlayer === playerColor && (
-                <Timer turnStartedAt={turnStartedAt} turnDuration={30000} />
-              )}
+              {currentPlayer === playerColor && <Timer turnStartedAt={turnStartedAt} turnDuration={30000} />}
               {waitingBot && <p style={{ fontSize: 13 }}>Бот думает...</p>}
             </div>
           )}

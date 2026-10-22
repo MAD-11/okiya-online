@@ -254,9 +254,21 @@ body, .emoji-font {
   background-size: 24px 24px;
 }
 
-/* ===== Анимация переворота камня (#15) ===== */
+/* ===== Анимация появления камня (#15) ===== */
 @keyframes placeStone {
-  0%   { transform: perspective(300px) rotateY(0deg)   scale(0.5); opacity: 0; }
-  60%  { transform: perspective(300px) rotateY(180deg) scale(1.1); opacity: 1; }
-  100% { transform: perspective(300px) rotateY(360deg) scale(1);   opacity: 1; }
+  0% {
+    transform: scale(0.2) rotate(-30deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.15) rotate(8deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.92) rotate(-3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
 }

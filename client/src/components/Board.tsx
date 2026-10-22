@@ -46,7 +46,6 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
   };
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Инициализация курсора при первом нажатии
     if (!cursor) {
       let start: { row: number; col: number } | null = null;
       for (let r = 0; r < 4 && !start; r++) {
@@ -57,10 +56,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
       setCursor(start || { row: 1, col: 1 });
       return;
     }
-
     let { row, col } = cursor;
     let handled = true;
-
     switch (e.key) {
       case 'ArrowUp':    row = (row + 3) % 4; break;
       case 'ArrowDown':  row = (row + 1) % 4; break;
@@ -68,9 +65,8 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
       case 'ArrowRight': col = (col + 1) % 4; break;
       case 'Enter':
       case ' ':
-        if (canInteract(row, col)) {
-          handleCellClick(row, col);
-        } else {
+        if (canInteract(row, col)) handleCellClick(row, col);
+        else {
           setInvalidCell({ row, col });
           setTimeout(() => setInvalidCell(null), 200);
         }
@@ -81,7 +77,6 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
       default:
         handled = false;
     }
-
     if (handled) {
       e.preventDefault();
       setCursor({ row, col });
@@ -112,6 +107,9 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
             const isInvalid = invalidCell?.row === r && invalidCell?.col === c;
             const isCursor = focused && cursor?.row === r && cursor?.col === c;
+            const stoneEmoji = cell === 'red' ? getStoneEmoji('red')
+                             : cell === 'black' ? getStoneEmoji('black')
+                             : null;
 
             return (
               <div
@@ -126,28 +124,27 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
                     : isInvalid ? '#ffcccc' : 'var(--cell-bg)',
-                  border: isCursor
-                    ? '3px solid var(--turn-indicator)'
-                    : isValid
-                      ? '2px solid var(--valid-move-border)'
-                      : '1px solid var(--border)',
-                  boxShadow: isCursor ? '0 0 0 3px rgba(212,163,115,0.3)' : undefined,
+                  border: '1px solid var(--border)',
+                  boxShadow: isValid
+                    ? 'inset 0 0 0 2px var(--valid-move-border)'
+                    : undefined,
+                  outline: isCursor ? '2px solid var(--turn-indicator)' : 'none',
+                  outlineOffset: '-2px',
                 }}
               >
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
-                {cell === 'red' && (
-                  <span style={{
-                    ...styles.stone,
-                    animation: isLastMove ? 'placeStone 0.45s ease-out' : 'none',
-                  }}>{getStoneEmoji('red')}</span>
-                )}
-                {cell === 'black' && (
-                  <span style={{
-                    ...styles.stone,
-                    animation: isLastMove ? 'placeStone 0.45s ease-out' : 'none',
-                  }}>{getStoneEmoji('black')}</span>
+                {stoneEmoji && (
+                  <span
+                    key={isLastMove ? `anim-${r}-${c}` : `stone-${r}-${c}`}
+                    style={{
+                      ...styles.stone,
+                      animation: isLastMove ? 'placeStone 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+                    }}
+                  >
+                    {stoneEmoji}
+                  </span>
                 )}
               </div>
             );
@@ -175,22 +172,22 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '16px',
     borderRadius: '16px',
     boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
-    // backgroundColor и текстура — из CSS-класса .board-grid
   },
   cell: {
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'background-color 0.2s, border 0.15s',
-    perspective: '300px',
+    transition: 'background-color 0.2s',
+    boxSizing: 'border-box',
+    // УБРАН perspective — он конфликтовал с анимацией
   },
   tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
   stone: {
     fontSize: '38px',
     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
     display: 'inline-block',
-    transformStyle: 'preserve-3d',
+    // УБРАН transformStyle — не нужен без 3D
   },
 };
 

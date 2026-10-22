@@ -4,6 +4,7 @@ import LastPickedTile from './LastPickedTile';
 import { initBoard, isValidMove, checkWin } from '../game/gameLogic';
 import { Tile, Board as BoardType } from '../types/game';
 import { playMoveSound, playWinSound } from '../utils/sound';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface TutorialStep {
   id: number;
@@ -26,7 +27,8 @@ const TutorialGame: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [highlightMoves, setHighlightMoves] = useState<boolean[][]>([]);
   const [showHint, setShowHint] = useState(false);
   const [completed, setCompleted] = useState(false);
-
+  const { skin } = useTheme();
+  
   const steps: TutorialStep[] = [
     {
       id: 1,
@@ -228,8 +230,8 @@ const TutorialGame: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             currentPlayer={currentPlayer}
             myColor={currentPlayer}
             lastMove={null}
-            hostSkin="sakura"
-            guestSkin="sakura"
+            hostSkin={skin}
+            guestSkin={skin}
             shake={false}
           />
           <LastPickedTile tile={lastPickedTile} />
