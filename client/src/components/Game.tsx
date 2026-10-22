@@ -374,25 +374,36 @@ const Game: React.FC = () => {
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
-            <p style={{ fontSize: 12, color: 'var(--secondary-text)', marginBottom: '4px' }}>🤖 Бот:</p>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          </div>
+          <div style={styles.difficultySelector}>
+            <p style={styles.difficultyLabel}>🤖 Игра с ботом</p>
+            <div style={styles.difficultyGrid}>
               <button
                 onClick={() => { setBotDifficulty('easy'); setShowBotGame(true); }}
-                style={{ ...styles.primaryBtn, backgroundColor: '#4a6741', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+                className="difficulty-hover"
+                style={{ ...styles.difficultyCard, borderColor: 'rgba(46, 204, 113, 0.5)' }}
+                title="Случайные ходы, для новичков"
               >
-                🟢 Лёгкий
+                <span style={styles.difficultyEmoji}>🟢</span>
+                <span style={styles.difficultyName}>Лёгкий</span>
               </button>
               <button
                 onClick={() => { setBotDifficulty('medium'); setShowBotGame(true); }}
-                style={{ ...styles.primaryBtn, backgroundColor: '#d4a373', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+                className="difficulty-hover"
+                style={{ ...styles.difficultyCard, borderColor: 'rgba(232, 165, 192, 0.5)' }}
+                title="Эвристика, средний уровень"
               >
-                🟡 Средний
+                <span style={styles.difficultyEmoji}>🟡</span>
+                <span style={styles.difficultyName}>Средний</span>
               </button>
               <button
                 onClick={() => { setBotDifficulty('hard'); setShowBotGame(true); }}
-                style={{ ...styles.primaryBtn, backgroundColor: '#c0392b', minWidth: '90px', padding: '10px 16px', fontSize: '14px' }}
+                className="difficulty-hover"
+                style={{ ...styles.difficultyCard, borderColor: 'rgba(231, 76, 60, 0.5)' }}
+                title="Минимакс, для опытных"
               >
-                🔴 Сложный
+                <span style={styles.difficultyEmoji}>🔴</span>
+                <span style={styles.difficultyName}>Сложный</span>
               </button>
             </div>
           </div>
@@ -752,6 +763,48 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     flexWrap: 'wrap',
     marginBottom: '20px',
+  },
+  difficultySelector: {
+    marginBottom: '18px',
+  },
+  difficultyLabel: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    textTransform: 'uppercase',
+    letterSpacing: '2px',
+    marginBottom: '10px',
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+  difficultyGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: '10px',
+  },
+  difficultyCard: {
+    padding: '14px 8px',
+    borderRadius: '14px',
+    border: '1px solid var(--border)',
+    background: 'rgba(255,255,255,0.03)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    fontFamily: '"Inter", sans-serif',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  },
+  difficultyEmoji: {
+    fontSize: '22px',
+    lineHeight: 1,
+  },
+  difficultyName: {
+    fontSize: '12px',
+    fontWeight: 600,
+    letterSpacing: '0.5px',
   },
   primaryBtn: {
     padding: '14px 28px',

@@ -313,13 +313,17 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'fixed',
-    top: 0, left: 0, right: 0, bottom: 0,
+    inset: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'auto',
     zIndex: 2000,
     color: 'var(--text)',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
+    backgroundColor: 'var(--bg)',
+    backgroundImage: 'var(--bg-decor-1), var(--bg-decor-2)',
+    backgroundAttachment: 'fixed',
+    backgroundSize: 'cover',
   },
   header: {
     display: 'flex',
