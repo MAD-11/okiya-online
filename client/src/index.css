@@ -1,64 +1,72 @@
 :root {
-  --bg: #f7f3eb;
-  --text: #3e362e;
-  --card-bg: #ffffff;
-  --cell-bg: #fdfaf5;
-  --border: #e0d6c8;
-  --btn-bg: #3e362e;
+  /* Светлая тема (modern light) */
+  --bg: #f5f0ea;
+  --bg-decor-1: radial-gradient(ellipse at top left, rgba(232,165,192,0.15) 0%, transparent 50%);
+  --bg-decor-2: radial-gradient(ellipse at bottom right, rgba(126,232,199,0.12) 0%, transparent 50%);
+  --text: #1a1a24;
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --cell-bg: rgba(255, 255, 255, 0.6);
+  --border: rgba(0, 0, 0, 0.08);
+  --btn-bg: linear-gradient(135deg, #e8a5c0, #b57edc);
   --btn-text: #ffffff;
-  --secondary-text: #8b7a6b;
-  --modal-bg: #ffffff;
-  --chat-bg: #fdfaf5;
-  --chat-bubble-mine: #e8f0fe;
-  --chat-bubble-other: #f0e8db;
-  --chat-text-mine: #1e1e1e;
-  --chat-text-other: #3e362e;
+  --secondary-text: #6a6a80;
+  --modal-bg: rgba(255, 255, 255, 0.95);
+  --chat-bg: rgba(255, 255, 255, 0.6);
+  --chat-bubble-mine: rgba(232, 165, 192, 0.25);
+  --chat-bubble-other: rgba(0, 0, 0, 0.04);
+  --chat-text-mine: #1a1a24;
+  --chat-text-other: #1a1a24;
   --overlay: rgba(0, 0, 0, 0.5);
-  --hover-bg: #5a4a3a;
-  --game-btn-bg: #5e503a;
-  --game-btn-text: #ffffff;
-  --turn-indicator: #b8860b;
-  --valid-move-border: #c9a96e;   /* важная переменная */
-  --timer-low: #c0392b;
-  --stone-red-bg: rgba(180, 130, 110, 0.2);
-  --stone-black-bg: rgba(80, 70, 60, 0.2);
-  --opponent-online: #27ae60;
-  --opponent-offline: #c0392b;
+  --accent: #b57edc;
+  --accent-2: #2ecc71;
+  --game-btn-bg: rgba(0, 0, 0, 0.05);
+  --game-btn-text: #1a1a24;
+  --turn-indicator: #b57edc;
+  --valid-move-border: #b57edc;
+  --timer-low: #e74c3c;
+  --stone-red-bg: rgba(232, 165, 192, 0.25);
+  --stone-black-bg: rgba(126, 232, 199, 0.2);
+  --opponent-online: #2ecc71;
+  --opponent-offline: #e74c3c;
+  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23000000' fill-opacity='0.03'/%3E%3C/svg%3E");
 }
 
 .dark {
-  --bg: #1e1e1e;
-  --text: #e0d6c8;
-  --card-bg: #2c2c2c;
-  --cell-bg: #3a3a3a;
-  --border: #444444;
-  --btn-bg: #5a4a3a;
-  --btn-text: #e0d6c8;
-  --secondary-text: #a09080;
-  --modal-bg: #2c2c2c;
-  --chat-bg: #2c2c2c;
-  --chat-bubble-mine: #5a4a3a;
-  --chat-bubble-other: #3a3a3a;
-  --chat-text-mine: #e0d6c8;
-  --chat-text-other: #e0d6c8;
-  --overlay: rgba(0, 0, 0, 0.7);
-  --hover-bg: #6b5b4f;
-  --game-btn-bg: #7a6b5a;
-  --game-btn-text: #ffffff;
-  --turn-indicator: #e6b422;
-  --valid-move-border: #d4a373;   /* тёмная тема – свой цвет */
-  --timer-low: #e67e22;
-  --stone-red-bg: rgba(180, 100, 70, 0.3);
-  --stone-black-bg: rgba(100, 90, 80, 0.3);
-  --opponent-online: #2ecc71;
-  --opponent-offline: #e74c3c;
+  --bg: #0f0f14;
+  --bg-decor-1: radial-gradient(ellipse at top left, rgba(232,165,192,0.08) 0%, transparent 50%);
+  --bg-decor-2: radial-gradient(ellipse at bottom right, rgba(126,232,199,0.06) 0%, transparent 50%);
+  --text: #e8e8f0;
+  --card-bg: rgba(30, 30, 42, 0.6);
+  --cell-bg: rgba(40, 40, 55, 0.6);
+  --border: rgba(255, 255, 255, 0.08);
+  --btn-bg: linear-gradient(135deg, #e8a5c0, #b57edc);
+  --btn-text: #1a1a24;
+  --secondary-text: #7a7a90;
+  --modal-bg: rgba(25, 25, 35, 0.95);
+  --chat-bg: rgba(30, 30, 42, 0.6);
+  --chat-bubble-mine: rgba(232, 165, 192, 0.15);
+  --chat-bubble-other: rgba(255, 255, 255, 0.05);
+  --chat-text-mine: #e8e8f0;
+  --chat-text-other: #e8e8f0;
+  --overlay: rgba(0, 0, 0, 0.8);
+  --accent: #e8a5c0;
+  --accent-2: #7ee8c7;
+  --game-btn-bg: rgba(255, 255, 255, 0.05);
+  --game-btn-text: #e8e8f0;
+  --turn-indicator: #e8a5c0;
+  --valid-move-border: #e8a5c0;
+  --timer-low: #ff6b8a;
+  --stone-red-bg: rgba(232, 165, 192, 0.15);
+  --stone-black-bg: rgba(126, 232, 199, 0.1);
+  --opponent-online: #7ee8c7;
+  --opponent-offline: #ff6b8a;
+  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E");
 }
 
 html, body, #root {
   margin: 0;
   padding: 0;
-  height: 100%;
-  overflow-x: hidden;
+  min-height: 100%;
   background-color: var(--bg);
   color: var(--text);
   transition: background-color 0.3s, color 0.3s;
@@ -66,209 +74,53 @@ html, body, #root {
 
 body {
   font-family: 'Inter', 'Segoe UI', sans-serif;
+  background-image: var(--bg-decor-1), var(--bg-decor-2);
+  background-attachment: fixed;
+  background-size: cover;
 }
 
-@keyframes placeStone {
-  0% { transform: scale(0.8); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes vsFadeIn {
-  0% { opacity: 0; transform: scale(0.8); }
-  10% { opacity: 1; transform: scale(1); }
-  90% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.2); }
-}
-
-/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
-@media (max-width: 768px) {
-  .gameContainer {
-    padding: 0;
-  }
-
-  .gameLayout {
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 12px !important;
-    padding: 0 12px 12px !important;
-  }
-
-  .chatColumn {
-    width: 100% !important;
-    height: 35vh !important;
-  }
-
-  .centerColumn {
-    order: 1;
-  }
-
-  .buttonRow {
-    gap: 8px !important;
-  }
-  
-  .actionBtn {
-    padding: 8px 16px !important;
-    font-size: 12px !important;
-  }
-
-  .gameHeader {
-    gap: 10px !important;
-    padding: 12px !important;
-  }
-  
-  .titleSmall {
-    font-size: 24px !important;
-  }
-  
-  .roomCode {
-    font-size: 11px !important;
-  }
-
-  .statusBar {
-    font-size: 11px !important;
-  }
-
-  .score {
-    font-size: 14px !important;
-  }
-
-  .turnIndicator {
-    font-size: 14px !important;
-  }
-
-  .lobbyCard {
-    padding: 32px 24px !important;
-    margin: 16px !important;
-  }
-  
-  .title {
-    font-size: 40px !important;
-  }
-  
-  .subtitle {
-    font-size: 14px !important;
-  }
-  
-  .primaryBtn, .secondaryBtn {
-    padding: 10px 24px !important;
-    font-size: 14px !important;
-  }
-
-  .modal {
-    width: 95% !important;
-    max-width: 95% !important;
-  }
-
-  .vsContent {
-    gap: 15px !important;
-    font-size: 28px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .buttonGroup {
-    flex-direction: column !important;
-    gap: 8px !important;
-  }
-  
-  .primaryBtn, .secondaryBtn {
-    width: 100% !important;
-  }
-  
-  .title {
-    font-size: 32px !important;
-  }
-}
-
-
-/* Спиннер загрузки */
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(0,0,0,0.1);
-  border-top-color: var(--btn-bg);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 16px;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Тряска доски */
-.board-shake {
-  animation: shakeBoard 0.4s ease-in-out 0s 2;
-}
-@keyframes shakeBoard {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-  100% { transform: translateX(0); }
-}
-
-/* Анимация появления VS */
-@keyframes vsFadeIn {
-  0% { opacity: 0; transform: scale(0.8); }
-  10% { opacity: 1; transform: scale(1); }
-  90% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.2); }
-}
-
-/* Адаптация иллюстраций правил для мобильных */
-@media (max-width: 550px) {
-  .rules-illustration-grid {
-    grid-template-columns: repeat(4, minmax(40px, 50px)) !important;
-    gap: 4px !important;
-  }
-  .rules-illustration-cell {
-    font-size: 18px !important;
-  }
-  .rules-illustration-cell span:first-child {
-    font-size: 20px !important;
-  }
-  .rules-illustration-cell span:last-child {
-    font-size: 16px !important;
-  }
-}
-
-/* Единый шрифт для эмодзи */
-body, .emoji-font {
-  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Twemoji Mozilla", "EmojiOne Color", sans-serif;
-}
-
-/* Для всех ячеек с эмодзи в правилах и игре */
-.board-cell-emoji {
-  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-}
-
-/* ===== Текстура доски (#17) ===== */
-:root {
-  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23000000' fill-opacity='0.035'/%3E%3C/svg%3E");
-}
-.dark {
-  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E");
-}
+/* Текстура доски */
 .board-grid {
   background-color: var(--bg);
   background-image: var(--board-texture);
   background-size: 24px 24px;
 }
 
-/* ===== Анимация появления камня (#15) ===== */
+/* Анимация появления камня */
 @keyframes placeStone {
-  0% {
-    transform: scale(0.2) rotate(-30deg);
-    opacity: 0;
-  }
-  55% {
-    transform: scale(1.15) rotate(8deg);
-    opacity: 1;
-  }
-  75% {
-    transform: scale(0.92) rotate(-3deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
+  0%   { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+  55%  { transform: scale(1.15) rotate(8deg); opacity: 1; }
+  75%  { transform: scale(0.92) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
+
+/* Тряска доски */
+.board-shake { animation: shakeBoard 0.4s ease-in-out 0s 2; }
+@keyframes shakeBoard {
+  0%   { transform: translateX(0); }
+  25%  { transform: translateX(-5px); }
+  75%  { transform: translateX(5px); }
+  100% { transform: translateX(0); }
+}
+
+/* VS-анимация */
+@keyframes vsFadeIn {
+  0%   { opacity: 0; transform: scale(0.8); }
+  10%  { opacity: 1; transform: scale(1); }
+  90%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+
+/* Спиннер */
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Выделение */
+::selection { background: rgba(232, 165, 192, 0.3); }

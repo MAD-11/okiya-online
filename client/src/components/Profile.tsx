@@ -34,15 +34,15 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
     }
   }, [socket, playerId]);
 
-  const formatDate = (timestamp: number) =>
-    new Date(timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const formatDate = (ts: number) =>
+    new Date(ts).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-  const getResultText = (game: GameResult, isHost: boolean) => {
-    if (game.winner === 'draw') return { text: 'Ничья', emoji: '🤝', color: 'var(--secondary-text)' };
-    const isWin = (game.winner === 'host' && isHost) || (game.winner === 'guest' && !isHost);
+  const getResult = (g: GameResult, isHost: boolean) => {
+    if (g.winner === 'draw') return { text: 'Ничья', emoji: '🤝', color: 'var(--secondary-text)' };
+    const isWin = (g.winner === 'host' && isHost) || (g.winner === 'guest' && !isHost);
     return isWin
-      ? { text: 'Победа', emoji: '🏆', color: '#27ae60' }
-      : { text: 'Поражение', emoji: '💔', color: '#c0392b' };
+      ? { text: 'Победа', emoji: '🏆', color: 'var(--accent-2)' }
+      : { text: 'Поражение', emoji: '💔', color: 'var(--timer-low)' };
   };
 
   return (
@@ -50,7 +50,7 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
       <h3 style={styles.title}>📊 Профиль</h3>
 
       {loading ? (
-        <p style={{ color: 'var(--secondary-text)', textAlign: 'center' }}>Загрузка...</p>
+        <p style={styles.loading}>Загрузка...</p>
       ) : stats ? (
         <>
           <div style={styles.ratingBadge}>
@@ -61,7 +61,7 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
           <div style={styles.statsGrid}>
             <div style={styles.statCard}>
               <div style={styles.statValue}>{stats.games}</div>
-              <div style={styles.statLabel}>всего игр</div>
+              <div style={styles.statLabel}>игр</div>
             </div>
             <div style={styles.statCard}>
               <div style={styles.statValue}>{stats.wins}</div>
@@ -79,21 +79,19 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
               <div style={styles.historyList}>
                 {stats.history.slice(0, 15).map((game, idx) => {
                   const isHost = game.players.host === playerId;
-                  const result = getResultText(game, isHost);
+                  const r = getResult(game, isHost);
                   return (
                     <div key={idx} style={styles.historyItem}>
                       <div style={styles.historyLeft}>
-                        <span style={styles.historyEmoji}>{result.emoji}</span>
+                        <span style={styles.historyEmoji}>{r.emoji}</span>
                         <div style={styles.historyInfo}>
-                          <span style={{ ...styles.historyResult, color: result.color }}>{result.text}</span>
+                          <span style={{ ...styles.historyResult, color: r.color }}>{r.text}</span>
                           <span style={styles.historyOpponent}>
                             vs {isHost ? game.players.guest.slice(0, 10) : game.players.host.slice(0, 10)}
                           </span>
                         </div>
                       </div>
-                      <div style={styles.historyRight}>
-                        <span style={styles.historyDate}>{formatDate(game.timestamp)}</span>
-                      </div>
+                      <span style={styles.historyDate}>{formatDate(game.timestamp)}</span>
                     </div>
                   );
                 })}
@@ -111,28 +109,67 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: '24px', background: 'var(--modal-bg)', color: 'var(--text)', fontFamily: '"Inter", sans-serif', borderRadius: '24px', maxHeight: '80vh', overflowY: 'auto' },
-  title: { fontSize: '24px', fontWeight: 500, margin: '0 0 20px', color: 'var(--text)', fontFamily: '"Cormorant Garamond", serif', textAlign: 'center' },
-  ratingBadge: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', marginBottom: '20px', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border)' },
-  ratingLabel: { fontSize: '14px', color: 'var(--secondary-text)', fontWeight: 500 },
-  ratingValue: { fontSize: '28px', fontWeight: 700, color: '#d4a373' },
-  statsGrid: { display: 'flex', justifyContent: 'space-around', marginBottom: '24px', gap: '12px' },
-  statCard: { textAlign: 'center', flex: 1, background: 'var(--card-bg)', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
-  statValue: { fontSize: '28px', fontWeight: 700, color: 'var(--text)' },
-  statLabel: { fontSize: '12px', color: 'var(--secondary-text)', marginTop: '4px' },
+  container: {
+    padding: '28px',
+    background: 'var(--modal-bg)',
+    color: 'var(--text)',
+    fontFamily: '"Inter", sans-serif',
+    borderRadius: '24px',
+    maxHeight: '80vh', overflowY: 'auto',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+  },
+  title: { fontSize: '22px', fontWeight: 600, margin: '0 0 20px', textAlign: 'center', letterSpacing: '0.5px' },
+  loading: { textAlign: 'center', color: 'var(--secondary-text)', padding: '20px' },
+  ratingBadge: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '16px 20px',
+    marginBottom: '20px',
+    background: 'var(--card-bg)',
+    borderRadius: '16px',
+    border: '1px solid var(--border)',
+  },
+  ratingLabel: { fontSize: '13px', color: 'var(--secondary-text)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '1px' },
+  ratingValue: {
+    fontSize: '30px', fontWeight: 700,
+    background: 'var(--btn-bg)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  statsGrid: { display: 'flex', gap: '12px', marginBottom: '20px' },
+  statCard: {
+    flex: 1, textAlign: 'center',
+    padding: '14px',
+    background: 'var(--card-bg)',
+    borderRadius: '16px',
+    border: '1px solid var(--border)',
+  },
+  statValue: { fontSize: '26px', fontWeight: 700 },
+  statLabel: { fontSize: '11px', color: 'var(--secondary-text)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '1px' },
   historySection: { marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' },
-  historyTitle: { fontSize: '16px', fontWeight: 500, marginBottom: '12px', color: 'var(--text)' },
-  historyList: { maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
-  historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: 'var(--card-bg)', border: '1px solid var(--border)', fontSize: '13px' },
+  historyTitle: { fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: 'var(--secondary-text)', textTransform: 'uppercase', letterSpacing: '1px' },
+  historyList: { maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
+  historyItem: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 14px',
+    borderRadius: '12px',
+    background: 'var(--card-bg)',
+    border: '1px solid var(--border)',
+    fontSize: '13px',
+  },
   historyLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
-  historyEmoji: { fontSize: '20px' },
+  historyEmoji: { fontSize: '18px' },
   historyInfo: { display: 'flex', flexDirection: 'column' },
   historyResult: { fontWeight: 600 },
   historyOpponent: { fontSize: '11px', color: 'var(--secondary-text)' },
-  historyRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
-  historyDate: { fontSize: '10px', color: 'var(--secondary-text)' },
+  historyDate: { fontSize: '11px', color: 'var(--secondary-text)' },
   noHistory: { textAlign: 'center', color: 'var(--secondary-text)', padding: '20px', fontStyle: 'italic' },
-  closeBtn: { display: 'block', margin: '24px auto 0', background: 'var(--btn-bg)', border: 'none', borderRadius: '30px', padding: '10px 32px', color: 'var(--btn-text)', fontWeight: 500, cursor: 'pointer', fontSize: '14px' },
+  closeBtn: {
+    display: 'block', margin: '20px auto 0',
+    padding: '12px 32px', borderRadius: '12px', border: 'none',
+    background: 'var(--btn-bg)', color: 'var(--btn-text)',
+    fontWeight: 600, cursor: 'pointer', fontSize: '14px',
+    boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
+  },
 };
 
 export default Profile;

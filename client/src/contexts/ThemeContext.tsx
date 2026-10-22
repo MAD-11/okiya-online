@@ -10,14 +10,14 @@ interface ThemeContextType {
   darkMode: boolean;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
-  toggleDarkMode: () => void; // оставлено для обратной совместимости
+  toggleDarkMode: () => void;
   skin: Skin;
   setSkin: (skin: Skin) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  darkMode: false,
-  themeMode: 'auto',
+  darkMode: true,
+  themeMode: 'dark',
   setThemeMode: () => {},
   toggleDarkMode: () => {},
   skin: 'sakura',
@@ -29,20 +29,20 @@ export const useTheme = () => useContext(ThemeContext);
 const VALID_SKINS: Skin[] = ['sakura', 'bird', 'maple', 'moon', 'bamboo', 'fox', 'fuji', 'torii'];
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // default = dark (пользователь выбрал тёмную тему как основную)
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const stored = localStorage.getItem('okiya_themeMode');
     if (stored === 'auto' || stored === 'light' || stored === 'dark') return stored;
-    // обратная совместимость со старым ключом
     const old = localStorage.getItem('okiya_darkMode');
-    if (old === 'true') return 'dark';
     if (old === 'false') return 'light';
-    return 'auto';
+    if (old === 'true') return 'dark';
+    return 'dark'; // default
   });
 
   const [systemDark, setSystemDark] = useState<boolean>(() =>
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
-      : false
+      : true
   );
 
   const [skin, setSkin] = useState<Skin>(() => {
@@ -50,7 +50,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return stored && VALID_SKINS.includes(stored) ? stored : 'sakura';
   });
 
-  // подписка на смену системной темы
   useEffect(() => {
     if (!window.matchMedia) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

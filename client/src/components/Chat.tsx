@@ -22,16 +22,14 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<number>(); // fixed: NodeJS.Timeout -> number
+  const typingTimeoutRef = useRef<number>();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -46,7 +44,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
         setIsTyping(false);
         socket?.emit('typing', roomId, false);
       }
-    }, 2000);
+    }, 2000) as unknown as number;
   };
 
   const handleSend = () => {
@@ -62,13 +60,11 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
     }
   };
 
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Чат</div>
+      <div style={styles.header}>ЧАТ</div>
       <div style={styles.messageList}>
         {messages.length === 0 && <div style={styles.empty}>Нет сообщений</div>}
         {messages.map((msg, i) => {
@@ -80,6 +76,8 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
                 ...styles.bubble,
                 backgroundColor: isMine ? 'var(--chat-bubble-mine)' : 'var(--chat-bubble-other)',
                 color: isMine ? 'var(--chat-text-mine)' : 'var(--chat-text-other)',
+                borderTopRightRadius: isMine ? '4px' : '14px',
+                borderTopLeftRadius: isMine ? '14px' : '4px',
               }}>
                 <div style={styles.sender}>{msg.sender}</div>
                 <div style={styles.text}>{msg.text}</div>
@@ -110,120 +108,88 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    width: '100%',
-    backgroundColor: 'var(--chat-bg)',
+    display: 'flex', flexDirection: 'column',
+    height: '100%', width: '100%',
+    background: 'var(--card-bg)',
     borderRadius: '20px',
     border: '1px solid var(--border)',
     overflow: 'hidden',
     fontFamily: '"Inter", sans-serif',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
   },
   header: {
-    padding: '12px 16px',
-    fontSize: '13px',
+    padding: '14px 20px',
+    fontSize: '11px',
     fontWeight: 600,
     color: 'var(--secondary-text)',
     borderBottom: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
+    letterSpacing: '2px',
+    background: 'rgba(255,255,255,0.02)',
   },
   messageList: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '12px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
+    flex: 1, overflowY: 'auto',
+    padding: '16px',
+    display: 'flex', flexDirection: 'column', gap: '10px',
   },
   empty: {
     color: 'var(--secondary-text)',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: '50px',
-    fontSize: '13px',
+    fontStyle: 'italic', textAlign: 'center',
+    marginTop: '50px', fontSize: '13px',
   },
-  row: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: '6px',
-  },
+  row: { display: 'flex', alignItems: 'flex-end', gap: '8px' },
   avatar: {
-    width: '24px',
-    height: '24px',
-    borderRadius: '12px',
-    backgroundColor: 'var(--btn-bg)',
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '12px',
-    fontWeight: 600,
-    flexShrink: 0,
+    width: '26px', height: '26px',
+    borderRadius: '13px',
+    background: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '11px', fontWeight: 700, flexShrink: 0,
   },
   bubble: {
-    maxWidth: '80%',
-    padding: '8px 12px',
-    borderRadius: '12px',
-    borderBottomRightRadius: '2px',
-    borderBottomLeftRadius: '2px',
+    maxWidth: '78%',
+    padding: '10px 14px',
+    borderRadius: '14px',
     wordBreak: 'break-word',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid var(--border)',
   },
-  sender: {
-    fontSize: '11px',
-    fontWeight: 600,
-    marginBottom: '2px',
-    opacity: 0.8,
-  },
-  text: {
-    fontSize: '13px',
-    lineHeight: '1.4',
-  },
-  time: {
-    fontSize: '10px',
-    textAlign: 'right',
-    marginTop: '4px',
-    opacity: 0.6,
-  },
+  sender: { fontSize: '11px', fontWeight: 600, marginBottom: '3px', opacity: 0.75 },
+  text: { fontSize: '13px', lineHeight: 1.45 },
+  time: { fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.55 },
   inputArea: {
-    display: 'flex',
-    padding: '8px',
+    display: 'flex', padding: '10px',
     borderTop: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
+    background: 'rgba(255,255,255,0.02)',
+    gap: '8px',
   },
   input: {
     flex: 1,
-    padding: '8px 12px',
-    borderRadius: '20px',
+    padding: '10px 14px',
+    borderRadius: '12px',
     border: '1px solid var(--border)',
     outline: 'none',
     fontSize: '13px',
-    backgroundColor: 'var(--card-bg)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     color: 'var(--text)',
     fontFamily: 'inherit',
+    transition: 'border-color 0.2s',
   },
   sendBtn: {
-    marginLeft: '8px',
-    width: '34px',
-    height: '34px',
-    borderRadius: '17px',
+    width: '38px', height: '38px',
+    borderRadius: '12px',
     border: 'none',
-    backgroundColor: 'var(--btn-bg)',
-    color: '#fff',
-    fontSize: '16px',
+    background: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    fontSize: '16px', fontWeight: 700,
     cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(232,165,192,0.3)',
+    transition: 'all 0.2s',
   },
   typingIndicator: {
     fontSize: '11px',
-    padding: '4px 12px 8px',
-    color: 'var(--secondary-text)',
+    padding: '4px 16px 10px',
+    color: 'var(--accent)',
     fontStyle: 'italic',
   },
 };
