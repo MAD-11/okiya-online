@@ -240,3 +240,23 @@ body, .emoji-font {
 .board-cell-emoji {
   font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
 }
+
+/* ===== Текстура доски (#17) ===== */
+:root {
+  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23000000' fill-opacity='0.035'/%3E%3C/svg%3E");
+}
+.dark {
+  --board-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E");
+}
+.board-grid {
+  background-color: var(--bg);
+  background-image: var(--board-texture);
+  background-size: 24px 24px;
+}
+
+/* ===== Анимация переворота камня (#15) ===== */
+@keyframes placeStone {
+  0%   { transform: perspective(300px) rotateY(0deg)   scale(0.5); opacity: 0; }
+  60%  { transform: perspective(300px) rotateY(180deg) scale(1.1); opacity: 1; }
+  100% { transform: perspective(300px) rotateY(360deg) scale(1);   opacity: 1; }
+}

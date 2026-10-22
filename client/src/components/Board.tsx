@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
 import { initAudio } from '../utils/sound';
 
@@ -16,18 +16,27 @@ interface BoardProps {
 
 const skinEmoji: Record<string, { red: string; black: string }> = {
   sakura: { red: '🌸', black: '🌺' },
-  bird: { red: '🐦', black: '🐦‍⬛' },
-  maple: { red: '🍁', black: '🍂' },
-  moon: { red: '🌙', black: '🌑' },
+  bird:   { red: '🐦', black: '🐦‍⬛' },
+  maple:  { red: '🍁', black: '🍂' },
+  moon:   { red: '🌙', black: '🌑' },
+  bamboo: { red: '🎋', black: '🎍' },
+  fox:    { red: '🦊', black: '🐺' },
+  fuji:   { red: '🗻', black: '🏔️' },
+  torii:  { red: '⛩️', black: '🏯' },
 };
 
 const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false }) => {
   const cellSize = 88;
   const fontSize = 32;
   const [invalidCell, setInvalidCell] = useState<{ row: number; col: number } | null>(null);
+  const [cursor, setCursor] = useState<{ row: number; col: number } | null>(null);
+  const [focused, setFocused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const canInteract = (row: number, col: number) => !!validMoves[row]?.[col];
 
   const handleCellClick = (row: number, col: number) => {
-    if (validMoves[row]?.[col]) {
+    if (canInteract(row, col)) {
       initAudio();
       onClick(row, col);
     } else {
@@ -36,23 +45,74 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
     }
   };
 
-  const getStoneEmoji = (color: 'red' | 'black') => {
-    if (color === 'red') {
-      return skinEmoji[hostSkin]?.red || skinEmoji.sakura.red;
-    } else {
-      return skinEmoji[guestSkin]?.black || skinEmoji.sakura.black;
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Инициализация курсора при первом нажатии
+    if (!cursor) {
+      let start: { row: number; col: number } | null = null;
+      for (let r = 0; r < 4 && !start; r++) {
+        for (let c = 0; c < 4 && !start; c++) {
+          if (canInteract(r, c)) start = { row: r, col: c };
+        }
+      }
+      setCursor(start || { row: 1, col: 1 });
+      return;
     }
+
+    let { row, col } = cursor;
+    let handled = true;
+
+    switch (e.key) {
+      case 'ArrowUp':    row = (row + 3) % 4; break;
+      case 'ArrowDown':  row = (row + 1) % 4; break;
+      case 'ArrowLeft':  col = (col + 3) % 4; break;
+      case 'ArrowRight': col = (col + 1) % 4; break;
+      case 'Enter':
+      case ' ':
+        if (canInteract(row, col)) {
+          handleCellClick(row, col);
+        } else {
+          setInvalidCell({ row, col });
+          setTimeout(() => setInvalidCell(null), 200);
+        }
+        break;
+      case 'Escape':
+        setCursor(null);
+        break;
+      default:
+        handled = false;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      setCursor({ row, col });
+    }
+  }, [cursor, validMoves, onClick]);
+
+  const getStoneEmoji = (color: 'red' | 'black') => {
+    if (color === 'red') return skinEmoji[hostSkin]?.red || skinEmoji.sakura.red;
+    return skinEmoji[guestSkin]?.black || skinEmoji.sakura.black;
   };
 
   return (
-    <div className={shake ? 'board-shake' : ''} style={styles.boardContainer}>
-      <div style={styles.grid}>
+    <div
+      className={shake ? 'board-shake' : ''}
+      ref={containerRef}
+      style={styles.boardContainer}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      aria-label="Игровое поле. Используйте стрелки и Enter для хода"
+    >
+      <div className="board-grid" style={styles.grid}>
         {board.map((row, r) =>
           row.map((cell, c) => {
             const isValid = validMoves[r]?.[c];
             const isPlayerCell = cell === 'red' || cell === 'black';
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
             const isInvalid = invalidCell?.row === r && invalidCell?.col === c;
+            const isCursor = focused && cursor?.row === r && cursor?.col === c;
+
             return (
               <div
                 key={`${r}-${c}`}
@@ -61,47 +121,33 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                   ...styles.cell,
                   width: cellSize,
                   height: cellSize,
-                  fontSize: fontSize,
+                  fontSize,
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
                     : isInvalid ? '#ffcccc' : 'var(--cell-bg)',
-                  border: isValid ? '2px solid var(--valid-move-border)' : '1px solid var(--border)',
-                  animation: isLastMove ? 'placeStone 0.3s ease-out' : 'none',
+                  border: isCursor
+                    ? '3px solid var(--turn-indicator)'
+                    : isValid
+                      ? '2px solid var(--valid-move-border)'
+                      : '1px solid var(--border)',
+                  boxShadow: isCursor ? '0 0 0 3px rgba(212,163,115,0.3)' : undefined,
                 }}
               >
                 {cell && typeof cell !== 'string' && (
                   <span style={styles.tileEmoji}>{getTileEmoji(cell.plant, cell.symbol)}</span>
                 )}
                 {cell === 'red' && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--stone-red-bg)',
-                    boxShadow: 'inset 0 0 0 2px rgba(220,80,60,0.4), 0 2px 8px rgba(0,0,0,0.2)',
-                    transition: 'all 0.1s ease',
-                  }}>
-                    <span style={styles.stone}>{getStoneEmoji('red')}</span>
-                  </div>
+                  <span style={{
+                    ...styles.stone,
+                    animation: isLastMove ? 'placeStone 0.45s ease-out' : 'none',
+                  }}>{getStoneEmoji('red')}</span>
                 )}
                 {cell === 'black' && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--stone-black-bg)',
-                    boxShadow: 'inset 0 0 0 2px rgba(80,80,100,0.4), 0 2px 8px rgba(0,0,0,0.2)',
-                    transition: 'all 0.1s ease',
-                  }}>
-                    <span style={styles.stone}>{getStoneEmoji('black')}</span>
-                  </div>
+                  <span style={{
+                    ...styles.stone,
+                    animation: isLastMove ? 'placeStone 0.45s ease-out' : 'none',
+                  }}>{getStoneEmoji('black')}</span>
                 )}
               </div>
             );
@@ -121,37 +167,31 @@ function getTileEmoji(plant: string, symbol: string): string {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  boardContainer: { display: 'flex', justifyContent: 'center' },
+  boardContainer: { display: 'flex', justifyContent: 'center', outline: 'none' },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 88px)',
     gap: '8px',
     padding: '16px',
-    backgroundColor: 'var(--bg)',
     borderRadius: '16px',
     boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
+    // backgroundColor и текстура — из CSS-класса .board-grid
   },
   cell: {
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s',
+    transition: 'background-color 0.2s, border 0.15s',
+    perspective: '300px',
   },
-  tileEmoji: { 
-  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-  fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
-  },
+  tileEmoji: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' },
   stone: {
     fontSize: '38px',
-    filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))',
-    textShadow: '0 0 2px rgba(0,0,0,0.5)',
-    transition: 'transform 0.1s ease',
+    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
     display: 'inline-block',
-    fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
+    transformStyle: 'preserve-3d',
   },
-
 };
-
 
 export default Board;
