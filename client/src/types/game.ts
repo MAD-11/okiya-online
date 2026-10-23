@@ -36,6 +36,18 @@ export interface GameState {
   hostSkin: string;
   guestSkin: string; // FIX: добавлено поле для скина гостя
   isPrivate?: boolean;
+  puzzlesSolved?: number;
 }
 
 export type ValidMoves = boolean[][];
+
+export type PuzzleDifficulty = 1 | 2;
+
+export interface Puzzle {
+  id: string;
+  difficulty: PuzzleDifficulty;
+  board: Board;
+  lastPickedTile: Tile;
+  solution: Array<{ row: number; col: number }>;
+  hint: string;
+}

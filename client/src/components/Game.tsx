@@ -14,6 +14,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import RulesModal from './RulesModal';
 import TutorialGame from './TutorialGame';
 import BotGame from './BotGame';
+import PuzzleGame from './PuzzleGame';
+import PuzzleList from './PuzzleList';
+import { PuzzleDifficulty } from '../types/game';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -57,6 +60,8 @@ const Game: React.FC = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showBotGame, setShowBotGame] = useState(false);
+  const [showPuzzles, setShowPuzzles] = useState(false);
+  const [puzzleDifficulty, setPuzzleDifficulty] = useState<PuzzleDifficulty | null>(null);
   const [botDifficulty, setBotDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
 
   useEffect(() => {
@@ -390,6 +395,15 @@ const Game: React.FC = () => {
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
+          </div>
+          <div style={{ marginTop: '10px', marginBottom: '18px' }}>
+            <button
+              onClick={() => setShowPuzzles(true)}
+              style={{ ...styles.secondaryBtn, marginTop: 0 }}
+              title="Тренировка: реши позицию за N ходов"
+            >
+              🎯 Пазлы
+            </button>
           </div>
           <div style={styles.difficultySelector}>
             <p style={styles.difficultyLabel}>🤖 Игра с ботом</p>
