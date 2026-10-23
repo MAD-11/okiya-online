@@ -757,6 +757,24 @@ const Game: React.FC = () => {
       {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
       {showBotGame && <BotGame difficulty={botDifficulty} onClose={() => setShowBotGame(false)} />}
+      {showPuzzles && puzzleDifficulty === null && (
+        <PuzzleList
+          onSelect={(d) => setPuzzleDifficulty(d)}
+          onClose={() => setShowPuzzles(false)}
+        />
+      )}
+      {showPuzzles && puzzleDifficulty !== null && (
+        <PuzzleGame
+          difficulty={puzzleDifficulty}
+          playerId={playerId}
+          socket={socket}
+          onChangeDifficulty={() => setPuzzleDifficulty(null)}
+          onClose={() => {
+            setShowPuzzles(false);
+            setPuzzleDifficulty(null);
+          }}
+        />
+      )}
     </>
   );
 };
