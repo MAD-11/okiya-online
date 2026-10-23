@@ -26,6 +26,12 @@ module.exports = {
       functions: 75,
       lines: 60,
     },
+    './src/puzzle/': {
+      statements: 70,
+      branches: 60,
+      functions: 80,
+      lines: 70,
+    },
   },
   // Предотвращает зависание воркера из-за открытых хендлов (Redis, таймеры)
   forceExit: true,
