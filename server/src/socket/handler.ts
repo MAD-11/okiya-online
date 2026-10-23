@@ -7,6 +7,14 @@ import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
 import { initBoard } from '../game/Board';
+import {
+  recordPuzzleSolved,
+  storeActivePuzzle,
+  consumeActivePuzzle,
+} from '../stats';
+import { generatePuzzle, generateWinIn1, generateWinIn2Safe } from '../puzzle/generator';
+import { PuzzleDifficulty } from '../puzzle/types';
+
 
 // ============================================================
 // RATE LIMITING
@@ -652,5 +660,43 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           callback({ games: 0, wins: 0, draws: 0, history: [] });
         });
     });
+    // ============================================================
+    // PUZZLES
+    // ============================================================
+
+    socket.on('puzzle:request', async (difficulty: PuzzleDifficulty, callback) => {
+      try {
+        if (difficulty !== 1 && difficulty !== 2) {
+          return callback({ error: 'Недопустимая сложность' });
+        }
+        const puzzle =
+          difficulty === 1 ? generateWinIn1() : generateWinIn2Safe();
+        await storeActivePuzzle(puzzle.id, puzzle.difficulty);
+        logger.info(`Puzzle ${puzzle.id} (difficulty ${puzzle.difficulty}) requested by ${socket.id}`);
+        callback({ puzzle });
+      } catch (err) {
+        logger.error('puzzle:request error', err);
+        callback({ error: 'Не удалось создать пазл' });
+      }
+    });
+
+    socket.on('puzzle:solved', async (puzzleId: string, playerId: string, callback) => {
+      try {
+        if (!puzzleId || !playerId) {
+          return callback({ error: 'Некорректные данные' });
+        }
+        const difficulty = await consumeActivePuzzle(puzzleId);
+        if (difficulty === null) {
+          return callback({ error: 'Пазл не найден или уже решён' });
+        }
+        const totalSolved = await recordPuzzleSolved(playerId);
+        logger.info(`Puzzle ${puzzleId} solved by ${playerId}, total=${totalSolved}`);
+        callback({ success: true, puzzlesSolved: totalSolved });
+      } catch (err) {
+        logger.error('puzzle:solved error', err);
+        callback({ error: 'Не удалось засчитать' });
+      }
+    });
+
   });
 }

@@ -85,6 +85,7 @@ export async function getPlayerStats(playerId: string): Promise<{
   wins: number;
   draws: number;
   rating: number;
+  puzzlesSolved: number; // ← добавить
   history: GameResult[];
 }> {
   try {
@@ -92,15 +93,95 @@ export async function getPlayerStats(playerId: string): Promise<{
     const data = await withTimeout(pubClient.lrange(key, 0, 99), REDIS_TIMEOUT);
     const games = data.map((d: string) => JSON.parse(d));
     const rating = await getPlayerRating(playerId);
+    const puzzlesSolved = await getPuzzlesSolved(playerId); // ← добавить
+
     let wins = 0, draws = 0;
     games.forEach((g: GameResult) => {
       const isHost = g.players.host === playerId;
       if (g.winner === 'draw') draws++;
       else if ((g.winner === 'host' && isHost) || (g.winner === 'guest' && !isHost)) wins++;
     });
-    return { games: games.length, wins, draws, rating, history: games };
+
+    return {
+      games: games.length,
+      wins,
+      draws,
+      rating,
+      puzzlesSolved, // ← добавить
+      history: games,
+    };
   } catch (err) {
-    console.error('getPlayerStats failed, returning defaults:', err);
-    return { games: 0, wins: 0, draws: 0, rating: DEFAULT_RATING, history: [] };
+    console.error('getPlayerStats failed:', err);
+    return {
+      games: 0, wins: 0, draws: 0,
+      rating: DEFAULT_RATING,
+      puzzlesSolved: 0,
+      history: [],
+    };
+  }
+}
+
+// ============================================================
+// PUZZLES
+// ============================================================
+
+const PUZZLES_SOLVED_PREFIX = 'okiya:puzzlesSolved:';
+const PUZZLE_PREFIX = 'okiya:puzzle:';
+const PUZZLE_TTL = 30 * 60; // 30 минут
+
+export async function recordPuzzleSolved(playerId: string): Promise<number> {
+  try {
+    const key = PUZZLES_SOLVED_PREFIX + playerId;
+    const newCount = await withTimeout(pubClient.incr(key), REDIS_TIMEOUT);
+    return newCount;
+  } catch (err) {
+    console.error('recordPuzzleSolved failed:', err);
+    return 0;
+  }
+}
+
+export async function getPuzzlesSolved(playerId: string): Promise<number> {
+  try {
+    const key = PUZZLES_SOLVED_PREFIX + playerId;
+    const val = await withTimeout(pubClient.get(key), REDIS_TIMEOUT);
+    return val ? parseInt(val, 10) : 0;
+  } catch (err) {
+    console.error('getPuzzlesSolved failed:', err);
+    return 0;
+  }
+}
+
+/**
+ * Сохранить активный пазл в Redis (для валидации при решении).
+ */
+export async function storeActivePuzzle(
+  puzzleId: string,
+  difficulty: number
+): Promise<void> {
+  try {
+    const key = PUZZLE_PREFIX + puzzleId;
+    await withTimeout(
+      pubClient.set(key, String(difficulty), 'EX', PUZZLE_TTL),
+      REDIS_TIMEOUT
+    );
+  } catch (err) {
+    console.error('storeActivePuzzle failed:', err);
+  }
+}
+
+/**
+ * Атомарно прочитать и удалить пазл (getdel).
+ * Возвращает difficulty или null, если пазл не найден / уже использован / истёк.
+ */
+export async function consumeActivePuzzle(
+  puzzleId: string
+): Promise<number | null> {
+  try {
+    const key = PUZZLE_PREFIX + puzzleId;
+    const val = await withTimeout(pubClient.getdel(key), REDIS_TIMEOUT);
+    return val ? parseInt(val, 10) : null;
+  } catch (err) {
+    console.error('consumeActivePuzzle failed:', err);
+    return null;
   }
 }
