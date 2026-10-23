@@ -34,7 +34,7 @@ async function setPlayerRating(playerId: string, rating: number): Promise<void> 
   await withTimeout(pubClient.set(RATING_PREFIX + playerId, String(rating)), REDIS_TIMEOUT);
 }
 
-function calculateNewRatings(
+export function calculateNewRatings(
   ratingA: number,
   ratingB: number,
   scoreA: number,
