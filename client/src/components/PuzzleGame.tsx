@@ -130,13 +130,20 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     requestPuzzle();
   };
 
-  const validMovesForDisplay = (() => {
-    if (!board || !puzzle || solved) {
-      return Array(4).fill(null).map(() => Array(4).fill(false));
-    }
-    // Не подсказываем решение — показываем пустую доску валидности
+    // Подсветка: не подсказываем решение — пусто
+    const validMovesForDisplay = (() => {
     return Array(4).fill(null).map(() => Array(4).fill(false));
-  })();
+    })();
+
+    // Кликабельность: все клетки, где есть фишка (не камень)
+    const clickableCells = (() => {
+    if (!board || solved) {
+        return Array(4).fill(null).map(() => Array(4).fill(false));
+    }
+    return board.map(row =>
+        row.map(cell => !!cell && typeof cell !== 'string')
+    );
+    })();
 
   return (
     <div style={styles.container}>
@@ -171,6 +178,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
               <Board
                 board={board}
                 validMoves={validMovesForDisplay}
+                clickableCells={clickableCells} 
                 onClick={handleCellClick}
                 currentPlayer="red"
                 myColor="red"

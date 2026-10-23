@@ -12,6 +12,7 @@ interface BoardProps {
   hostSkin: string;
   guestSkin: string;
   shake?: boolean;
+  clickableCells?: ValidMoves;  // ← добавить
 }
 
 const skinEmoji: Record<string, { red: string; black: string }> = {
@@ -25,7 +26,7 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
   torii:  { red: '⛩️', black: '🏯' },
 };
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false }) => {
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false, clickableCells}) => {
   const cellSize = 88;
   const fontSize = 32;
   const [invalidCell, setInvalidCell] = useState<{ row: number; col: number } | null>(null);
@@ -33,10 +34,14 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
   const [focused, setFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const canInteract = (row: number, col: number) => !!validMoves[row]?.[col];
+  const canInteract = (row: number, col: number) => {
+    const clickable = clickableCells ?? validMoves;
+    return !!clickable[row]?.[col];
+  };
 
   const handleCellClick = (row: number, col: number) => {
-    if (canInteract(row, col)) {
+    const clickable = clickableCells ?? validMoves;
+    if (clickable[row]?.[col]) {
       initAudio();
       onClick(row, col);
     } else {
