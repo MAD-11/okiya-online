@@ -1,0 +1,49 @@
+# ============ OS ============
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ============ IDE ============
+.vscode/
+.idea/
+*.iml
+
+# ============ Node ============
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ============ Build ============
+dist/
+dist-test/
+build/
+*.tsbuildinfo
+
+# ============ Test / Coverage ============
+coverage/
+.nyc_output/
+*.lcov
+jest-cache/
+.jest-cache/
+
+# ============ Env ============
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ============ Logs ============
+logs/
+*.log
+
+# ============ Vercel / Render ============
+.vercel/
+.render/
+
+# ============ Vite ============
+.vite/
+client/dist/
+client/node_modules/.vite/
