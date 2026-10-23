@@ -14,6 +14,7 @@ interface Stats {
   wins: number;
   draws: number;
   rating: number;
+  puzzlesSolved: number;
   history: GameResult[];
 }
 
@@ -25,11 +26,11 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
     if (socket && playerId) {
       setLoading(true);
       socket.emit('get_profile', playerId, (data: Stats) => {
-        setStats(data || { games: 0, wins: 0, draws: 0, rating: 1000, history: [] });
+        setStats(data || { games: 0, wins: 0, draws: 0, rating: 1000, puzzlesSolved: 0, history: [] });
         setLoading(false);
       });
     } else {
-      setStats({ games: 0, wins: 0, draws: 0, rating: 1000, history: [] });
+      setStats({ games: 0, wins: 0, draws: 0, rating: 1000, puzzlesSolved: 0, history: [] });
       setLoading(false);
     }
   }, [socket, playerId]);
@@ -70,6 +71,14 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
             <div style={styles.statCard}>
               <div style={styles.statValue}>{stats.draws}</div>
               <div style={styles.statLabel}>ничьих</div>
+            </div>
+          </div>
+
+          <div style={styles.puzzleBadge}>
+            <span style={styles.puzzleIcon}>🎯</span>
+            <div style={styles.puzzleInfo}>
+              <span style={styles.puzzleValue}>{stats.puzzlesSolved}</span>
+              <span style={styles.puzzleLabel}>пазлов решено</span>
             </div>
           </div>
 
@@ -115,15 +124,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text)',
     fontFamily: '"Inter", sans-serif',
     borderRadius: '24px',
-    maxHeight: '80vh', overflowY: 'auto',
-    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+    maxHeight: '80vh',
+    overflowY: 'auto',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
   },
   title: { fontSize: '22px', fontWeight: 600, margin: '0 0 20px', textAlign: 'center', letterSpacing: '0.5px' },
   loading: { textAlign: 'center', color: 'var(--secondary-text)', padding: '20px' },
   ratingBadge: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '16px 20px',
-    marginBottom: '20px',
+    marginBottom: '16px',
     background: 'var(--card-bg)',
     borderRadius: '16px',
     border: '1px solid var(--border)',
@@ -135,7 +146,7 @@ const styles: Record<string, React.CSSProperties> = {
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
   },
-  statsGrid: { display: 'flex', gap: '12px', marginBottom: '20px' },
+  statsGrid: { display: 'flex', gap: '12px', marginBottom: '16px' },
   statCard: {
     flex: 1, textAlign: 'center',
     padding: '14px',
@@ -145,6 +156,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   statValue: { fontSize: '26px', fontWeight: 700 },
   statLabel: { fontSize: '11px', color: 'var(--secondary-text)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '1px' },
+  puzzleBadge: {
+    display: 'flex', alignItems: 'center', gap: '14px',
+    padding: '14px 20px',
+    marginBottom: '20px',
+    background: 'rgba(232, 165, 192, 0.08)',
+    borderRadius: '16px',
+    border: '1px solid rgba(232, 165, 192, 0.3)',
+  },
+  puzzleIcon: { fontSize: '28px', lineHeight: 1 },
+  puzzleInfo: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
+  puzzleValue: {
+    fontSize: '24px', fontWeight: 700,
+    background: 'var(--btn-bg)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  puzzleLabel: { fontSize: '11px', color: 'var(--secondary-text)', textTransform: 'uppercase', letterSpacing: '1px' },
   historySection: { marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' },
   historyTitle: { fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: 'var(--secondary-text)', textTransform: 'uppercase', letterSpacing: '1px' },
   historyList: { maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
