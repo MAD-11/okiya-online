@@ -2,6 +2,7 @@ import { pubClient } from './redis';
 
 interface GameResult {
   roomId: string;
+  gameId: string;
   winner: 'host' | 'guest' | 'draw';
   players: { host: string; guest: string };
   timestamp: number;
