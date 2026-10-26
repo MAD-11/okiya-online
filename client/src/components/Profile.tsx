@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
+import ReplayViewer from './ReplayViewer';
 
 interface GameResult {
   roomId: string;
+  gameId?: string;   // ← опционально, для старых записей
   winner: 'host' | 'guest' | 'draw';
   players: { host: string; guest: string };
   timestamp: number;
@@ -21,6 +23,7 @@ interface Stats {
 const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: string }> = ({ onClose, socket, playerId }) => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [replayGameId, setReplayGameId] = useState<string | null>(null);
 
   useEffect(() => {
     if (socket && playerId) {
@@ -47,73 +50,99 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
   };
 
   return (
-    <div style={styles.container}>
-      <h3 style={styles.title}>📊 Профиль</h3>
+    <>
+      <div style={styles.container}>
+        <h3 style={styles.title}>📊 Профиль</h3>
 
-      {loading ? (
-        <p style={styles.loading}>Загрузка...</p>
-      ) : stats ? (
-        <>
-          <div style={styles.ratingBadge}>
-            <span style={styles.ratingLabel}>Рейтинг ELO</span>
-            <span style={styles.ratingValue}>{stats.rating}</span>
-          </div>
+        {loading ? (
+          <p style={styles.loading}>Загрузка...</p>
+        ) : stats ? (
+          <>
+            <div style={styles.ratingBadge}>
+              <span style={styles.ratingLabel}>Рейтинг ELO</span>
+              <span style={styles.ratingValue}>{stats.rating}</span>
+            </div>
 
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}>
-              <div style={styles.statValue}>{stats.games}</div>
-              <div style={styles.statLabel}>игр</div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={styles.statValue}>{stats.wins}</div>
-              <div style={styles.statLabel}>побед</div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={styles.statValue}>{stats.draws}</div>
-              <div style={styles.statLabel}>ничьих</div>
-            </div>
-          </div>
-
-          <div style={styles.puzzleBadge}>
-            <span style={styles.puzzleIcon}>🎯</span>
-            <div style={styles.puzzleInfo}>
-              <span style={styles.puzzleValue}>{stats.puzzlesSolved}</span>
-              <span style={styles.puzzleLabel}>пазлов решено</span>
-            </div>
-          </div>
-
-          {stats.history && stats.history.length > 0 ? (
-            <div style={styles.historySection}>
-              <h4 style={styles.historyTitle}>📜 Последние игры</h4>
-              <div style={styles.historyList}>
-                {stats.history.slice(0, 15).map((game, idx) => {
-                  const isHost = game.players.host === playerId;
-                  const r = getResult(game, isHost);
-                  return (
-                    <div key={idx} style={styles.historyItem}>
-                      <div style={styles.historyLeft}>
-                        <span style={styles.historyEmoji}>{r.emoji}</span>
-                        <div style={styles.historyInfo}>
-                          <span style={{ ...styles.historyResult, color: r.color }}>{r.text}</span>
-                          <span style={styles.historyOpponent}>
-                            vs {isHost ? game.players.guest.slice(0, 10) : game.players.host.slice(0, 10)}
-                          </span>
-                        </div>
-                      </div>
-                      <span style={styles.historyDate}>{formatDate(game.timestamp)}</span>
-                    </div>
-                  );
-                })}
+            <div style={styles.statsGrid}>
+              <div style={styles.statCard}>
+                <div style={styles.statValue}>{stats.games}</div>
+                <div style={styles.statLabel}>игр</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={styles.statValue}>{stats.wins}</div>
+                <div style={styles.statLabel}>побед</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={styles.statValue}>{stats.draws}</div>
+                <div style={styles.statLabel}>ничьих</div>
               </div>
             </div>
-          ) : (
-            <p style={styles.noHistory}>Нет сыгранных игр</p>
-          )}
-        </>
-      ) : null}
 
-      <button onClick={onClose} style={styles.closeBtn}>Закрыть</button>
-    </div>
+            <div style={styles.puzzleBadge}>
+              <span style={styles.puzzleIcon}>🎯</span>
+              <div style={styles.puzzleInfo}>
+                <span style={styles.puzzleValue}>{stats.puzzlesSolved}</span>
+                <span style={styles.puzzleLabel}>пазлов решено</span>
+              </div>
+            </div>
+
+            {stats.history && stats.history.length > 0 ? (
+              <div style={styles.historySection}>
+                <h4 style={styles.historyTitle}>📜 Последние игры</h4>
+                <div style={styles.historyList}>
+                  {stats.history.slice(0, 15).map((game, idx) => {
+                    const isHost = game.players.host === playerId;
+                    const r = getResult(game, isHost);
+                    const canReplay = !!game.gameId;
+                    return (
+                      <div key={idx} style={styles.historyItem}>
+                        <div style={styles.historyLeft}>
+                          <span style={styles.historyEmoji}>{r.emoji}</span>
+                          <div style={styles.historyInfo}>
+                            <span style={{ ...styles.historyResult, color: r.color }}>{r.text}</span>
+                            <span style={styles.historyOpponent}>
+                              vs {isHost ? game.players.guest.slice(0, 10) : game.players.host.slice(0, 10)}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={styles.historyRight}>
+                          <span style={styles.historyDate}>{formatDate(game.timestamp)}</span>
+                          {canReplay ? (
+                            <button
+                              onClick={() => setReplayGameId(game.gameId!)}
+                              style={styles.replayBtn}
+                              title="Смотреть реплей"
+                            >
+                              ▶ Смотреть
+                            </button>
+                          ) : (
+                            <span style={styles.noReplay} title="Реплей недоступен для старых партий">
+                              —
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p style={styles.noHistory}>Нет сыгранных игр</p>
+            )}
+          </>
+        ) : null}
+
+        <button onClick={onClose} style={styles.closeBtn}>Закрыть</button>
+      </div>
+
+      {replayGameId && socket && (
+        <ReplayViewer
+          gameId={replayGameId}
+          socket={socket}
+          onClose={() => setReplayGameId(null)}
+        />
+      )}
+    </>
   );
 };
 
@@ -175,7 +204,7 @@ const styles: Record<string, React.CSSProperties> = {
   puzzleLabel: { fontSize: '11px', color: 'var(--secondary-text)', textTransform: 'uppercase', letterSpacing: '1px' },
   historySection: { marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' },
   historyTitle: { fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: 'var(--secondary-text)', textTransform: 'uppercase', letterSpacing: '1px' },
-  historyList: { maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
+  historyList: { maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' },
   historyItem: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '10px 14px',
@@ -183,13 +212,39 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--card-bg)',
     border: '1px solid var(--border)',
     fontSize: '13px',
+    gap: '12px',
   },
-  historyLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
+  historyLeft: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 },
   historyEmoji: { fontSize: '18px' },
-  historyInfo: { display: 'flex', flexDirection: 'column' },
+  historyInfo: { display: 'flex', flexDirection: 'column', minWidth: 0 },
   historyResult: { fontWeight: 600 },
-  historyOpponent: { fontSize: '11px', color: 'var(--secondary-text)' },
+  historyOpponent: { fontSize: '11px', color: 'var(--secondary-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  historyRight: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '4px',
+    flexShrink: 0,
+  },
   historyDate: { fontSize: '11px', color: 'var(--secondary-text)' },
+  replayBtn: {
+    padding: '4px 10px',
+    borderRadius: '8px',
+    border: '1px solid rgba(232,165,192,0.4)',
+    background: 'rgba(232,165,192,0.1)',
+    color: 'var(--accent)',
+    cursor: 'pointer',
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.3px',
+    transition: 'all 0.15s',
+  },
+  noReplay: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    opacity: 0.4,
+    padding: '4px 10px',
+  },
   noHistory: { textAlign: 'center', color: 'var(--secondary-text)', padding: '20px', fontStyle: 'italic' },
   closeBtn: {
     display: 'block', margin: '20px auto 0',

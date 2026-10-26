@@ -51,3 +51,30 @@ export interface Puzzle {
   solution: Array<{ row: number; col: number }>;
   hint: string;
 }
+
+// ============================================================
+// REPLAYS
+// ============================================================
+
+export interface ReplayMove {
+  row: number;
+  col: number;
+  player: 'red' | 'black';
+  tile: Tile;
+  timestamp: number;
+}
+
+export interface ReplayMeta {
+  gameId: string;
+  board: Board;
+  lastPickedTile: Tile | null;
+  players: { red: string; black: string };
+  roomId: string;
+  maxWins: number;
+  startedAt: number;
+}
+
+export interface Replay {
+  meta: ReplayMeta;
+  moves: ReplayMove[];
+}
