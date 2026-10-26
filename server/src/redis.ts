@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
 import { Game } from './game/Game';
 import { logger } from './logger';
+import crypto from 'crypto';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -40,6 +41,7 @@ const GAME_TTL = 3600; // 1 час
 
 function serializeGame(game: Game): string {
   return JSON.stringify({
+    gameId: game.gameId,
     board: game.board,
     currentPlayer: game.currentPlayer,
     status: game.status,
@@ -70,6 +72,7 @@ function serializeGame(game: Game): string {
 function deserializeGame(data: string): Game {
   const obj = JSON.parse(data);
   const game = new Game(obj.maxWins, obj.turnDuration);
+  game.gameId = obj.gameId || crypto.randomBytes(6).toString('hex');
   game.board = obj.board;
   game.currentPlayer = obj.currentPlayer;
   game.status = obj.status;
