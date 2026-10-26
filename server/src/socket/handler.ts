@@ -14,17 +14,18 @@ import {
 } from '../stats';
 import { generatePuzzle, generateWinIn1, generateWinIn2Safe } from '../puzzle/generator';
 import { PuzzleDifficulty } from '../puzzle/types';
+import { saveReplayMeta, saveReplayMove, getReplay } from '../replay';
 
 
 // ============================================================
 // RATE LIMITING
 // ============================================================
-const moveRateLimits = new Map<string, number[]>();   // socketId -> timestamps
-const chatRateLimits = new Map<string, number[]>();   // socketId -> timestamps
+const moveRateLimits = new Map<string, number[]>();
+const chatRateLimits = new Map<string, number[]>();
 
-const MOVE_LIMIT_MS = 1000;                           // 1 ход в секунду
-const CHAT_LIMIT_COUNT = 5;                           // 5 сообщений...
-const CHAT_LIMIT_WINDOW_MS = 10_000;                  // ...за 10 секунд
+const MOVE_LIMIT_MS = 1000;
+const CHAT_LIMIT_COUNT = 5;
+const CHAT_LIMIT_WINDOW_MS = 10_000;
 
 function checkMoveRate(socketId: string): boolean {
   const now = Date.now();
@@ -386,8 +387,37 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
         logger.info(`move from ${socket.id} in ${roomId} (${row},${col})`);
         const game = games.get(roomId);
         if (!game) return callback({ error: 'Игра не найдена' });
+
+        // === REPLAY: запомнить начальную доску при первом ходе ===
+        const isFirstMove = game.lastPickedTile === null;
+        const initialBoardSnapshot = isFirstMove ? game.board.map(r => [...r]) : null;
+
         const success = game.makeMove(row, col, socket.id);
         if (!success) return callback({ error: 'Недопустимый ход' });
+
+        // === REPLAY: сохранить meta при первом ходе ===
+        if (isFirstMove && initialBoardSnapshot) {
+          await saveReplayMeta({
+            gameId: game.gameId,
+            board: initialBoardSnapshot,
+            lastPickedTile: null,
+            players: { red: game.nickRed, black: game.nickBlack },
+            roomId,
+            maxWins: game.maxWins,
+            startedAt: Date.now(),
+          });
+        }
+
+        // === REPLAY: сохранить ход ===
+        if (game.lastPickedTile) {
+          await saveReplayMove(game.gameId, {
+            row,
+            col,
+            player: game.players.red === socket.id ? 'red' : 'black',
+            tile: game.lastPickedTile,
+            timestamp: Date.now(),
+          });
+        }
 
         await saveGame(roomId, game);
         sendPersonalGameState(io, game);
@@ -397,6 +427,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           if (game.seriesWinner || game.maxWins === 1) {
             await saveGameResult({
               roomId,
+              gameId: game.gameId,
               winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
               players: { host: game.hostPlayerId, guest: game.guestPlayerId },
               timestamp: Date.now(),
@@ -443,6 +474,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
       if (game.seriesWinner || game.maxWins === 1) {
         saveGameResult({
           roomId,
+          gameId: game.gameId,
           winner: game.seriesWinner || (game.winner === 'red' ? 'host' : 'guest'),
           players: { host: game.hostPlayerId, guest: game.guestPlayerId },
           timestamp: Date.now(),
@@ -569,6 +601,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
                 if (currentGame.seriesWinner || currentGame.maxWins === 1) {
                   saveGameResult({
                     roomId,
+                    gameId: currentGame.gameId,
                     winner: currentGame.seriesWinner || (currentGame.winner === 'red' ? 'host' : 'guest'),
                     players: { host: currentGame.hostPlayerId, guest: currentGame.guestPlayerId },
                     timestamp: Date.now(),
@@ -660,6 +693,26 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>) {
           callback({ games: 0, wins: 0, draws: 0, history: [] });
         });
     });
+    // ============================================================
+    // REPLAYS
+    // ============================================================
+    socket.on('replay:get', async (gameId: string, callback) => {
+      try {
+        if (!gameId || typeof gameId !== 'string' || gameId.length < 6) {
+          return callback({ error: 'Некорректный gameId' });
+        }
+        const { meta, moves } = await getReplay(gameId);
+        if (!meta) {
+          return callback({ error: 'Реплей не найден или истёк срок хранения' });
+        }
+        logger.info(`replay:get ${gameId} — ${moves.length} moves`);
+        callback({ meta, moves });
+      } catch (err) {
+        logger.error('replay:get error', err);
+        callback({ error: 'Не удалось загрузить реплей' });
+      }
+    });
+
     // ============================================================
     // PUZZLES
     // ============================================================

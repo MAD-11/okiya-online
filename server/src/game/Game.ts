@@ -1,8 +1,10 @@
 import { Board, GameStatus, Tile, Winner } from './types';
 import { initBoard, isValidMove, checkWin } from './Board';
+import crypto from 'crypto';
 
 export class Game {
   public roomId: string | null = null;
+  public gameId: string;
   public board: Board;
   public currentPlayer: 'red' | 'black';
   public status: GameStatus;
@@ -40,6 +42,7 @@ export class Game {
   public lastMove: { row: number; col: number } | null = null;
 
   constructor(maxWins = 1, turnDuration = 30_000) {
+    this.gameId = crypto.randomBytes(6).toString('hex');
     this.board = initBoard();
     this.currentPlayer = 'red';
     this.status = 'waiting';
@@ -210,6 +213,7 @@ export class Game {
   }
 
   private fullReset() {
+    this.gameId = crypto.randomBytes(6).toString('hex');
     const maxWins = this.maxWins;
     const turnDuration = this.turnDuration;
     const hostSocket = this.hostSocketId;
@@ -249,6 +253,7 @@ export class Game {
   }
 
   startNewRound() {
+    this.gameId = crypto.randomBytes(6).toString('hex');
     this.clearTurnTimer();
     this.swapColors();
     this.board = initBoard();
