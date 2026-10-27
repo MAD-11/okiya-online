@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Socket } from 'socket.io-client';
 import Board from './Board';
 import LastPickedTile from './LastPickedTile';
@@ -13,7 +14,7 @@ interface ReplayViewerProps {
 
 const REPLAY_INTERVAL_MS = 1100;
 const EMPTY_MOVES = Array(4).fill(null).map(() => Array(4).fill(false));
-const WIDE_THRESHOLD = 700;
+const WIDE_THRESHOLD = 800;
 
 const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) => {
   const [replay, setReplay] = useState<Replay | null>(null);
@@ -26,14 +27,12 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     typeof window !== 'undefined' && window.innerWidth >= WIDE_THRESHOLD
   );
 
-  // Отслеживание ширины
   useEffect(() => {
     const check = () => setIsWide(window.innerWidth >= WIDE_THRESHOLD);
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Загрузка
   useEffect(() => {
     if (!socket) return;
     setLoading(true);
@@ -50,7 +49,6 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     });
   }, [socket, gameId]);
 
-  // Автовоспроизведение
   useEffect(() => {
     if (!playing || !replay) return;
     if (step >= replay.moves.length) { setPlaying(false); return; }
@@ -58,7 +56,6 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     return () => clearTimeout(timer);
   }, [playing, step, replay]);
 
-  // Состояние на шаге
   const currentBoard: BoardType | null = useMemo(() => {
     if (!replay) return null;
     const b = replay.meta.board.map(row => [...row]);
@@ -89,7 +86,6 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
   const totalMoves = replay?.moves.length ?? 0;
   const lastMove = step > 0 && replay ? replay.moves[step - 1] : null;
 
-  // Управление
   const goTo = useCallback((target: number) => {
     if (!replay) return;
     setStep(Math.max(0, Math.min(target, replay.moves.length)));
@@ -110,7 +106,6 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
   const handleExit = () => { if (playing) setConfirmExitOpen(true); else onClose(); };
   const confirmExit = () => { setConfirmExitOpen(false); onClose(); };
 
-  // Клавиатура
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepBack(); }
@@ -126,7 +121,6 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
 
   const progressPct = totalMoves > 0 ? (step / totalMoves) * 100 : 0;
 
-  // Блоки
   const Controls = (
     <div style={styles.controls}>
       <button onClick={toStart} style={styles.ctrlBtn} disabled={step === 0} title="В начало (Home)">⏮</button>
@@ -161,25 +155,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     </div>
   );
 
-  const PlayersBox = (
-    <div style={styles.playersBox}>
-      <div style={styles.playerRow}>
-        <span style={styles.dotRed} />
-        <span style={styles.nickText}>{replay?.meta.players.red || ''}</span>
-      </div>
-      <div style={styles.vsSmall}>vs</div>
-      <div style={styles.playerRow}>
-        <span style={styles.dotBlack} />
-        <span style={styles.nickText}>{replay?.meta.players.black || ''}</span>
-      </div>
-      <div style={styles.subMetaSmall}>
-        Комната <strong>{replay?.meta.roomId}</strong>
-        {replay && replay.meta.maxWins > 1 && ` · до ${replay.meta.maxWins}`}
-      </div>
-    </div>
-  );
-
-  return (
+  const content = (
     <div style={styles.container}>
       <header style={styles.header}>
         <h2 style={styles.title}>📺 Реплей</h2>
@@ -192,7 +168,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
       {loading && (
         <div style={styles.centered}>
           <div className="spinner" />
-          <p style={styles.loadingText}>Загрузка...</p>
+          <p style={styles.loadingText}>Загрузка реплея...</p>
         </div>
       )}
 
@@ -206,60 +182,83 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
       )}
 
       {!loading && !error && replay && currentBoard && (
-        <>
-          {isWide ? (
-            // ===== ДЕСКТОП: доска слева, управление справа =====
-            <div style={styles.wideLayout}>
-              <div style={styles.boardColumn}>
-                <Board
-                  board={currentBoard}
-                  validMoves={EMPTY_MOVES}
-                  onClick={() => {}}
-                  currentPlayer={currentPlayer}
-                  myColor={null}
-                  lastMove={currentLastMove}
-                  hostSkin="sakura"
-                  guestSkin="sakura"
-                  shake={false}
-                />
-                <LastPickedTile tile={currentLastPickedTile} />
-              </div>
+        isWide ? (
+          <div style={styles.wideLayout}>
+            <div style={styles.boardColumn}>
+              <Board
+                board={currentBoard}
+                validMoves={EMPTY_MOVES}
+                onClick={() => {}}
+                currentPlayer={currentPlayer}
+                myColor={null}
+                lastMove={currentLastMove}
+                hostSkin="sakura"
+                guestSkin="sakura"
+                shake={false}
+              />
+              <LastPickedTile tile={currentLastPickedTile} />
+            </div>
 
-              <div style={styles.infoColumn}>
-                {PlayersBox}
-                {MoveInfo}
-                {ProgressBar}
-                {Controls}
-                <div style={styles.hintLine}>
-                  ← → · Space · Home/End · Esc
+            <div style={styles.infoColumn}>
+              <div style={styles.playersBox}>
+                <div style={styles.playerRow}>
+                  <span style={styles.dotRed} />
+                  <span style={styles.nickText}>{replay.meta.players.red}</span>
+                </div>
+                <div style={styles.vsRow}>vs</div>
+                <div style={styles.playerRow}>
+                  <span style={styles.dotBlack} />
+                  <span style={styles.nickText}>{replay.meta.players.black}</span>
+                </div>
+                <div style={styles.subMetaSmall}>
+                  Комната <strong>{replay.meta.roomId}</strong>
+                  {replay.meta.maxWins > 1 && ` · до ${replay.meta.maxWins} побед`}
                 </div>
               </div>
-            </div>
-          ) : (
-            // ===== МОБИЛЬНЫЙ: доска → кнопки → прогресс → мета =====
-            <div style={styles.mobileLayout}>
-              <div style={styles.boardColumn}>
-                <Board
-                  board={currentBoard}
-                  validMoves={EMPTY_MOVES}
-                  onClick={() => {}}
-                  currentPlayer={currentPlayer}
-                  myColor={null}
-                  lastMove={currentLastMove}
-                  hostSkin="sakura"
-                  guestSkin="sakura"
-                  shake={false}
-                />
-                <LastPickedTile tile={currentLastPickedTile} />
-              </div>
 
-              {Controls}
-              {ProgressBar}
               {MoveInfo}
-              {PlayersBox}
+              {ProgressBar}
+              {Controls}
+
+              <div style={styles.hintLine}>
+                ← → · Space · Home/End · Esc
+              </div>
             </div>
-          )}
-        </>
+          </div>
+        ) : (
+          <div style={styles.mobileLayout}>
+            <div style={styles.boardColumn}>
+              <Board
+                board={currentBoard}
+                validMoves={EMPTY_MOVES}
+                onClick={() => {}}
+                currentPlayer={currentPlayer}
+                myColor={null}
+                lastMove={currentLastMove}
+                hostSkin="sakura"
+                guestSkin="sakura"
+                shake={false}
+              />
+              <LastPickedTile tile={currentLastPickedTile} />
+            </div>
+
+            {Controls}
+            {ProgressBar}
+            {MoveInfo}
+
+            <div style={styles.playersBox}>
+              <div style={styles.playerRow}>
+                <span style={styles.dotRed} />
+                <span style={styles.nickText}>{replay.meta.players.red}</span>
+              </div>
+              <div style={styles.vsRow}>vs</div>
+              <div style={styles.playerRow}>
+                <span style={styles.dotBlack} />
+                <span style={styles.nickText}>{replay.meta.players.black}</span>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       <ConfirmDialog
@@ -271,12 +270,20 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
       />
     </div>
   );
+
+  // ⭐ ГЛАВНОЕ: рендерим в document.body, минуя родителя с backdrop-filter
+  return createPortal(content, document.body);
 };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'fixed',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100vw',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -284,7 +291,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundImage: 'var(--bg-decor-1), var(--bg-decor-2)',
     backgroundAttachment: 'fixed',
     backgroundSize: 'cover',
-    zIndex: 3000,
+    zIndex: 9999,
     color: 'var(--text)',
     fontFamily: '"Inter", "Segoe UI", sans-serif',
   },
@@ -292,7 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '10px 16px',
+    padding: '12px 20px',
     background: 'var(--card-bg)',
     borderBottom: '1px solid var(--border)',
     backdropFilter: 'blur(20px)',
@@ -301,14 +308,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     margin: 0,
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 600,
     letterSpacing: '0.3px',
     flexShrink: 0,
   },
   headerMeta: {
     flex: 1,
-    fontSize: '11px',
+    fontSize: '12px',
     color: 'var(--secondary-text)',
     letterSpacing: '0.3px',
     overflow: 'hidden',
@@ -318,7 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   closeBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '20px',
+    fontSize: '22px',
     cursor: 'pointer',
     color: 'var(--secondary-text)',
     padding: '4px 8px',
@@ -363,16 +370,16 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
   },
 
-  // ===== ДЕСКТОП =====
+  // ===== ДЕСКТОП: доска слева, управление справа =====
   wideLayout: {
     flex: 1,
     minHeight: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '24px',
-    padding: '12px 16px',
-    overflow: 'hidden',
+    gap: '32px',
+    padding: '16px 24px',
+    overflow: 'auto',
   },
   boardColumn: {
     display: 'flex',
@@ -383,40 +390,24 @@ const styles: Record<string, React.CSSProperties> = {
   infoColumn: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
-    width: '280px',
-    maxHeight: '100%',
-    overflowY: 'auto',
+    gap: '12px',
+    width: '300px',
     flexShrink: 0,
   },
-
-  // ===== МОБИЛЬНЫЙ =====
-  mobileLayout: {
-    flex: 1,
-    minHeight: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 12px',
-    overflowY: 'auto',
-  },
-
-  // ===== ОБЩИЕ БЛОКИ =====
   playersBox: {
     background: 'var(--card-bg)',
-    padding: '10px 12px',
-    borderRadius: '12px',
+    padding: '12px 16px',
+    borderRadius: '14px',
     border: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '6px',
   },
   playerRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 600,
   },
   nickText: {
@@ -442,7 +433,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.2)',
     flexShrink: 0,
   },
-  vsSmall: {
+  vsRow: {
     fontSize: '10px',
     color: 'var(--secondary-text)',
     letterSpacing: '1px',
@@ -456,7 +447,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.3px',
   },
   moveInfo: {
-    fontSize: '12px',
+    fontSize: '13px',
     color: 'var(--secondary-text)',
     textAlign: 'center',
     minHeight: '18px',
@@ -465,27 +456,26 @@ const styles: Record<string, React.CSSProperties> = {
   controls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '8px',
     justifyContent: 'center',
   },
   ctrlBtn: {
-    width: '38px',
-    height: '38px',
+    width: '42px',
+    height: '42px',
     borderRadius: '10px',
     border: '1px solid var(--border)',
     background: 'rgba(255,255,255,0.03)',
     color: 'var(--text)',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 600,
-    transition: 'all 0.15s',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   playBtn: {
-    width: '50px',
+    width: '56px',
     background: 'var(--btn-bg)',
     color: 'var(--btn-text)',
     border: 'none',
@@ -494,9 +484,8 @@ const styles: Record<string, React.CSSProperties> = {
   progress: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
     justifyContent: 'center',
-    width: '100%',
   },
   progressBar: {
     flex: 1,
@@ -525,6 +514,18 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0.5,
     textAlign: 'center',
     letterSpacing: '0.3px',
+  },
+
+  // ===== МОБИЛЬНЫЙ =====
+  mobileLayout: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 16px 16px',
+    overflowY: 'auto',
   },
 };
 
