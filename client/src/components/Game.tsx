@@ -117,6 +117,14 @@ const Game: React.FC = () => {
   };
 
   const backToMenu = () => {
+    if (gameState?.isSpectator) {
+      if (socket && roomId) socket.emit('leave_room', roomId);
+      clearSavedRoom();
+      setGameState(null);
+      setRoomId(null);
+      setMessage('');
+      return;
+    }
     setConfirmExitOpen(true);
   };
 
@@ -228,6 +236,28 @@ const Game: React.FC = () => {
         setWaitingRestart(false);
         setWaitingReset(false);
       }
+    });
+  };
+
+  const spectateRoom = (roomIdToSpectate: string) => {
+    if (!socket) {
+      setMessage('Нет соединения с сервером');
+      return;
+    }
+    socket.emit('spectate_room', { roomId: roomIdToSpectate, playerId }, (res: any) => {
+      if (res?.error) {
+        setMessage(res.error);
+        return;
+      }
+      // Зритель не сохраняет token — при F5 не переподключится
+      localStorage.setItem('okiya_roomId', roomIdToSpectate);
+      localStorage.removeItem('okiya_playerToken');
+      setRoomId(roomIdToSpectate);
+      setGameState(res.state);
+      setMessage('');
+      setPersonalGameOver(null);
+      setWaitingRestart(false);
+      setWaitingReset(false);
     });
   };
 
@@ -350,12 +380,23 @@ const Game: React.FC = () => {
       setOpponentTyping(isTyping);
     });
 
+    socket.on('room_closed', (data: { reason: string }) => {
+      setMessage(`Комната закрыта: ${data.reason}`);
+      clearSavedRoom();
+      setGameState(null);
+      setRoomId(null);
+      setPersonalGameOver(null);
+      setWaitingRestart(false);
+      setWaitingReset(false);
+    });
+
     return () => {
       socket.off('game_state');
       socket.off('game_over');
       socket.off('opponent_joined');
       socket.off('chat_cleared');
       socket.off('opponent_typing');
+      socket.off('room_closed');
     };
   }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins, roomId]);
 
@@ -483,6 +524,7 @@ const Game: React.FC = () => {
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
               <RoomList
                 onJoin={(roomId) => { joinRoom(roomId); setShowRoomList(false); }}
+                onSpectate={(roomId) => { spectateRoom(roomId); setShowRoomList(false); }}
                 socket={socket}
                 onClose={() => setShowRoomList(false)}
               />
@@ -554,6 +596,9 @@ const Game: React.FC = () => {
           )}
           <header style={styles.gameHeader}>
             <h2 style={styles.titleSmall}>Окийя</h2>
+            {gameState.isSpectator && (
+              <span style={styles.spectatorBadge}>👁 Зритель</span>
+            )}
             {roomId && (
               <div style={styles.roomBadge}>
                 <strong style={styles.roomBadgeCode}>{roomId}</strong>
@@ -585,6 +630,7 @@ const Game: React.FC = () => {
                     socket={socket}
                     roomId={roomId}
                     opponentTyping={opponentTyping}
+                    readOnly={!!gameState.isSpectator}
                   />
                 </div>
               </details>
@@ -657,6 +703,9 @@ const Game: React.FC = () => {
           )}
           <header style={styles.gameHeader}>
             <h2 style={styles.titleSmall}>Окийя</h2>
+            {gameState.isSpectator && (
+              <span style={styles.spectatorBadge}>👁 Зритель</span>
+            )}
             {roomId && (
               <div style={styles.roomBadge}>
                 <span style={styles.roomBadgeLabel}>Комната</span>
@@ -693,6 +742,7 @@ const Game: React.FC = () => {
                   socket={socket}
                   roomId={roomId}
                   opponentTyping={opponentTyping}
+                  readOnly={!!gameState.isSpectator}
                 />
               </div>
             )}
@@ -1382,6 +1432,16 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 5000,
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
+  },
+  spectatorBadge: {
+    padding: '4px 10px',
+    borderRadius: '12px',
+    background: 'rgba(232,165,192,0.15)',
+    border: '1px solid rgba(232,165,192,0.4)',
+    color: 'var(--accent)',
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.5px',
   },
 };
 
