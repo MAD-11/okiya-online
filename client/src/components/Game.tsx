@@ -69,7 +69,9 @@ const Game: React.FC = () => {
   }, [showTutorial]);
 
   useEffect(() => {
-    if (gameState && gameState.status === 'playing' && gameState.myColor) {
+    if (gameState?.isSpectator && gameState.status === 'playing') {
+      document.title = `👁 ${gameState.nickRed} vs ${gameState.nickBlack} — Окийя`;
+    } else if (gameState && gameState.status === 'playing' && gameState.myColor) {
       document.title = gameState.currentPlayer === gameState.myColor
         ? '☀️ Ваш ход — Окийя'
         : '🌙 Ход соперника — Окийя';
@@ -77,7 +79,7 @@ const Game: React.FC = () => {
       document.title = 'Окийя — онлайн';
     }
     return () => { document.title = 'Окийя — онлайн'; };
-  }, [gameState?.currentPlayer, gameState?.myColor, gameState?.status]);
+  }, [gameState?.currentPlayer, gameState?.myColor, gameState?.status, gameState?.isSpectator, gameState?.nickRed, gameState?.nickBlack]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -614,7 +616,9 @@ const Game: React.FC = () => {
             }} />
             <span style={{ marginLeft: 6, fontSize: 13 }}>{gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}</span>
             <span style={{ marginLeft: 16, fontSize: 13 }}>
-              {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+              {gameState.isSpectator
+                ? `${gameState.nickRed} vs ${gameState.nickBlack}`
+                : `${gameState.myNick} vs ${gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}`}
             </span>
           </div>
           {gameState.maxWins > 1 && <div style={styles.score}>Счёт: {gameState.myScore} — {gameState.opponentScore}</div>}
@@ -722,7 +726,9 @@ const Game: React.FC = () => {
             }} />
             <span style={{ marginLeft: 6, fontSize: 13 }}>{gameState.opponentConnected ? 'Соперник в сети' : 'Соперник не в сети'}</span>
             <span style={{ marginLeft: 16, fontSize: 13 }}>
-              {gameState.myNick} vs {gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}
+              {gameState.isSpectator
+                ? `${gameState.nickRed} vs ${gameState.nickBlack}`
+                : `${gameState.myNick} vs ${gameState.myColor === 'red' ? gameState.nickBlack : gameState.nickRed}`}
             </span>
           </div>
           {gameState.maxWins > 1 && <div style={styles.score}>Счёт: {gameState.myScore} — {gameState.opponentScore}</div>}
