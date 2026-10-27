@@ -14,11 +14,20 @@ interface ChatProps {
   socket?: Socket | null;
   roomId?: string | null;
   opponentTyping?: boolean;
+  readOnly?: boolean;   // ← новый проп
 }
 
 const MAX_MESSAGE_LENGTH = 200;
 
-const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, roomId, opponentTyping = false }) => {
+const Chat: React.FC<ChatProps> = ({
+  messages = [],
+  onSend,
+  myNick,
+  socket,
+  roomId,
+  opponentTyping = false,
+  readOnly = false,
+}) => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -29,9 +38,12 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (!readOnly) inputRef.current?.focus();
+  }, [readOnly]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return;
     const value = e.target.value;
     setInput(value);
     if (!isTyping && value.trim()) {
@@ -48,6 +60,7 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
   };
 
   const handleSend = () => {
+    if (readOnly) return;
     const trimmed = input.trim().slice(0, MAX_MESSAGE_LENGTH);
     if (trimmed) {
       onSend(trimmed);
@@ -60,11 +73,16 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
     }
   };
 
-  const formatTime = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (t: number) =>
+    new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>ЧАТ</div>
+      <div style={styles.header}>
+        ЧАТ
+        {readOnly && <span style={styles.readOnlyHeader}>👁 только просмотр</span>}
+      </div>
+
       <div style={styles.messageList}>
         {messages.length === 0 && <div style={styles.empty}>Нет сообщений</div>}
         {messages.map((msg, i) => {
@@ -72,13 +90,15 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
           return (
             <div key={i} style={{ ...styles.row, justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
               {!isMine && <div style={styles.avatar}>{msg.sender[0]}</div>}
-              <div style={{
-                ...styles.bubble,
-                backgroundColor: isMine ? 'var(--chat-bubble-mine)' : 'var(--chat-bubble-other)',
-                color: isMine ? 'var(--chat-text-mine)' : 'var(--chat-text-other)',
-                borderTopRightRadius: isMine ? '4px' : '14px',
-                borderTopLeftRadius: isMine ? '14px' : '4px',
-              }}>
+              <div
+                style={{
+                  ...styles.bubble,
+                  backgroundColor: isMine ? 'var(--chat-bubble-mine)' : 'var(--chat-bubble-other)',
+                  color: isMine ? 'var(--chat-text-mine)' : 'var(--chat-text-other)',
+                  borderTopRightRadius: isMine ? '4px' : '14px',
+                  borderTopLeftRadius: isMine ? '14px' : '4px',
+                }}
+              >
                 <div style={styles.sender}>{msg.sender}</div>
                 <div style={styles.text}>{msg.text}</div>
                 <div style={styles.time}>{formatTime(msg.timestamp)}</div>
@@ -89,33 +109,44 @@ const Chat: React.FC<ChatProps> = ({ messages = [], onSend, myNick, socket, room
         })}
         <div ref={bottomRef} />
       </div>
-      <div style={styles.inputArea}>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Сообщение..."
-          maxLength={MAX_MESSAGE_LENGTH}
-          style={styles.input}
-        />
-        <button onClick={handleSend} style={styles.sendBtn}>↑</button>
-      </div>
-      {opponentTyping && <div style={styles.typingIndicator}>Соперник печатает...</div>}
+
+      {!readOnly ? (
+        <div style={styles.inputArea}>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder="Сообщение..."
+            maxLength={MAX_MESSAGE_LENGTH}
+            style={styles.input}
+          />
+          <button onClick={handleSend} style={styles.sendBtn}>↑</button>
+        </div>
+      ) : (
+        <div style={styles.readOnlyFooter}>Вы смотрите как зритель</div>
+      )}
+
+      {opponentTyping && !readOnly && (
+        <div style={styles.typingIndicator}>Соперник печатает...</div>
+      )}
     </div>
   );
 };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    display: 'flex', flexDirection: 'column',
-    height: '100%', width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
     background: 'var(--card-bg)',
     borderRadius: '20px',
     border: '1px solid var(--border)',
     overflow: 'hidden',
     fontFamily: '"Inter", sans-serif',
-    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
     boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
   },
   header: {
@@ -126,25 +157,45 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--border)',
     letterSpacing: '2px',
     background: 'rgba(255,255,255,0.02)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+  },
+  readOnlyHeader: {
+    fontSize: '9px',
+    color: 'var(--accent)',
+    letterSpacing: '0.5px',
+    fontWeight: 500,
   },
   messageList: {
-    flex: 1, overflowY: 'auto',
+    flex: 1,
+    overflowY: 'auto',
     padding: '16px',
-    display: 'flex', flexDirection: 'column', gap: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
   },
   empty: {
     color: 'var(--secondary-text)',
-    fontStyle: 'italic', textAlign: 'center',
-    marginTop: '50px', fontSize: '13px',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: '50px',
+    fontSize: '13px',
   },
   row: { display: 'flex', alignItems: 'flex-end', gap: '8px' },
   avatar: {
-    width: '26px', height: '26px',
+    width: '26px',
+    height: '26px',
     borderRadius: '13px',
     background: 'var(--btn-bg)',
     color: 'var(--btn-text)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '11px', fontWeight: 700, flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '11px',
+    fontWeight: 700,
+    flexShrink: 0,
   },
   bubble: {
     maxWidth: '78%',
@@ -157,7 +208,8 @@ const styles: Record<string, React.CSSProperties> = {
   text: { fontSize: '13px', lineHeight: 1.45 },
   time: { fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.55 },
   inputArea: {
-    display: 'flex', padding: '10px',
+    display: 'flex',
+    padding: '10px',
     borderTop: '1px solid var(--border)',
     background: 'rgba(255,255,255,0.02)',
     gap: '8px',
@@ -172,19 +224,31 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: 'rgba(255,255,255,0.04)',
     color: 'var(--text)',
     fontFamily: 'inherit',
-    transition: 'border-color 0.2s',
   },
   sendBtn: {
-    width: '38px', height: '38px',
+    width: '38px',
+    height: '38px',
     borderRadius: '12px',
     border: 'none',
     background: 'var(--btn-bg)',
     color: 'var(--btn-text)',
-    fontSize: '16px', fontWeight: 700,
+    fontSize: '16px',
+    fontWeight: 700,
     cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     boxShadow: '0 4px 12px rgba(232,165,192,0.3)',
-    transition: 'all 0.2s',
+    flexShrink: 0,
+  },
+  readOnlyFooter: {
+    padding: '12px 16px',
+    borderTop: '1px solid var(--border)',
+    background: 'rgba(255,255,255,0.02)',
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   typingIndicator: {
     fontSize: '11px',
