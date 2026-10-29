@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client';
 import Board from './Board';
 import LastPickedTile from './LastPickedTile';
 import { isValidMove } from '../game/gameLogic';
+import { checkWin } from '../game/gameLogic';
 import { Puzzle, PuzzleDifficulty, Tile, Board as BoardType } from '../types/game';
 import { playMoveSound, playWinSound, initAudio } from '../utils/sound';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,9 +18,21 @@ interface PuzzleGameProps {
 
 const difficultyLabel: Record<PuzzleDifficulty, string> = {
   1: '🟢 Выиграй за 1 ход',
-  2: '🟡 Найди верный ход',
-  3: '🔴 Заблокируй соперника',
+  2: '🔴 Заблокируй соперника',
 };
+
+// Может ли `color` выиграть следующим ходом?
+function canWinNext(board: BoardType, color: 'red' | 'black', lastTile: Tile | null): boolean {
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (!isValidMove(board, r, c, lastTile)) continue;
+      const sim = board.map(row => [...row]);
+      sim[r][c] = color;
+      if (checkWin(sim, color)) return true;
+    }
+  }
+  return false;
+}
 
 const PuzzleGame: React.FC<PuzzleGameProps> = ({
   difficulty,
@@ -32,7 +45,6 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [board, setBoard] = useState<BoardType | null>(null);
   const [lastPickedTile, setLastPickedTile] = useState<Tile | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
   const [solved, setSolved] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -45,7 +57,6 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     setLoading(true);
     setError(null);
     setSolved(false);
-    setStepIndex(0);
     setMessage('');
     setShowHint(false);
 
@@ -70,9 +81,6 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     initAudio();
     if (!puzzle || !board || solved) return;
 
-    const expected = puzzle.solution[stepIndex];
-    if (!expected) return;
-
     const cell = board[row][col];
     if (!cell || typeof cell === 'string') {
       setMessage('❌ Это клетка без фишки');
@@ -84,45 +92,46 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
       return;
     }
 
-    if (row !== expected.row || col !== expected.col) {
+    const newBoard = board.map(r => [...r]);
+    newBoard[row][col] = 'red';
+    const pickedTile = cell as Tile;
+
+    // Проверка: решён ли пазл (универсально для win и block)
+    let isSolved = false;
+    if (puzzle.type === 'win') {
+      isSolved = checkWin(newBoard, 'red');
+    } else {
+      // block: после хода чёрные не могут выиграть следующим ходом
+      isSolved = !canWinNext(newBoard, 'black', pickedTile);
+    }
+
+    if (!isSolved) {
       setMessage(puzzle.type === 'block'
         ? '❌ Эта фишка не блокирует угрозу'
-        : '❌ Валидный ход, но не ведёт к победе');
+        : '❌ Этот ход не ведёт к победе');
       return;
     }
 
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = 'red';
     setBoard(newBoard);
-    setLastPickedTile(cell as Tile);
+    setLastPickedTile(pickedTile);
+    setSolved(true);
     playMoveSound();
+    playWinSound();
+    setMessage(puzzle.type === 'block'
+      ? '🎉 Вы заблокировали соперника!'
+      : '🎉 Пазл решён!');
 
-    const nextStep = stepIndex + 1;
-
-    if (nextStep === puzzle.solution.length) {
-      setSolved(true);
-      if (puzzle.type === 'block') {
-        setMessage('🎉 Вы заблокировали соперника!');
-      } else {
-        setMessage('🎉 Пазл решён!');
+    socket?.emit('puzzle:solved', puzzle.id, playerId, (res: any) => {
+      if (res?.success) {
+        setTotalSolved(res.puzzlesSolved);
       }
-      playWinSound();
-      socket?.emit('puzzle:solved', puzzle.id, playerId, (res: any) => {
-        if (res?.success) {
-          setTotalSolved(res.puzzlesSolved);
-        }
-      });
-    } else {
-      setStepIndex(nextStep);
-      setMessage(`✅ Верно! Осталось ходов: ${puzzle.solution.length - nextStep}`);
-    }
-  }, [puzzle, board, lastPickedTile, stepIndex, solved, socket, playerId]);
+    });
+  }, [puzzle, board, lastPickedTile, solved, socket, playerId]);
 
   const handleReset = () => {
     if (!puzzle) return;
     setBoard(puzzle.board.map(row => [...row]));
     setLastPickedTile(puzzle.lastPickedTile);
-    setStepIndex(0);
     setSolved(false);
     setMessage('');
     setShowHint(false);
@@ -238,12 +247,7 @@ const styles: Record<string, React.CSSProperties> = {
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
   },
-  title: {
-    margin: 0,
-    fontSize: '20px',
-    fontWeight: 600,
-    letterSpacing: '0.5px',
-  },
+  title: { margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '0.5px' },
   closeBtn: {
     background: 'none',
     border: 'none',
@@ -262,11 +266,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '24px 20px',
     gap: '16px',
   },
-  loading: {
-    fontSize: '16px',
-    color: 'var(--secondary-text)',
-    fontStyle: 'italic',
-  },
+  loading: { fontSize: '16px', color: 'var(--secondary-text)', fontStyle: 'italic' },
   errorBox: {
     padding: '20px',
     background: 'rgba(231, 76, 60, 0.1)',
@@ -274,16 +274,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '16px',
     textAlign: 'center',
   },
-  errorText: {
-    color: 'var(--timer-low)',
-    marginBottom: '16px',
-    fontSize: '14px',
-  },
-  boardWrapper: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
+  errorText: { color: 'var(--timer-low)', marginBottom: '16px', fontSize: '14px' },
+  boardWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
   message: {
     fontSize: '14px',
     fontWeight: 500,
@@ -291,11 +283,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '20px',
     letterSpacing: '0.3px',
   },
-  hintRow: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '4px',
-  },
+  hintRow: { display: 'flex', justifyContent: 'center', marginTop: '4px' },
   hintBtn: {
     padding: '8px 16px',
     borderRadius: '12px',

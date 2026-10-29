@@ -43,8 +43,8 @@ export interface GameState {
 
 export type ValidMoves = boolean[][];
 
-export type PuzzleDifficulty = 1 | 2 | 3;
-export type PuzzleType = 'win' | 'win-hard' | 'block';
+export type PuzzleDifficulty = 1 | 2;
+export type PuzzleType = 'win' | 'block';
 
 export interface Puzzle {
   id: string;

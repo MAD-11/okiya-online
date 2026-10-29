@@ -901,12 +901,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // --------------------------------------------------------
     socket.on('puzzle:request', async (difficulty: PuzzleDifficulty, callback) => {
       try {
-        if (difficulty !== 1 && difficulty !== 2 && difficulty !== 3) {
+        if (difficulty !== 1 && difficulty !== 2) {
           return callback({ error: 'Недопустимая сложность' });
         }
         const puzzle = generatePuzzle(difficulty);
         await storeActivePuzzle(puzzle.id, puzzle.difficulty);
-        logger.info(`Puzzle ${puzzle.id} (type=${puzzle.type}, difficulty=${puzzle.difficulty}) requested by ${socket.id}`);
+        logger.info(`Puzzle ${puzzle.id} (type=${puzzle.type}) requested by ${socket.id}`);
         callback({ puzzle });
       } catch (err) {
         logger.error('puzzle:request error', err);
