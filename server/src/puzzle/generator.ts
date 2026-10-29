@@ -1,5 +1,4 @@
 import { Board, Tile, Plant, Symbol, Cell } from '../game/types';
-import { initBoard } from '../game/Board';
 import { Puzzle, PuzzleDifficulty } from './types';
 
 const PLANTS: Plant[] = ['sakura', 'iris', 'pine', 'maple'];
@@ -49,136 +48,120 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-function availableCells(board: Board, exclude: Set<string>): Array<[number, number]> {
-  const result: Array<[number, number]> = [];
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      if (exclude.has(`${r},${c}`)) continue;
-      if (typeof board[r][c] === 'string') continue;
-      result.push([r, c]);
-    }
-  }
-  return result;
-}
-
-// ============================================================
-// EASY: Win in 1 — очевидный победный ход
-// ============================================================
-export function generateWinIn1(): Puzzle {
-  const board = initBoard();
-  const line = pick(ALL_WINNING);
-  const answerIdx = Math.floor(Math.random() * 4);
-  const answerCell = line[answerIdx];
-
-  for (let i = 0; i < 4; i++) {
-    if (i !== answerIdx) {
-      const [r, c] = line[i];
-      board[r][c] = 'red';
-    }
-  }
-
-  // 2–3 чёрных камня вне линии
-  const lineCells = new Set(line.map(([r, c]) => `${r},${c}`));
-  const freeCells = availableCells(board, lineCells);
-  const numBlack = 2 + Math.floor(Math.random() * 2);
-  for (let i = 0; i < numBlack && freeCells.length > 0; i++) {
-    const idx = Math.floor(Math.random() * freeCells.length);
-    const [r, c] = freeCells[idx];
-    board[r][c] = 'black';
-    freeCells.splice(idx, 1);
-  }
-
-  const answerTile = board[answerCell[0]][answerCell[1]] as Tile;
-
-  return {
-    id: generateId(),
-    difficulty: 1,
-    type: 'win',
-    board,
-    lastPickedTile: answerTile,
-    solution: [{ row: answerCell[0], col: answerCell[1] }],
-    hint: 'Найди клетку, которая завершит линию из 4 красных камней.',
-  };
-}
-
-// ============================================================
-// MEDIUM: Win in 1 с обманками
-// ============================================================
-export function generateWinIn1WithDecoys(): Puzzle {
-  const board = initBoard();
-  const line = pick(ALL_WINNING);
-  const answerIdx = Math.floor(Math.random() * 4);
-  const answerCell = line[answerIdx];
-
-  for (let i = 0; i < 4; i++) {
-    if (i !== answerIdx) {
-      const [r, c] = line[i];
-      board[r][c] = 'red';
-    }
-  }
-
-  const lineCells = new Set(line.map(([r, c]) => `${r},${c}`));
-  const freeCells = availableCells(board, lineCells);
-
-  // 2 чёрных камня
-  for (let i = 0; i < 2 && freeCells.length > 0; i++) {
-    const idx = Math.floor(Math.random() * freeCells.length);
-    const [r, c] = freeCells[idx];
-    board[r][c] = 'black';
-    freeCells.splice(idx, 1);
-  }
-
-  const answerTile = board[answerCell[0]][answerCell[1]] as Tile;
-
-  // 2–3 обманки: фишки, совпадающие с lastPickedTile, но не ведущие к победе
-  const decoyCells = availableCells(board, lineCells);
-  const numDecoys = 2 + Math.floor(Math.random() * 2);
-  for (let i = 0; i < numDecoys && decoyCells.length > 0; i++) {
-    const idx = Math.floor(Math.random() * decoyCells.length);
-    const [r, c] = decoyCells[idx];
-    decoyCells.splice(idx, 1);
-
-    const matchByPlant = Math.random() < 0.5;
-    const newTile: Tile = matchByPlant
-      ? { plant: answerTile.plant, symbol: pick(SYMBOLS.filter(s => s !== answerTile.symbol)) }
-      : { plant: pick(PLANTS.filter(p => p !== answerTile.plant)), symbol: answerTile.symbol };
-    board[r][c] = newTile;
-  }
-
-  return {
-    id: generateId(),
-    difficulty: 2,
-    type: 'win-hard',
-    board,
-    lastPickedTile: answerTile,
-    solution: [{ row: answerCell[0], col: answerCell[1] }],
-    hint: 'Найди клетку, которая завершит линию. Осторожно: не все совпадающие фишки ведут к победе.',
-  };
-}
-
-// ============================================================
-// HARD: Block — заблокируй угрозу чёрных
-// ============================================================
-export function generateBlockPuzzle(): Puzzle {
-  const line = pick(ALL_WINNING);
-  const gapIdx = Math.floor(Math.random() * 4);
-  const gapCell = line[gapIdx];
-
-  const L_TILE: Tile = { plant: 'sakura', symbol: 'sun' };   // lastPickedTile
-  const G_TILE: Tile = { plant: 'sakura', symbol: 'bird' };  // tile in gap → block
-
-  // Создаём пустую доску
+function emptyBoard(): Board {
   const board: Board = [];
   for (let r = 0; r < 4; r++) {
     const row: Cell[] = [];
     for (let c = 0; c < 4; c++) row.push(null);
     board.push(row);
   }
+  return board;
+}
 
-  // Ставим G_TILE в гэп
-  board[gapCell[0]][gapCell[1]] = G_TILE;
+// Возвращает tile, который совпадает с исходным по одному признаку,
+// но не является тем же самым tile (другое растение или другой символ).
+function makeMatchingTile(tile: Tile): Tile {
+  if (Math.random() < 0.5) {
+    return {
+      plant: tile.plant,
+      symbol: pick(SYMBOLS.filter(s => s !== tile.symbol)),
+    };
+  }
+  return {
+    plant: pick(PLANTS.filter(p => p !== tile.plant)),
+    symbol: tile.symbol,
+  };
+}
 
-  // 3 чёрных камня — остальные клетки линии
+// Заполняет свободные клетки случайными tile'ами, не пересекаясь с used.
+function fillWithTiles(
+  board: Board,
+  cells: Array<[number, number]>,
+  used: Set<string>
+): void {
+  for (const [r, c] of cells) {
+    let tile: Tile;
+    do {
+      tile = { plant: pick(PLANTS), symbol: pick(SYMBOLS) };
+    } while (used.has(`${tile.plant}/${tile.symbol}`));
+    used.add(`${tile.plant}/${tile.symbol}`);
+    board[r][c] = tile;
+  }
+}
+
+// ============================================================
+// WIN-IN-1
+// Количество камней: 3 red (в линии) + 3 black (вне линии) = 6
+// Это соответствует ходу красных: red = black = 3, сейчас 4-й ход red.
+// ============================================================
+export function generateWinIn1(): Puzzle {
+  const line = pick(ALL_WINNING);
+  const gapIdx = Math.floor(Math.random() * 4);
+  const gapCell = line[gapIdx];
+
+  const board = emptyBoard();
+
+  // 3 красных камня в линии
+  for (let i = 0; i < 4; i++) {
+    if (i !== gapIdx) {
+      const [r, c] = line[i];
+      board[r][c] = 'red';
+    }
+  }
+
+  // Фишка-ответ в гэпе
+  const answerTile: Tile = { plant: pick(PLANTS), symbol: pick(SYMBOLS) };
+  board[gapCell[0]][gapCell[1]] = answerTile;
+
+  // lastPickedTile: совпадает с ответом, но это другая фишка
+  // (её взял чёрный на прошлом ходу)
+  const lastPickedTile = makeMatchingTile(answerTile);
+
+  // 3 чёрных камня вне линии
+  const freeCells: Array<[number, number]> = [];
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (board[r][c] === null) freeCells.push([r, c]);
+    }
+  }
+  const shuffled = shuffle(freeCells);
+  for (let i = 0; i < 3; i++) {
+    const [r, c] = shuffled[i];
+    board[r][c] = 'black';
+  }
+
+  // 9 случайных фишек в остальные клетки
+  const used = new Set<string>([
+    `${answerTile.plant}/${answerTile.symbol}`,
+    `${lastPickedTile.plant}/${lastPickedTile.symbol}`,
+  ]);
+  fillWithTiles(board, shuffled.slice(3), used);
+
+  return {
+    id: generateId(),
+    difficulty: 1,
+    type: 'win',
+    board,
+    lastPickedTile,
+    solution: [{ row: gapCell[0], col: gapCell[1] }],
+    hint: 'Найди клетку, которая завершит линию из 4 красных камней.',
+  };
+}
+
+// ============================================================
+// BLOCK
+// Количество камней: 3 black (в линии) + 3 red (вне линии) = 6
+// red = black = 3, сейчас ход red. Нужно взять фишку из гэпа
+// чёрных, чтобы заблокировать победу.
+// ============================================================
+export function generateBlockPuzzle(): Puzzle {
+  const line = pick(ALL_WINNING);
+  const gapIdx = Math.floor(Math.random() * 4);
+  const gapCell = line[gapIdx];
+
+  const board = emptyBoard();
+
+  // 3 чёрных камня в линии
   for (let i = 0; i < 4; i++) {
     if (i !== gapIdx) {
       const [r, c] = line[i];
@@ -186,56 +169,45 @@ export function generateBlockPuzzle(): Puzzle {
     }
   }
 
-  // Собираем пустые клетки
-  const empty: Array<[number, number]> = [];
+  // Фишка-ответ в гэпе (эту надо взять, чтобы заблокировать)
+  const gapTile: Tile = { plant: pick(PLANTS), symbol: pick(SYMBOLS) };
+  board[gapCell[0]][gapCell[1]] = gapTile;
+
+  // lastPickedTile: совпадает с gapTile, но другая фишка
+  const lastPickedTile = makeMatchingTile(gapTile);
+
+  // 3 красных камня вне линии
+  const freeCells: Array<[number, number]> = [];
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
-      if (board[r][c] === null) empty.push([r, c]);
+      if (board[r][c] === null) freeCells.push([r, c]);
     }
   }
-  const shuffled = shuffle(empty);
-
-  // 2 sakura-* фишки (dangerous legal moves), 1 красный камень, остальное — inert
-  const sakuraFreeTiles: Tile[] = [
-    { plant: 'sakura', symbol: 'rain' },
-    { plant: 'sakura', symbol: 'tanzaku' },
-  ];
-  const inertTiles: Tile[] = [
-    { plant: 'iris', symbol: 'bird' },
-    { plant: 'iris', symbol: 'rain' },
-    { plant: 'iris', symbol: 'tanzaku' },
-    { plant: 'pine', symbol: 'bird' },
-    { plant: 'pine', symbol: 'rain' },
-    { plant: 'pine', symbol: 'tanzaku' },
-    { plant: 'maple', symbol: 'bird' },
-    { plant: 'maple', symbol: 'rain' },
-    { plant: 'maple', symbol: 'tanzaku' },
-  ];
-
-  board[shuffled[0][0]][shuffled[0][1]] = sakuraFreeTiles[0];
-  board[shuffled[1][0]][shuffled[1][1]] = sakuraFreeTiles[1];
-  board[shuffled[2][0]][shuffled[2][1]] = 'red';
-
-  for (let i = 3; i < shuffled.length; i++) {
-    board[shuffled[i][0]][shuffled[i][1]] = pick(inertTiles);
+  const shuffled = shuffle(freeCells);
+  for (let i = 0; i < 3; i++) {
+    const [r, c] = shuffled[i];
+    board[r][c] = 'red';
   }
+
+  // 9 случайных фишек
+  const used = new Set<string>([
+    `${gapTile.plant}/${gapTile.symbol}`,
+    `${lastPickedTile.plant}/${lastPickedTile.symbol}`,
+  ]);
+  fillWithTiles(board, shuffled.slice(3), used);
 
   return {
     id: generateId(),
-    difficulty: 3,
+    difficulty: 2,
     type: 'block',
     board,
-    lastPickedTile: L_TILE,
+    lastPickedTile,
     solution: [{ row: gapCell[0], col: gapCell[1] }],
     hint: 'У чёрных 3 камня в линию с пустой клеткой. Возьми фишку из этой клетки, чтобы заблокировать их победу.',
   };
 }
 
-// ============================================================
-// Dispatcher
-// ============================================================
 export function generatePuzzle(difficulty: PuzzleDifficulty): Puzzle {
   if (difficulty === 1) return generateWinIn1();
-  if (difficulty === 2) return generateWinIn1WithDecoys();
   return generateBlockPuzzle();
 }
