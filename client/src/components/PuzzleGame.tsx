@@ -4,7 +4,7 @@ import Board from './Board';
 import LastPickedTile from './LastPickedTile';
 import { isValidMove } from '../game/gameLogic';
 import { Puzzle, PuzzleDifficulty, Tile, Board as BoardType } from '../types/game';
-import { playMoveSound, playWinSound, playLoseSound, initAudio } from '../utils/sound';
+import { playMoveSound, playWinSound, initAudio } from '../utils/sound';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface PuzzleGameProps {
@@ -17,7 +17,8 @@ interface PuzzleGameProps {
 
 const difficultyLabel: Record<PuzzleDifficulty, string> = {
   1: '🟢 Выиграй за 1 ход',
-  2: '🟡 Выиграй за 2 хода',
+  2: '🟡 Найди верный ход',
+  3: '🔴 Заблокируй соперника',
 };
 
 const PuzzleGame: React.FC<PuzzleGameProps> = ({
@@ -39,7 +40,6 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
   const [totalSolved, setTotalSolved] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
 
-  // Запросить пазл при монтировании / смене сложности
   const requestPuzzle = useCallback(() => {
     if (!socket) return;
     setLoading(true);
@@ -79,19 +79,18 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
       return;
     }
 
-    // Проверка по правилам игры
     if (!isValidMove(board, row, col, lastPickedTile)) {
       setMessage('❌ Эта фишка не совпадает с предыдущей');
       return;
     }
 
-    // Проверка, что это ожидаемый ход
     if (row !== expected.row || col !== expected.col) {
-      setMessage('❌ Валидный ход, но не ведёт к победе');
+      setMessage(puzzle.type === 'block'
+        ? '❌ Эта фишка не блокирует угрозу'
+        : '❌ Валидный ход, но не ведёт к победе');
       return;
     }
 
-    // Применить ход
     const newBoard = board.map(r => [...r]);
     newBoard[row][col] = 'red';
     setBoard(newBoard);
@@ -101,9 +100,12 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     const nextStep = stepIndex + 1;
 
     if (nextStep === puzzle.solution.length) {
-      // Решено
       setSolved(true);
-      setMessage('🎉 Пазл решён!');
+      if (puzzle.type === 'block') {
+        setMessage('🎉 Вы заблокировали соперника!');
+      } else {
+        setMessage('🎉 Пазл решён!');
+      }
       playWinSound();
       socket?.emit('puzzle:solved', puzzle.id, playerId, (res: any) => {
         if (res?.success) {
@@ -130,20 +132,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     requestPuzzle();
   };
 
-    // Подсветка: не подсказываем решение — пусто
-    const validMovesForDisplay = (() => {
-    return Array(4).fill(null).map(() => Array(4).fill(false));
-    })();
-
-    // Кликабельность: все клетки, где есть фишка (не камень)
-    const clickableCells = (() => {
-    if (!board || solved) {
-        return Array(4).fill(null).map(() => Array(4).fill(false));
-    }
-    return board.map(row =>
-        row.map(cell => !!cell && typeof cell !== 'string')
-    );
-    })();
+  const validMovesForDisplay = Array(4).fill(null).map(() => Array(4).fill(false));
 
   return (
     <div style={styles.container}>
@@ -164,21 +153,10 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
 
         {!loading && !error && puzzle && board && (
           <>
-            <div style={styles.progress}>
-              <span>Шаг {solved ? puzzle.solution.length : stepIndex + 1} из {puzzle.solution.length}</span>
-              <div style={styles.progressBar}>
-                <div style={{
-                  ...styles.progressFill,
-                  width: `${((solved ? puzzle.solution.length : stepIndex) / puzzle.solution.length) * 100}%`,
-                }} />
-              </div>
-            </div>
-
             <div style={styles.boardWrapper}>
               <Board
                 board={board}
                 validMoves={validMovesForDisplay}
-                clickableCells={clickableCells} 
                 onClick={handleCellClick}
                 currentPlayer="red"
                 myColor="red"
@@ -186,6 +164,9 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
                 hostSkin={skin}
                 guestSkin={skin}
                 shake={false}
+                clickableCells={board.map(row =>
+                  row.map(cell => !!cell && typeof cell !== 'string')
+                )}
               />
               <LastPickedTile tile={lastPickedTile} />
             </div>
@@ -297,28 +278,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--timer-low)',
     marginBottom: '16px',
     fontSize: '14px',
-  },
-  progress: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '13px',
-    color: 'var(--secondary-text)',
-    letterSpacing: '1px',
-  },
-  progressBar: {
-    width: '240px',
-    height: '6px',
-    borderRadius: '3px',
-    background: 'var(--border)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    background: 'var(--btn-bg)',
-    borderRadius: '3px',
-    transition: 'width 0.3s ease',
   },
   boardWrapper: {
     display: 'flex',

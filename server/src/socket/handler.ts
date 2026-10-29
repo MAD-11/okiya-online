@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
 import { initBoard } from '../game/Board';
-import { generatePuzzle, generateWinIn1, generateWinIn2Safe } from '../puzzle/generator';
+import { generatePuzzle } from '../puzzle/generator';
 import { PuzzleDifficulty } from '../puzzle/types';
 import { saveReplayMeta, saveReplayMove, getReplay } from '../replay';
 
@@ -901,12 +901,12 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // --------------------------------------------------------
     socket.on('puzzle:request', async (difficulty: PuzzleDifficulty, callback) => {
       try {
-        if (difficulty !== 1 && difficulty !== 2) {
+        if (difficulty !== 1 && difficulty !== 2 && difficulty !== 3) {
           return callback({ error: 'Недопустимая сложность' });
         }
-        const puzzle = difficulty === 1 ? generateWinIn1() : generateWinIn2Safe();
+        const puzzle = generatePuzzle(difficulty);
         await storeActivePuzzle(puzzle.id, puzzle.difficulty);
-        logger.info(`Puzzle ${puzzle.id} (difficulty ${puzzle.difficulty}) requested by ${socket.id}`);
+        logger.info(`Puzzle ${puzzle.id} (type=${puzzle.type}, difficulty=${puzzle.difficulty}) requested by ${socket.id}`);
         callback({ puzzle });
       } catch (err) {
         logger.error('puzzle:request error', err);
