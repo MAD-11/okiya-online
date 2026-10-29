@@ -7,7 +7,13 @@ interface PuzzleListProps {
 }
 
 const PuzzleList: React.FC<PuzzleListProps> = ({ onSelect, onClose }) => {
-  const levels: Array<{ value: PuzzleDifficulty; icon: string; title: string; desc: string; borderColor: string }> = [
+  const levels: Array<{
+    value: PuzzleDifficulty;
+    icon: string;
+    title: string;
+    desc: string;
+    borderColor: string;
+  }> = [
     {
       value: 1,
       icon: '🟢',
@@ -19,15 +25,22 @@ const PuzzleList: React.FC<PuzzleListProps> = ({ onSelect, onClose }) => {
       value: 2,
       icon: '🟡',
       title: 'Средний',
-      desc: 'Выиграй за 2 хода',
+      desc: 'Найди верный среди обманок',
       borderColor: 'rgba(232, 165, 192, 0.5)',
+    },
+    {
+      value: 3,
+      icon: '🔴',
+      title: 'Сложный',
+      desc: 'Заблокируй соперника',
+      borderColor: 'rgba(231, 76, 60, 0.5)',
     },
   ];
 
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>🎯 Пазлы</h2>
-      <p style={styles.subtitle}>Найди выигрышную комбинацию за минимальное число ходов</p>
+      <p style={styles.subtitle}>Тренируй тактику на реальных позициях</p>
 
       <div style={styles.grid}>
         {levels.map(lvl => (
@@ -85,7 +98,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(160px, 220px))',
+    gridTemplateColumns: 'repeat(3, minmax(150px, 200px))',
     gap: '16px',
     marginBottom: '32px',
   },
@@ -106,7 +119,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardEmoji: { fontSize: '36px', lineHeight: 1 },
   cardTitle: { fontSize: '16px', fontWeight: 600, letterSpacing: '0.5px' },
-  cardDesc: { fontSize: '12px', color: 'var(--secondary-text)' },
+  cardDesc: { fontSize: '11px', color: 'var(--secondary-text)', textAlign: 'center', lineHeight: 1.3 },
   closeBtn: {
     padding: '11px 28px',
     borderRadius: '12px',
