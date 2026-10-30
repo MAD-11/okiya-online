@@ -12,9 +12,51 @@ interface ReplayViewerProps {
   onClose: () => void;
 }
 
+type Verdict = 'brilliant' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+
+interface MoveAnalysis {
+  moveIndex: number;
+  player: 'red' | 'black';
+  actual: { row: number; col: number };
+  best: { row: number; col: number };
+  bestScore: number;
+  actualScore: number;
+  delta: number;
+  verdict: Verdict;
+  isBest: boolean;
+  actualWasWinning: boolean;
+  bestWasWinning: boolean;
+}
+
+interface PlayerStats {
+  accuracy: number;
+  brilliant: number;
+  good: number;
+  inaccuracy: number;
+  mistake: number;
+  blunder: number;
+  moves: number;
+}
+
+interface GameAnalysis {
+  gameId: string;
+  depth: number;
+  moves: MoveAnalysis[];
+  stats: { red: PlayerStats; black: PlayerStats };
+  analyzedAt: number;
+}
+
 const REPLAY_INTERVAL_MS = 1100;
 const EMPTY_MOVES = Array(4).fill(null).map(() => Array(4).fill(false));
 const WIDE_THRESHOLD = 800;
+
+const VERDICT_INFO: Record<Verdict, { emoji: string; label: string; color: string; bg: string }> = {
+  brilliant: { emoji: '⭐', label: 'Отличный ход', color: '#f1c40f', bg: 'rgba(241,196,15,0.15)' },
+  good: { emoji: '✅', label: 'Хороший ход', color: '#2ecc71', bg: 'rgba(46,204,113,0.12)' },
+  inaccuracy: { emoji: '⚠️', label: 'Неточность', color: '#f39c12', bg: 'rgba(243,156,18,0.12)' },
+  mistake: { emoji: '❌', label: 'Ошибка', color: '#e67e22', bg: 'rgba(230,126,34,0.12)' },
+  blunder: { emoji: '💀', label: 'Зевок', color: '#e74c3c', bg: 'rgba(231,76,60,0.12)' },
+};
 
 const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) => {
   const [replay, setReplay] = useState<Replay | null>(null);
@@ -27,12 +69,20 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     typeof window !== 'undefined' && window.innerWidth >= WIDE_THRESHOLD
   );
 
+  // Анализ
+  const [analysis, setAnalysis] = useState<GameAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showBestMove, setShowBestMove] = useState(false);
+
+  // Отслеживание ширины
   useEffect(() => {
     const check = () => setIsWide(window.innerWidth >= WIDE_THRESHOLD);
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // Загрузка реплея
   useEffect(() => {
     if (!socket) return;
     setLoading(true);
@@ -40,6 +90,9 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     setReplay(null);
     setStep(0);
     setPlaying(false);
+    setAnalysis(null);
+    setAnalysisError(null);
+    setShowBestMove(false);
 
     socket.emit('replay:get', gameId, (res: any) => {
       setLoading(false);
@@ -49,6 +102,12 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     });
   }, [socket, gameId]);
 
+  // Сброс подсветки лучшего хода при смене шага
+  useEffect(() => {
+    setShowBestMove(false);
+  }, [step]);
+
+  // Автовоспроизведение
   useEffect(() => {
     if (!playing || !replay) return;
     if (step >= replay.moves.length) { setPlaying(false); return; }
@@ -56,6 +115,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     return () => clearTimeout(timer);
   }, [playing, step, replay]);
 
+  // Текущее состояние на шаге
   const currentBoard: BoardType | null = useMemo(() => {
     if (!replay) return null;
     const b = replay.meta.board.map(row => [...row]);
@@ -86,6 +146,13 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
   const totalMoves = replay?.moves.length ?? 0;
   const lastMove = step > 0 && replay ? replay.moves[step - 1] : null;
 
+  // Анализ текущего хода
+  const currentAnalysis: MoveAnalysis | null = useMemo(() => {
+    if (!analysis || step === 0) return null;
+    return analysis.moves[step - 1] || null;
+  }, [analysis, step]);
+
+  // Управление
   const goTo = useCallback((target: number) => {
     if (!replay) return;
     setStep(Math.max(0, Math.min(target, replay.moves.length)));
@@ -103,9 +170,27 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     setPlaying(p => !p);
   };
 
+  const handleAnalyze = useCallback(() => {
+    if (!socket || !gameId) return;
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+
+    socket.emit('replay:analyze', gameId, (res: any) => {
+      setAnalysisLoading(false);
+      if (res?.error) {
+        setAnalysisError(res.error);
+        return;
+      }
+      if (res?.analysis) {
+        setAnalysis(res.analysis);
+      }
+    });
+  }, [socket, gameId]);
+
   const handleExit = () => { if (playing) setConfirmExitOpen(true); else onClose(); };
   const confirmExit = () => { setConfirmExitOpen(false); onClose(); };
 
+  // Клавиатура
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepBack(); }
@@ -121,6 +206,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
 
   const progressPct = totalMoves > 0 ? (step / totalMoves) * 100 : 0;
 
+  // ===== Компоненты =====
   const Controls = (
     <div style={styles.controls}>
       <button onClick={toStart} style={styles.ctrlBtn} disabled={step === 0} title="В начало (Home)">⏮</button>
@@ -148,13 +234,70 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
   );
 
   const MoveInfo = (
-    <div style={styles.moveInfo}>
-      {lastMove
-        ? `Ход ${step}/${totalMoves}: ${lastMove.player === 'red' ? '🔴' : '⚫'} → (${lastMove.row + 1}, ${lastMove.col + 1})`
-        : 'Начальная позиция'}
+    <div style={styles.moveInfoWrap}>
+      <div style={styles.moveInfo}>
+        {lastMove
+          ? `Ход ${step}/${totalMoves}: ${lastMove.player === 'red' ? '🔴' : '⚫'} → (${lastMove.row + 1}, ${lastMove.col + 1})`
+          : 'Начальная позиция'}
+      </div>
+
+      {currentAnalysis && (
+        <div style={styles.verdictRow}>
+          <span style={{
+            ...styles.verdictBadge,
+            background: VERDICT_INFO[currentAnalysis.verdict].bg,
+            color: VERDICT_INFO[currentAnalysis.verdict].color,
+            borderColor: VERDICT_INFO[currentAnalysis.verdict].color + '60',
+          }}>
+            {VERDICT_INFO[currentAnalysis.verdict].emoji} {VERDICT_INFO[currentAnalysis.verdict].label}
+          </span>
+
+          {!currentAnalysis.isBest && (
+            <button
+              onClick={() => setShowBestMove(v => !v)}
+              style={{
+                ...styles.showBestBtn,
+                background: showBestMove ? 'rgba(241,196,15,0.15)' : 'transparent',
+                borderColor: showBestMove ? '#f1c40f' : 'var(--border)',
+                color: showBestMove ? '#f1c40f' : 'var(--secondary-text)',
+              }}
+              title="Показать лучший ход"
+            >
+              👁 {showBestMove ? 'Скрыть' : 'Лучший ход'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 
+  const StatsRow = ({ color, label, stats }: { color: 'red' | 'black'; label: string; stats: PlayerStats }) => (
+    <div style={styles.statsRow}>
+      <span style={{
+        ...styles.statsDot,
+        background: color === 'red' ? '#e74c3c' : '#2c3e50',
+      }} />
+      <span style={styles.statsLabel}>{label}</span>
+      <span style={styles.statsAccuracy}>{stats.accuracy}%</span>
+      <div style={styles.statsIcons}>
+        {stats.brilliant > 0 && <span title="Отличных">{'⭐'}{stats.brilliant}</span>}
+        {stats.good > 0 && <span title="Хороших">{'✅'}{stats.good}</span>}
+        {stats.inaccuracy > 0 && <span title="Неточности">{'⚠️'}{stats.inaccuracy}</span>}
+        {stats.mistake > 0 && <span title="Ошибки">{'❌'}{stats.mistake}</span>}
+        {stats.blunder > 0 && <span title="Зевки">{'💀'}{stats.blunder}</span>}
+      </div>
+    </div>
+  );
+
+  const AnalysisStats = analysis ? (
+    <div style={styles.statsCard}>
+      <div style={styles.statsHeader}>📊 Точность</div>
+      <StatsRow color="red" label={replay?.meta.players.red || 'Красные'} stats={analysis.stats.red} />
+      <StatsRow color="black" label={replay?.meta.players.black || 'Чёрные'} stats={analysis.stats.black} />
+    </div>
+  ) : null;
+
+  // ===== Рендер =====
   const content = (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -162,8 +305,29 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
         <span style={styles.headerMeta}>
           {replay && `${replay.meta.roomId} · ${totalMoves} ${totalMoves === 1 ? 'ход' : totalMoves < 5 ? 'хода' : 'ходов'}`}
         </span>
+
+        {replay && totalMoves > 0 && !analysis && !analysisLoading && (
+          <button onClick={handleAnalyze} style={styles.analyzeBtn} title="Анализировать партию">
+            🔍 Анализ
+          </button>
+        )}
+        {analysisLoading && (
+          <span style={styles.analyzeStatus}>⏳ Анализ…</span>
+        )}
+        {analysis && (
+          <span style={styles.analyzeStatusDone} title="Анализ готов">
+            ✅ Анализ
+          </span>
+        )}
+
         <button onClick={handleExit} style={styles.closeBtn} title="Закрыть (Esc)">✕</button>
       </header>
+
+      {analysisError && (
+        <div style={styles.analysisErrorBanner}>
+          ⚠️ Не удалось проанализировать: {analysisError}
+        </div>
+      )}
 
       {loading && (
         <div style={styles.centered}>
@@ -195,6 +359,11 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
                 hostSkin="sakura"
                 guestSkin="sakura"
                 shake={false}
+                highlightCell={
+                  showBestMove && currentAnalysis && !currentAnalysis.isBest
+                    ? { row: currentAnalysis.best.row, col: currentAnalysis.best.col, color: '#f1c40f' }
+                    : null
+                }
               />
               <LastPickedTile tile={currentLastPickedTile} />
             </div>
@@ -219,6 +388,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
               {MoveInfo}
               {ProgressBar}
               {Controls}
+              {AnalysisStats}
 
               <div style={styles.hintLine}>
                 ← → · Space · Home/End · Esc
@@ -238,6 +408,11 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
                 hostSkin="sakura"
                 guestSkin="sakura"
                 shake={false}
+                highlightCell={
+                  showBestMove && currentAnalysis && !currentAnalysis.isBest
+                    ? { row: currentAnalysis.best.row, col: currentAnalysis.best.col, color: '#f1c40f' }
+                    : null
+                }
               />
               <LastPickedTile tile={currentLastPickedTile} />
             </div>
@@ -245,18 +420,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
             {Controls}
             {ProgressBar}
             {MoveInfo}
-
-            <div style={styles.playersBox}>
-              <div style={styles.playerRow}>
-                <span style={styles.dotRed} />
-                <span style={styles.nickText}>{replay.meta.players.red}</span>
-              </div>
-              <div style={styles.vsRow}>vs</div>
-              <div style={styles.playerRow}>
-                <span style={styles.dotBlack} />
-                <span style={styles.nickText}>{replay.meta.players.black}</span>
-              </div>
-            </div>
+            {AnalysisStats}
           </div>
         )
       )}
@@ -271,17 +435,13 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     </div>
   );
 
-  // ⭐ ГЛАВНОЕ: рендерим в document.body, минуя родителя с backdrop-filter
   return createPortal(content, document.body);
 };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     width: '100vw',
     height: '100vh',
     display: 'flex',
@@ -322,6 +482,43 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  analyzeBtn: {
+    padding: '8px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(232,165,192,0.5)',
+    background: 'rgba(232,165,192,0.12)',
+    color: 'var(--accent)',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+  },
+  analyzeStatus: {
+    padding: '8px 12px',
+    fontSize: '12px',
+    color: 'var(--secondary-text)',
+    flexShrink: 0,
+    fontStyle: 'italic',
+  },
+  analyzeStatusDone: {
+    padding: '6px 10px',
+    fontSize: '11px',
+    color: 'var(--accent-2, #2ecc71)',
+    border: '1px solid rgba(46,204,113,0.3)',
+    background: 'rgba(46,204,113,0.1)',
+    borderRadius: '8px',
+    fontWeight: 600,
+    flexShrink: 0,
+  },
+  analysisErrorBanner: {
+    padding: '8px 20px',
+    background: 'rgba(231,76,60,0.1)',
+    borderBottom: '1px solid rgba(231,76,60,0.3)',
+    color: '#e74c3c',
+    fontSize: '12px',
+    flexShrink: 0,
+  },
   closeBtn: {
     background: 'none',
     border: 'none',
@@ -354,7 +551,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   errorText: {
-    color: 'var(--timer-low)',
+    color: '#e74c3c',
     marginBottom: '14px',
     fontSize: '13px',
   },
@@ -370,7 +567,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
   },
 
-  // ===== ДЕСКТОП: доска слева, управление справа =====
+  // ===== ДЕСКТОП =====
   wideLayout: {
     flex: 1,
     minHeight: 0,
@@ -390,7 +587,7 @@ const styles: Record<string, React.CSSProperties> = {
   infoColumn: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
     width: '300px',
     flexShrink: 0,
   },
@@ -446,12 +643,94 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '4px',
     letterSpacing: '0.3px',
   },
+  moveInfoWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
   moveInfo: {
     fontSize: '13px',
     color: 'var(--secondary-text)',
     textAlign: 'center',
     minHeight: '18px',
     letterSpacing: '0.3px',
+  },
+  verdictRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  verdictBadge: {
+    padding: '5px 12px',
+    borderRadius: '10px',
+    border: '1px solid',
+    fontSize: '12px',
+    fontWeight: 600,
+    letterSpacing: '0.3px',
+    whiteSpace: 'nowrap',
+  },
+  showBestBtn: {
+    padding: '5px 12px',
+    borderRadius: '10px',
+    border: '1px solid',
+    fontSize: '11px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.15s',
+  },
+  statsCard: {
+    background: 'var(--card-bg)',
+    padding: '12px 14px',
+    borderRadius: '14px',
+    border: '1px solid var(--border)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  statsHeader: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'var(--secondary-text)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    marginBottom: '2px',
+  },
+  statsRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    flexWrap: 'wrap',
+  },
+  statsDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    flexShrink: 0,
+  },
+  statsLabel: {
+    flex: 1,
+    fontWeight: 600,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: '60px',
+  },
+  statsAccuracy: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: 'var(--accent)',
+    marginRight: '4px',
+  },
+  statsIcons: {
+    display: 'flex',
+    gap: '6px',
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+    flexWrap: 'wrap',
   },
   controls: {
     display: 'flex',

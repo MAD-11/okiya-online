@@ -12,7 +12,8 @@ interface BoardProps {
   hostSkin: string;
   guestSkin: string;
   shake?: boolean;
-  clickableCells?: ValidMoves;  // ← добавить
+  clickableCells?: ValidMoves;
+  highlightCell?: { row: number; col: number; color: string } | null;
 }
 
 const skinEmoji: Record<string, { red: string; black: string }> = {
@@ -26,7 +27,7 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
   torii:  { red: '⛩️', black: '🏯' },
 };
 
-const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false, clickableCells}) => {
+const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false, clickableCells, highlightCell = null}) => {
   const cellSize = 88;
   const fontSize = 32;
   const [invalidCell, setInvalidCell] = useState<{ row: number; col: number } | null>(null);
@@ -115,7 +116,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
             const stoneEmoji = cell === 'red' ? getStoneEmoji('red')
                              : cell === 'black' ? getStoneEmoji('black')
                              : null;
-
+            const isHighlighted = !!highlightCell && highlightCell.row === r && highlightCell.col === c;
             return (
               <div
                 key={`${r}-${c}`}
@@ -124,17 +125,16 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                   ...styles.cell,
                   width: cellSize,
                   height: cellSize,
-                  fontSize,
+                  fontSize: fontSize,
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
                     : isInvalid ? '#ffcccc' : 'var(--cell-bg)',
-                  border: '1px solid var(--border)',
-                  boxShadow: isValid
-                    ? 'inset 0 0 0 2px var(--valid-move-border)'
+                  border: isValid ? '2px solid var(--valid-move-border)' : '1px solid var(--border)',
+                  boxShadow: isHighlighted
+                    ? `0 0 0 3px ${highlightCell!.color}, 0 0 20px ${highlightCell!.color}80`
                     : undefined,
-                  outline: isCursor ? '2px solid var(--turn-indicator)' : 'none',
-                  outlineOffset: '-2px',
+                  animation: isLastMove ? 'placeStone 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
                 }}
               >
                 {cell && typeof cell !== 'string' && (
