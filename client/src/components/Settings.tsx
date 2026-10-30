@@ -19,7 +19,12 @@ const themeModes: { value: ThemeMode; label: string; icon: string }[] = [
   { value: 'dark',  label: 'Тёмная',  icon: '🌙' },
 ];
 
-const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+interface SettingsProps {
+  onClose: () => void;
+  onRestartOnboarding?: () => void;
+}
+
+const Settings: React.FC<SettingsProps> = ({ onClose, onRestartOnboarding }) => {
   const { themeMode, setThemeMode, skin, setSkin } = useTheme();
   const [soundOn, setSoundOn] = useState<boolean>(() => getSoundEnabled());
 
@@ -94,7 +99,19 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           ))}
         </div>
       </div>
-
+      {onRestartOnboarding && (
+        <div style={styles.option}>
+          <button
+            onClick={() => {
+              localStorage.removeItem('okiya_onboarded');
+              onRestartOnboarding();
+            }}
+            style={styles.onboardingResetBtn}
+          >
+            🎓 Показать онбординг снова
+          </button>
+        </div>
+      )}
       <button onClick={onClose} style={styles.closeBtn}>Закрыть</button>
     </div>
   );
@@ -196,6 +213,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600, fontSize: '14px',
     cursor: 'pointer',
     boxShadow: '0 4px 20px rgba(232,165,192,0.3)',
+  },
+  onboardingResetBtn: {
+    width: '100%',
+    padding: '11px 16px',
+    borderRadius: '12px',
+    border: '1px solid var(--border)',
+    background: 'rgba(255,255,255,0.03)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 500,
+    fontFamily: '"Inter", sans-serif',
+    transition: 'all 0.2s',
   },
 };
 

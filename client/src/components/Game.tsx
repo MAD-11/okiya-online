@@ -16,6 +16,7 @@ import TutorialGame from './TutorialGame';
 import BotGame from './BotGame';
 import PuzzleGame from './PuzzleGame';
 import PuzzleList from './PuzzleList';
+import Onboarding from './Onboarding';
 import { PuzzleDifficulty } from '../types/game';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
@@ -63,6 +64,9 @@ const Game: React.FC = () => {
   const [showPuzzles, setShowPuzzles] = useState(false);
   const [puzzleDifficulty, setPuzzleDifficulty] = useState<PuzzleDifficulty | null>(null);
   const [botDifficulty, setBotDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(
+    () => !localStorage.getItem('okiya_onboarded')
+  );
 
   useEffect(() => {
     console.log('showTutorial changed:', showTutorial);
@@ -582,7 +586,13 @@ const Game: React.FC = () => {
       {showSettings && (
         <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <Settings onClose={() => setShowSettings(false)} />
+            <Settings
+              onClose={() => setShowSettings(false)}
+              onRestartOnboarding={() => {
+                setShowSettings(false);
+                setShowOnboarding(true);
+              }}
+            />
           </div>
         </div>
       )}
@@ -724,7 +734,13 @@ const Game: React.FC = () => {
           {showSettings && (
             <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
-                <Settings onClose={() => setShowSettings(false)} />
+                <Settings
+                  onClose={() => setShowSettings(false)}
+                  onRestartOnboarding={() => {
+                    setShowSettings(false);
+                    setShowOnboarding(true);
+                  }}
+                />
               </div>
             </div>
           )}
@@ -831,7 +847,13 @@ const Game: React.FC = () => {
           {showSettings && (
             <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
-                <Settings onClose={() => setShowSettings(false)} />
+                <Settings
+                  onClose={() => setShowSettings(false)}
+                  onRestartOnboarding={() => {
+                    setShowSettings(false);
+                    setShowOnboarding(true);
+                  }}
+                />
               </div>
             </div>
           )}
@@ -854,6 +876,9 @@ const Game: React.FC = () => {
           <span style={{ fontSize: '16px', marginRight: '8px' }}>📡</span>
           Нет подключения — игра приостановлена
         </div>
+      )}
+      {showOnboarding && (
+        <Onboarding onFinish={() => setShowOnboarding(false)} />
       )}
       {content}
       {showTutorial && <TutorialGame onClose={() => setShowTutorial(false)} />}
@@ -998,7 +1023,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     border: 'none',
     borderRadius: '10px',
-    backgroundColor: 'var(--btn-bg)',
+    background: 'var(--btn-bg)',
     color: 'var(--btn-text)',
     cursor: 'pointer',
     flexShrink: 0,

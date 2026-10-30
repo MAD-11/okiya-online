@@ -8,7 +8,7 @@
   --cell-bg: rgba(255, 255, 255, 0.6);
   --border: rgba(0, 0, 0, 0.08);
   --btn-bg: linear-gradient(135deg, #e8a5c0, #b57edc);
-  --btn-text: #ffffff;
+  --btn-text: #1a1a24;
   --secondary-text: #6a6a80;
   --modal-bg: rgba(255, 255, 255, 0.95);
   --chat-bg: rgba(255, 255, 255, 0.6);
@@ -182,4 +182,10 @@ button.link-btn:not(:disabled):hover {
   justify-content: center;
   padding: 20px;
   text-align: center;
+}
+
+/* Онбординг: плавающая анимация эмодзи */
+@keyframes onboardingFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
