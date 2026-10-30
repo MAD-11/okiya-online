@@ -52,7 +52,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
-        <button onClick={handleSkip} style={styles.skipBtn} title="Пропустить">
+        <button onClick={handleSkip} className="flat-btn" style={styles.skipBtn} title="Пропустить">
           Пропустить
         </button>
 

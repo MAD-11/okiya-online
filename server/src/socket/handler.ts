@@ -16,6 +16,8 @@ import { initBoard } from '../game/Board';
 import { generatePuzzle } from '../puzzle/generator';
 import { PuzzleDifficulty } from '../puzzle/types';
 import { saveReplayMeta, saveReplayMove, getReplay } from '../replay';
+import { analyzeGame } from '../analysis/analyzer';
+import { getCachedAnalysis, cacheAnalysis } from '../redis';
 
 // ============================================================
 // CONSTANTS
@@ -27,6 +29,9 @@ const MAX_SPECTATORS_PER_ROOM = 10;
 const MOVE_LIMIT_MS = 1000;
 const CHAT_LIMIT_COUNT = 5;
 const CHAT_LIMIT_WINDOW_MS = 10_000;
+// Analyze limits
+const ANALYZE_LIMIT_COUNT = 3;
+const ANALYZE_LIMIT_WINDOW_MS = 60_000;
 
 // ============================================================
 // VALIDATION SCHEMAS
@@ -54,6 +59,7 @@ const roomMutexes = new Map<string, Mutex>();
 const userRoomCount = new Map<string, number>();
 const moveRateLimits = new Map<string, number[]>();
 const chatRateLimits = new Map<string, number[]>();
+const analyzeRateLimits = new Map<string, number[]>();
 
 // ============================================================
 // EXPORTS FOR INDEX.TS
@@ -96,9 +102,20 @@ function checkChatRate(socketId: string): boolean {
   return true;
 }
 
+function checkAnalyzeRate(socketId: string): boolean {
+  const now = Date.now();
+  const ts = analyzeRateLimits.get(socketId) || [];
+  const recent = ts.filter(t => now - t < ANALYZE_LIMIT_WINDOW_MS);
+  if (recent.length >= ANALYZE_LIMIT_COUNT) return false;
+  recent.push(now);
+  analyzeRateLimits.set(socketId, recent);
+  return true;
+}
+
 function cleanupRateLimits(socketId: string): void {
   moveRateLimits.delete(socketId);
   chatRateLimits.delete(socketId);
+  analyzeRateLimits.delete(socketId);
 }
 
 // ============================================================
@@ -952,6 +969,50 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       } catch (err) {
         logger.error('replay:get error', err);
         callback({ error: 'Не удалось загрузить реплей' });
+      }
+    });
+
+    // --------------------------------------------------------
+    // REPLAY: ANALYZE
+    // --------------------------------------------------------
+    socket.on('replay:analyze', async (gameId: string, callback) => {
+      try {
+        if (!gameId || typeof gameId !== 'string' || gameId.length < 6) {
+          return callback({ error: 'Некорректный gameId' });
+        }
+
+        if (!checkAnalyzeRate(socket.id)) {
+          logger.warn(`Rate limit: analyze from ${socket.id}`);
+          return callback({ error: 'Слишком много запросов. Подождите минуту.' });
+        }
+
+        // 1. Проверить кэш
+        const cached = await getCachedAnalysis(gameId);
+        if (cached) {
+          logger.info(`replay:analyze ${gameId} — from cache`);
+          return callback({ analysis: cached, cached: true });
+        }
+
+        // 2. Загрузить реплей
+        const { meta, moves } = await getReplay(gameId);
+        if (!meta) {
+          return callback({ error: 'Реплей не найден или истёк срок хранения' });
+        }
+        if (moves.length === 0) {
+          return callback({ error: 'В партии нет ходов' });
+        }
+
+        // 3. Анализ
+        const analysis = analyzeGame(meta, moves);
+
+        // 4. Кэш
+        await cacheAnalysis(gameId, analysis);
+
+        logger.info(`replay:analyze ${gameId} — ${analysis.moves.length} moves analyzed`);
+        callback({ analysis, cached: false });
+      } catch (err) {
+        logger.error('replay:analyze error', err);
+        callback({ error: 'Не удалось проанализировать партию' });
       }
     });
   });

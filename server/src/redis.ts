@@ -161,3 +161,33 @@ export async function closeRedisConnections(): Promise<void> {
     chatSubscriber.quit(),
   ]);
 }
+
+// ============================================================
+// ANALYSIS CACHE
+// ============================================================
+const ANALYSIS_PREFIX = 'okiya:analysis:';
+const ANALYSIS_TTL = 7 * 24 * 60 * 60;
+
+export async function getCachedAnalysis(gameId: string): Promise<any | null> {
+  try {
+    const raw = await dataClient.get(ANALYSIS_PREFIX + gameId);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('getCachedAnalysis failed:', err);
+    return null;
+  }
+}
+
+export async function cacheAnalysis(gameId: string, analysis: any): Promise<void> {
+  try {
+    await dataClient.set(
+      ANALYSIS_PREFIX + gameId,
+      JSON.stringify(analysis),
+      'EX',
+      ANALYSIS_TTL
+    );
+  } catch (err) {
+    console.error('cacheAnalysis failed:', err);
+  }
+}

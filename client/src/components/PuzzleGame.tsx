@@ -212,7 +212,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
                 </button>
               )}
               <button onClick={onChangeDifficulty} style={styles.secondaryBtn}>
-                ← Сменить сложность
+                ← Сменить режим
               </button>
             </div>
           </>
