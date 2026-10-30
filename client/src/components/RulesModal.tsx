@@ -12,17 +12,16 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
     return (
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 65px)',   // фиксированная ширина 65px
+        gridTemplateColumns: 'repeat(4, minmax(55px, 65px))',
         gap: '6px',
         justifyContent: 'center',
-        margin: '12px auto',
-        overflowX: 'auto',
-        maxWidth: '100%',
+        margin: '12px 0',
       }}>
         {boardData.map((row, r) =>
           row.map((cell, c) => {
             const isHighlight = highlight?.some(([hr, hc]) => hr === r && hc === c);
             const trimmed = cell.trim();
+
             const emojis = (trimmed === '.' || trimmed === '')
               ? []
               : trimmed.match(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu) || [];
@@ -39,13 +38,12 @@ const RulesModal: React.FC<RulesModalProps> = ({ onClose, onStartTutorial }) => 
                   flexDirection: hasTwo ? 'column' : 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '65px',
-                  height: '65px',
+                  width: '100%',
+                  aspectRatio: '1 / 1',
                   backgroundColor: isHighlight ? '#f1c40f' : 'var(--cell-bg)',
                   border: '1px solid var(--border)',
                   borderRadius: '10px',
                   padding: '4px',
-                  boxSizing: 'border-box',
                 }}
               >
                 {!isEmpty && (
@@ -199,7 +197,9 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '700px',
     width: '90%',
     maxHeight: '85vh',
-    overflow: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',                       // ← важно: скролл только в content
     padding: '28px',
     border: '1px solid var(--border)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -214,6 +214,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     color: 'var(--text)',
     letterSpacing: '0.5px',
+    flexShrink: 0,                            // ← не сжимается
   },
   tabs: {
     display: 'flex',
@@ -223,6 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: '12px',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    flexShrink: 0,                            // ← не сжимается
   },
   tab: {
     padding: '9px 16px',
@@ -235,6 +237,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--secondary-text)',
     transition: 'all 0.2s',
     fontFamily: '"Inter", sans-serif',
+    flexShrink: 0,
   },
   activeTab: {
     background: 'var(--btn-bg)',
@@ -244,6 +247,12 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 16px rgba(232,165,192,0.3)',
   },
   content: {
+    flex: 1,
+    minHeight: '420px',                       // ← фиксированная минимальная высота
+    maxHeight: '55vh',                        // ← ограничение скролла
+    overflowY: 'auto',                        // ← скролл только здесь
+    overflowX: 'hidden',
+    paddingRight: '8px',                      // ← чтобы скролл не наезжал на текст
     marginBottom: '24px',
     lineHeight: 1.6,
     color: 'var(--text)',
@@ -254,6 +263,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     justifyContent: 'flex-end',
     flexWrap: 'wrap',
+    flexShrink: 0,                            // ← не сжимается
   },
   closeBtn: {
     padding: '11px 24px',
