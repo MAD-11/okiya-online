@@ -424,62 +424,32 @@ const Game: React.FC = () => {
       </div>
     );
   } else if (!gameState) {
-    content = (
-      <div style={styles.lobbyContainer}>
-        <div style={styles.lobbyCard}>
-          <h1 style={styles.title}>Окийя</h1>
-          <p style={styles.subtitle}>изящная дуэльная игра</p>
-          {nick && (
-            <p style={styles.playerName}>
-              Вы: <strong style={styles.playerNameStrong}>{nick}</strong>
-            </p>
-          )}
+  content = (
+    <div style={styles.lobbyContainer}>
+      <div style={styles.lobbyCard}>
+        <h1 style={styles.title}>Окийя</h1>
+        <p style={styles.subtitle}>изящная дуэльная игра</p>
+        {nick && (
+          <p style={styles.playerName}>
+            Вы: <strong style={styles.playerNameStrong}>{nick}</strong>
+          </p>
+        )}
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* 🎮 СЕКЦИЯ: ИГРАТЬ С ДРУГОМ                    */}
+        {/* ═══════════════════════════════════════════════ */}
+        <div style={styles.lobbySection}>
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionIcon}>🎮</span>
+            <span style={styles.sectionTitle}>Играть с другом</span>
+          </div>
+
           <div style={styles.buttonGroup}>
             <button onClick={() => createRoom(1)} style={styles.primaryBtn}>Одна игра</button>
             <button onClick={() => createRoom(3)} style={styles.primaryBtn}>До 3 побед</button>
             <button onClick={() => createRoom(5)} style={styles.primaryBtn}>До 5 побед</button>
           </div>
-          <div style={{ marginTop: '10px', marginBottom: '18px' }}>
-            <button
-              onClick={() => setShowPuzzles(true)}
-              style={{ ...styles.secondaryBtn, marginTop: 0 }}
-              title="Тренировка: реши позицию за N ходов"
-            >
-              🎯 Пазлы
-            </button>
-          </div>
-          <div style={styles.difficultySelector}>
-            <p style={styles.difficultyLabel}>🤖 Игра с ботом</p>
-            <div style={styles.difficultyGrid}>
-              <button
-                onClick={() => { setBotDifficulty('easy'); setShowBotGame(true); }}
-                className="difficulty-hover"
-                style={{ ...styles.difficultyCard, borderColor: 'rgba(46, 204, 113, 0.5)' }}
-                title="Случайные ходы, для новичков"
-              >
-                <span style={styles.difficultyEmoji}>🟢</span>
-                <span style={styles.difficultyName}>Лёгкий</span>
-              </button>
-              <button
-                onClick={() => { setBotDifficulty('medium'); setShowBotGame(true); }}
-                className="difficulty-hover"
-                style={{ ...styles.difficultyCard, borderColor: 'rgba(232, 165, 192, 0.5)' }}
-                title="Эвристика, средний уровень"
-              >
-                <span style={styles.difficultyEmoji}>🟡</span>
-                <span style={styles.difficultyName}>Средний</span>
-              </button>
-              <button
-                onClick={() => { setBotDifficulty('hard'); setShowBotGame(true); }}
-                className="difficulty-hover"
-                style={{ ...styles.difficultyCard, borderColor: 'rgba(231, 76, 60, 0.5)' }}
-                title="Минимакс, для опытных"
-              >
-                <span style={styles.difficultyEmoji}>🔴</span>
-                <span style={styles.difficultyName}>Сложный</span>
-              </button>
-            </div>
-          </div>
+
           <label style={{
             ...styles.privateCard,
             borderColor: isPrivate ? 'rgba(232,165,192,0.6)' : 'var(--border)',
@@ -504,82 +474,157 @@ const Game: React.FC = () => {
               {isPrivate && <span style={styles.privateToggleDotInner} />}
             </span>
           </label>
-          <div style={styles.separator} />
-          <button onClick={() => setShowJoinModal(true)} style={styles.secondaryBtn}>Войти по коду</button>
-          <button onClick={() => setShowRoomList(true)} style={{ ...styles.secondaryBtn, marginTop: '12px' }}>Открытые комнаты</button>
-          <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: '20px' }}>
-            <button onClick={() => setShowProfile(true)} className="link-btn" style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
-            <button onClick={() => setShowSettings(true)} className="link-btn" style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
-            <button onClick={() => setShowRules(true)} className="link-btn" style={styles.textBtn} title="Правила игры">📖 Правила</button>
+
+          <div style={styles.joinRow}>
+            <button onClick={() => setShowJoinModal(true)} style={styles.joinBtn}>
+              🚪 Войти по коду
+            </button>
+            <button onClick={() => setShowRoomList(true)} style={styles.joinBtn}>
+              📋 Открытые комнаты
+            </button>
           </div>
-          {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
         </div>
-        {showProfile && (
-          <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <Profile onClose={() => setShowProfile(false)} socket={socket} playerId={playerId} />
-            </div>
+
+        <div style={styles.sectionDivider} />
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* 🎯 СЕКЦИЯ: ТРЕНИРОВАТЬСЯ                      */}
+        {/* ═══════════════════════════════════════════════ */}
+        <div style={styles.lobbySection}>
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionIcon}>🎯</span>
+            <span style={styles.sectionTitle}>Тренироваться</span>
           </div>
-        )}
-        {showRoomList && (
-          <div style={styles.modalOverlay} onClick={() => setShowRoomList(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <RoomList
-                onJoin={(roomId) => { joinRoom(roomId); setShowRoomList(false); }}
-                onSpectate={(roomId) => { spectateRoom(roomId); setShowRoomList(false); }}
-                socket={socket}
-                onClose={() => setShowRoomList(false)}
-              />
-            </div>
-          </div>
-        )}
-        {showSettings && (
-          <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <Settings onClose={() => setShowSettings(false)} />
-            </div>
-          </div>
-        )}
-        {showJoinModal && (
-          <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
-            <div style={styles.joinModal} onClick={e => e.stopPropagation()}>
-              <h3 style={styles.joinModalTitle}>Введите код комнаты</h3>
-              <input
-                ref={joinInputRef}
-                value={joinCode}
-                onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === 'Enter' && joinRoom(joinCode)}
-                style={styles.joinModalInput}
-                placeholder="Например: A1B2"
-                maxLength={4}
-              />
-              <div style={styles.joinModalButtons}>
-                <button onClick={() => setShowJoinModal(false)} style={styles.joinModalBtnCancel}>Отмена</button>
-                <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.joinModalBtnConfirm}>Войти</button>
+
+          <div style={styles.trainingCard}>
+            <div style={styles.trainingCardMain}>
+              <span style={styles.trainingEmoji}>🎯</span>
+              <div style={styles.trainingCardText}>
+                <span style={styles.trainingCardTitle}>Пазлы</span>
+                <span style={styles.trainingCardDesc}>Тренируй тактику</span>
               </div>
             </div>
+            <button onClick={() => setShowPuzzles(true)} style={styles.trainingActionBtn}>
+              Открыть
+            </button>
           </div>
-        )}
-        {showRules && (
-          <RulesModal
-            onClose={() => setShowRules(false)}
-            onStartTutorial={() => {
-              console.log('onStartTutorial called');
-              setShowRules(false);
-              setShowTutorial(true);
-            }}
-          />
-        )}
-        <ConfirmDialog
-          open={confirmExitOpen}
-          title="Выйти из игры?"
-          message="Текущая игра будет потеряна. Вы уверены?"
-          onConfirm={handleConfirmExit}
-          onCancel={() => setConfirmExitOpen(false)}
-        />
+
+          <div style={styles.trainingCard}>
+            <div style={styles.trainingCardMain}>
+              <span style={styles.trainingEmoji}>🤖</span>
+              <div style={styles.trainingCardText}>
+                <span style={styles.trainingCardTitle}>Игра с ботом</span>
+                <span style={styles.trainingCardDesc}>Выбери сложность</span>
+              </div>
+            </div>
+            <div style={styles.botRow}>
+              <button
+                onClick={() => { setBotDifficulty('easy'); setShowBotGame(true); }}
+                style={{ ...styles.botDiffBtn, color: '#2ecc71', borderColor: 'rgba(46,204,113,0.4)' }}
+                title="Лёгкий"
+              >
+                🟢
+              </button>
+              <button
+                onClick={() => { setBotDifficulty('medium'); setShowBotGame(true); }}
+                style={{ ...styles.botDiffBtn, color: 'var(--accent)', borderColor: 'rgba(232,165,192,0.4)' }}
+                title="Средний"
+              >
+                🟡
+              </button>
+              <button
+                onClick={() => { setBotDifficulty('hard'); setShowBotGame(true); }}
+                style={{ ...styles.botDiffBtn, color: '#e74c3c', borderColor: 'rgba(231,76,60,0.4)' }}
+                title="Сложный"
+              >
+                🔴
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.sectionDivider} />
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* FOOTER                                         */}
+        {/* ═══════════════════════════════════════════════ */}
+        <div style={styles.lobbyFooter}>
+          <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
+          <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
+          <button onClick={() => setShowRules(true)} style={styles.textBtn} title="Правила игры">📖 Правила</button>
+        </div>
+
+        {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
       </div>
-    );
-  } else {
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/* МОДАЛКИ (без изменений)                        */}
+      {/* ═══════════════════════════════════════════════ */}
+      {showProfile && (
+        <div style={styles.modalOverlay} onClick={() => setShowProfile(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <Profile onClose={() => setShowProfile(false)} socket={socket} playerId={playerId} />
+          </div>
+        </div>
+      )}
+      {showRoomList && (
+        <div style={styles.modalOverlay} onClick={() => setShowRoomList(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <RoomList
+              onJoin={(roomId) => { joinRoom(roomId); setShowRoomList(false); }}
+              onSpectate={(roomId) => { spectateRoom(roomId); setShowRoomList(false); }}
+              socket={socket}
+              onClose={() => setShowRoomList(false)}
+            />
+          </div>
+        </div>
+      )}
+      {showSettings && (
+        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <Settings onClose={() => setShowSettings(false)} />
+          </div>
+        </div>
+      )}
+      {showJoinModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowJoinModal(false)}>
+          <div style={styles.joinModal} onClick={e => e.stopPropagation()}>
+            <h3 style={styles.joinModalTitle}>Введите код комнаты</h3>
+            <input
+              ref={joinInputRef}
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && joinRoom(joinCode)}
+              style={styles.joinModalInput}
+              placeholder="Например: A1B2"
+              maxLength={4}
+            />
+            <div style={styles.joinModalButtons}>
+              <button onClick={() => setShowJoinModal(false)} style={styles.joinModalBtnCancel}>Отмена</button>
+              <button onClick={() => { joinRoom(joinCode); setShowJoinModal(false); setJoinCode(''); }} style={styles.joinModalBtnConfirm}>Войти</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRules && (
+        <RulesModal
+          onClose={() => setShowRules(false)}
+          onStartTutorial={() => {
+            setShowRules(false);
+            setShowTutorial(true);
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={confirmExitOpen}
+        title="Выйти из игры?"
+        message="Текущая игра будет потеряна. Вы уверены?"
+        onConfirm={handleConfirmExit}
+        onCancel={() => setConfirmExitOpen(false)}
+      />
+    </div>
+  );
+} else {
     const isSpectator = !gameState.myColor;
     const canRestart = gameState.roundFinished && !waitingRestart;
 
@@ -839,22 +884,150 @@ const styles: Record<string, React.CSSProperties> = {
   lobbyContainer: {
     display: 'flex',
     justifyContent: 'center',
-    alignItems: 'center',
     minHeight: '100dvh',
     boxSizing: 'border-box',
     padding: '20px',
+    overflow: 'auto',
     fontFamily: '"Inter", sans-serif',
   },
   lobbyCard: {
+    margin: 'auto',
     background: 'var(--card-bg)',
     borderRadius: '28px',
     border: '1px solid var(--border)',
-    backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-    padding: '48px 40px',
-    maxWidth: '460px',
+    padding: '40px 32px',
+    maxWidth: '520px',
     width: '100%',
     textAlign: 'center',
+  },
+  lobbySection: {
+    marginBottom: '4px',
+    textAlign: 'center',
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+    marginTop: '8px',
+  },
+  sectionIcon: {
+    fontSize: '14px',
+  },
+  sectionTitle: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: 'var(--secondary-text)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '2px',
+  },
+  sectionDivider: {
+    height: '1px',
+    background: 'linear-gradient(90deg, transparent, var(--border), transparent)',
+    margin: '20px 0',
+  },
+  joinRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
+    marginTop: '4px',
+  },
+  joinBtn: {
+    padding: '12px 14px',
+    fontSize: '13px',
+    fontWeight: 500,
+    border: '1px solid var(--border)',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontFamily: '"Inter", sans-serif',
+    transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  trainingCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 14px',
+    marginBottom: '10px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid var(--border)',
+    borderRadius: '14px',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    transition: 'all 0.2s',
+  },
+  trainingCardMain: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'left' as const,
+  },
+  trainingEmoji: {
+    fontSize: '24px',
+    lineHeight: 1,
+    flexShrink: 0,
+  },
+  trainingCardText: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+    minWidth: 0,
+  },
+  trainingCardTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'var(--text)',
+  },
+  trainingCardDesc: {
+    fontSize: '11px',
+    color: 'var(--secondary-text)',
+  },
+  trainingActionBtn: {
+    padding: '8px 16px',
+    fontSize: '12px',
+    fontWeight: 600,
+    border: 'none',
+    borderRadius: '10px',
+    backgroundColor: 'var(--btn-bg)',
+    color: 'var(--btn-text)',
+    cursor: 'pointer',
+    flexShrink: 0,
+    boxShadow: '0 4px 12px rgba(232,165,192,0.25)',
+    transition: 'all 0.2s',
+  },
+  botRow: {
+    display: 'flex',
+    gap: '6px',
+    flexShrink: 0,
+  },
+  botDiffBtn: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '10px',
+    border: '1px solid var(--border)',
+    background: 'rgba(255,255,255,0.03)',
+    cursor: 'pointer',
+    fontSize: '18px',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lobbyFooter: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    flexWrap: 'wrap' as const,
   },
   title: {
     fontSize: '56px',
@@ -894,48 +1067,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     marginBottom: '20px',
   },
-  difficultySelector: {
-    marginBottom: '18px',
-  },
-  difficultyLabel: {
-    fontSize: '11px',
-    color: 'var(--secondary-text)',
-    textTransform: 'uppercase',
-    letterSpacing: '2px',
-    marginBottom: '10px',
-    fontWeight: 600,
-    textAlign: 'center',
-  },
-  difficultyGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: '10px',
-  },
-  difficultyCard: {
-    padding: '16px 8px',
-    borderRadius: '14px',
-    border: '1px solid var(--border)',
-    background: 'rgba(255,255,255,0.03)',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.2s',
-    fontFamily: '"Inter", sans-serif',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-  },
-  difficultyEmoji: {
-    fontSize: '24px',
-    lineHeight: 1,
-  },
-  difficultyName: {
-    fontSize: '13px',
-    fontWeight: 600,
-    letterSpacing: '0.5px',
-  },
   primaryBtn: {
     padding: '16px 26px',
     fontSize: '15px',
@@ -970,7 +1101,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '14px',
     padding: '14px 16px',
-    margin: '16px 0 10px',
+    margin: '8px 0 12px',
     borderRadius: '14px',
     border: '1px solid var(--border)',
     cursor: 'pointer',
@@ -1018,14 +1149,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'block',
   },
   hiddenCheckbox: { display: 'none' },
-  separator: {
-    height: '1px',
-    background: 'linear-gradient(90deg, transparent, var(--border), transparent)',
-    margin: '22px 0',
-    width: '70%',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  },
   textBtn: {
     background: 'none',
     border: 'none',
