@@ -189,3 +189,28 @@ button.link-btn:not(:disabled):hover {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
 }
+
+/* ============================================================ */
+/* FLAT BUTTONS — текстовые кнопки без фона, тени и hover-эффектов */
+/* ============================================================ */
+button.flat-btn,
+button.flat-btn:hover,
+button.flat-btn:focus,
+button.flat-btn:focus-visible,
+button.flat-btn:active {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  outline: none !important;
+  border: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+button.flat-btn:not(:disabled):hover {
+  color: var(--accent) !important;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

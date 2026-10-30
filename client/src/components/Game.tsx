@@ -553,9 +553,9 @@ const Game: React.FC = () => {
         {/* FOOTER                                         */}
         {/* ═══════════════════════════════════════════════ */}
         <div style={styles.lobbyFooter}>
-          <button onClick={() => setShowProfile(true)} style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
-          <button onClick={() => setShowSettings(true)} style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
-          <button onClick={() => setShowRules(true)} style={styles.textBtn} title="Правила игры">📖 Правила</button>
+          <button onClick={() => setShowProfile(true)} className="flat-btn" style={styles.textBtn} title="Просмотр статистики">👤 Профиль</button>
+          <button onClick={() => setShowSettings(true)} className="flat-btn" style={styles.textBtn} title="Настройки игры">⚙️ Настройки</button>
+          <button onClick={() => setShowRules(true)} className="flat-btn" style={styles.textBtn} title="Правила игры">📖 Правила</button>
         </div>
 
         {message && <p style={{ color: 'var(--timer-low)', marginTop: 16, fontSize: 14 }}>{message}</p>}
@@ -1182,7 +1182,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: '"Inter", sans-serif',
     transition: 'color 0.2s',
-    padding: '6px 10px',
   },
   centered: {
     display: 'flex',
