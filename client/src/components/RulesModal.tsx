@@ -196,10 +196,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '24px',
     maxWidth: '700px',
     width: '90%',
-    maxHeight: '85vh',
+    height: 'min(85vh, 720px)',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',                       // ← важно: скролл только в content
+    overflow: 'hidden',
     padding: '28px',
     border: '1px solid var(--border)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -214,7 +214,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     color: 'var(--text)',
     letterSpacing: '0.5px',
-    flexShrink: 0,                            // ← не сжимается
+    flexShrink: 0,
   },
   tabs: {
     display: 'flex',
@@ -224,7 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: '12px',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    flexShrink: 0,                            // ← не сжимается
+    flexShrink: 0,
   },
   tab: {
     padding: '9px 16px',
@@ -247,12 +247,11 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 16px rgba(232,165,192,0.3)',
   },
   content: {
-    flex: 1,
-    minHeight: '420px',                       // ← фиксированная минимальная высота
-    maxHeight: '55vh',                        // ← ограничение скролла
-    overflowY: 'auto',                        // ← скролл только здесь
+    flex: '1 1 0',
+    minHeight: 0,
+    overflowY: 'auto',
     overflowX: 'hidden',
-    paddingRight: '8px',                      // ← чтобы скролл не наезжал на текст
+    paddingRight: '8px',
     marginBottom: '24px',
     lineHeight: 1.6,
     color: 'var(--text)',
@@ -263,7 +262,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     justifyContent: 'flex-end',
     flexWrap: 'wrap',
-    flexShrink: 0,                            // ← не сжимается
+    flexShrink: 0,
   },
   closeBtn: {
     padding: '11px 24px',

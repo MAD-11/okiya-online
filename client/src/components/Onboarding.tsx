@@ -58,11 +58,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
 
         <div style={styles.emojiWrap}>
           <span style={styles.emoji}>{slide.emoji}</span>
-          <div style={{ ...styles.emojiGlow, background: `radial-gradient(circle, ${slide.accent}40 0%, transparent 70%)` }} />
+          <div style={{
+            ...styles.emojiGlow,
+            background: `radial-gradient(circle, ${slide.accent}40 0%, transparent 70%)`,
+          }} />
         </div>
 
         <h2 style={styles.title}>{slide.title}</h2>
-        <p style={styles.text}>{slide.text}</p>
+
+        <div style={styles.textArea}>
+          <p style={styles.text}>{slide.text}</p>
+        </div>
 
         <div style={styles.dots}>
           {SLIDES.map((_, i) => (
@@ -78,12 +84,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
         </div>
 
         <div style={styles.buttons}>
-          {!isFirst ? (
+          {!isFirst && (
             <button onClick={handleBack} style={styles.secondaryBtn}>
               ← Назад
             </button>
-          ) : (
-            <div style={{ flex: 1 }} />
           )}
           <button onClick={handleNext} style={styles.primaryBtn}>
             {isLast ? 'Начать 🎮' : 'Далее →'}
@@ -118,11 +122,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '48px 36px 32px',
     maxWidth: '480px',
     width: '100%',
+    height: 'min(560px, 88vh)',
     textAlign: 'center',
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px',
+    gap: '16px',
   },
   skipBtn: {
     position: 'absolute',
@@ -135,13 +140,15 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     textDecoration: 'underline',
     textUnderlineOffset: '3px',
+    padding: '4px 8px',
   },
   emojiWrap: {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: '4px',
+    height: '110px',
+    flexShrink: 0,
   },
   emoji: {
     fontSize: '72px',
@@ -164,6 +171,17 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     color: 'var(--text)',
     letterSpacing: '0.3px',
+    minHeight: '32px',
+    flexShrink: 0,
+  },
+  textArea: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflowY: 'auto',
+    padding: '0 4px',
   },
   text: {
     fontSize: '14px',
@@ -177,7 +195,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: '8px',
+    height: '16px',
+    flexShrink: 0,
   },
   dot: {
     height: '8px',
@@ -187,8 +206,9 @@ const styles: Record<string, React.CSSProperties> = {
   buttons: {
     display: 'flex',
     gap: '12px',
-    marginTop: '8px',
-    alignItems: 'center',
+    alignItems: 'stretch',
+    minHeight: '48px',
+    flexShrink: 0,
   },
   primaryBtn: {
     flex: 1,
@@ -218,5 +238,4 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// keyframes добавятся через <style> в Game.tsx — см. ниже
 export default Onboarding;
