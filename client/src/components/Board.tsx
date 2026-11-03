@@ -172,7 +172,7 @@ const styles: Record<string, React.CSSProperties> = {
   boardContainer: { display: 'flex', justifyContent: 'center', outline: 'none' },
   grid: {
     display: 'grid',
-    gridTemplateColumns: `repeat(4, \${CELL_SIZE}px)`,
+    gridTemplateColumns: `repeat(4, ${CELL_SIZE}px)`,
     gap: '8px',
     padding: '16px',
     borderRadius: '16px',
