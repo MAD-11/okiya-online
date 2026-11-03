@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Board as BoardType, ValidMoves } from '../types/game';
 import { initAudio } from '../utils/sound';
 
@@ -16,6 +16,9 @@ interface BoardProps {
   highlightCell?: { row: number; col: number; color: string } | null;
 }
 
+const CELL_SIZE = 88;
+const CELL_FONT_SIZE = 32;
+
 const skinEmoji: Record<string, { red: string; black: string }> = {
   sakura: { red: '🌸', black: '🌺' },
   bird:   { red: '🐦', black: '🐦‍⬛' },
@@ -28,12 +31,10 @@ const skinEmoji: Record<string, { red: string; black: string }> = {
 };
 
 const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hostSkin, guestSkin, shake = false, clickableCells, highlightCell = null}) => {
-  const cellSize = 88;
-  const fontSize = 32;
   const [invalidCell, setInvalidCell] = useState<{ row: number; col: number } | null>(null);
   const [cursor, setCursor] = useState<{ row: number; col: number } | null>(null);
   const [focused, setFocused] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+
 
   const canInteract = (row: number, col: number) => {
     const clickable = clickableCells ?? validMoves;
@@ -97,7 +98,6 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
   return (
     <div
       className={shake ? 'board-shake' : ''}
-      ref={containerRef}
       style={styles.boardContainer}
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -108,7 +108,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
       <div className="board-grid" style={styles.grid}>
         {board.map((row, r) =>
           row.map((cell, c) => {
-            const isValid = validMoves[r]?.[c];
+            const isValid = !!((clickableCells ?? validMoves)[r]?.[c]);
             const isPlayerCell = cell === 'red' || cell === 'black';
             const isLastMove = lastMove?.row === r && lastMove?.col === c;
             const isInvalid = invalidCell?.row === r && invalidCell?.col === c;
@@ -123,9 +123,9 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, onClick, lastMove, hos
                 onClick={() => handleCellClick(r, c)}
                 style={{
                   ...styles.cell,
-                  width: cellSize,
-                  height: cellSize,
-                  fontSize: fontSize,
+                  width: CELL_SIZE,
+                  height: CELL_SIZE,
+                  fontSize: CELL_FONT_SIZE,
                   cursor: isValid ? 'pointer' : 'default',
                   backgroundColor: isPlayerCell
                     ? cell === 'red' ? 'var(--stone-red-bg)' : 'var(--stone-black-bg)'
@@ -172,7 +172,7 @@ const styles: Record<string, React.CSSProperties> = {
   boardContainer: { display: 'flex', justifyContent: 'center', outline: 'none' },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 88px)',
+    gridTemplateColumns: `repeat(4, \${CELL_SIZE}px)`,
     gap: '8px',
     padding: '16px',
     borderRadius: '16px',

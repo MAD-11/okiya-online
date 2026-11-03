@@ -3,8 +3,22 @@ services:
     name: okiya-server
     env: node
     rootDir: server
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 4000
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: okiya-redis
+          property: connectionString
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: NODE_VERSION
+        value: "20.11.5"
+
+  - type: redis
+    name: okiya-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
