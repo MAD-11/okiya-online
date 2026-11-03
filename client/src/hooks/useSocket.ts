@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 export function useSocket(serverUrl: string) {
-  const socketRef = useRef<Socket | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -20,19 +21,25 @@ export function useSocket(serverUrl: string) {
   }, []);
 
   useEffect(() => {
-    const socket = io(serverUrl, {
+    const s = io(serverUrl, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
     });
-    socketRef.current = socket;
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
+    socketRef.current = s;
+    setSocket(s);
+
+    s.on('connect', () => setConnected(true));
+    s.on('disconnect', () => setConnected(false));
+
     return () => {
-      socket.disconnect();
+      s.disconnect();
+      socketRef.current = null;
+      setSocket(null);
+      setConnected(false);
     };
   }, [serverUrl]);
 
-  return { socket: socketRef.current, connected, isOnline };
+  return { socket, connected, isOnline };
 }

@@ -31,7 +31,7 @@ const Chat: React.FC<ChatProps> = ({
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<number>();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ const Chat: React.FC<ChatProps> = ({
         setIsTyping(false);
         socket?.emit('typing', roomId, false);
       }
-    }, 2000) as unknown as number;
+    }, 2000);
   };
 
   const handleSend = () => {

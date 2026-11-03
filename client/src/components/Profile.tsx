@@ -7,6 +7,7 @@ interface GameResult {
   gameId?: string;   // ← опционально, для старых записей
   winner: 'host' | 'guest' | 'draw';
   players: { host: string; guest: string };
+  nicks?: { host: string; guest: string };
   timestamp: number;
   maxWins: number;
 }
@@ -101,7 +102,11 @@ const Profile: React.FC<{ onClose: () => void; socket: Socket | null; playerId: 
                           <div style={styles.historyInfo}>
                             <span style={{ ...styles.historyResult, color: r.color }}>{r.text}</span>
                             <span style={styles.historyOpponent}>
-                              vs {isHost ? game.players.guest.slice(0, 10) : game.players.host.slice(0, 10)}
+                              vs {
+                                isHost
+                                  ? (game.nicks?.guest || game.players.guest.slice(0, 8))
+                                  : (game.nicks?.host || game.players.host.slice(0, 8))
+                              }
                             </span>
                           </div>
                         </div>

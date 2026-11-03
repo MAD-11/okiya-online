@@ -78,6 +78,18 @@ export class Game {
     }, this.turnDuration);
   }
 
+  public resumeTimer(): void {
+    if (this.status !== 'playing') return;
+    this.clearTurnTimer();
+    const elapsed = Date.now() - this.turnStartedAt;
+    const remaining = Math.max(1000, this.turnDuration - elapsed);
+    this.turnTimer = setTimeout(() => {
+      if (this.status === 'playing' && this.onTimerExpired) {
+        this.onTimerExpired();
+      }
+    }, remaining);
+  } 
+
   addPlayer(socketId: string): boolean {
     if (this.players.red && this.players.black) return false;
     if (!this.players.red) {
@@ -92,23 +104,34 @@ export class Game {
     return true;
   }
 
+  private consecutiveSkips: number = 0;
+
   skipTurn() {
     if (this.status !== 'playing') return;
     const opponent = this.currentPlayer === 'red' ? 'black' : 'red';
-    
+
     if (this.isBoardFull()) {
       this.winner = 'draw';
       this.handleGameOver();
       return;
     }
-    
+
     if (!this.hasValidMove()) {
       this.winner = opponent;
       this.handleGameOver();
-    } else {
-      this.currentPlayer = opponent;
-      this.startTurnTimer();
+      return;
     }
+
+    this.consecutiveSkips += 1;
+    // Если оба подряд AFK — ничья, чтобы не крутить бесконечно
+    if (this.consecutiveSkips >= 2) {
+      this.winner = 'draw';
+      this.handleGameOver();
+      return;
+    }
+
+    this.currentPlayer = opponent;
+    this.startTurnTimer();
   }
 
   makeMove(row: number, col: number, playerSocketId: string): boolean {
@@ -127,7 +150,7 @@ export class Game {
     this.board[row][col] = playerColor;
     this.lastPickedTile = picked;
     this.lastMove = { row, col };
-
+    this.consecutiveSkips = 0;
     this.clearTurnTimer();
 
     if (checkWin(this.board, playerColor)) {
@@ -247,6 +270,7 @@ export class Game {
     this.seriesWinner = null;
     this.restartVotes.clear();
     this.resetVotes.clear();
+    this.consecutiveSkips = 0;
     this.lastMove = null;
     this.clearTurnTimer();
     this.startTurnTimer();
@@ -263,6 +287,8 @@ export class Game {
     this.status = 'playing';
     this.roundFinished = false;
     this.restartVotes.clear();
+    this.resetVotes.clear();
+    this.consecutiveSkips = 0;
     this.lastMove = null;
     this.startTurnTimer();
   }

@@ -6,18 +6,20 @@ import {
   getPlayerStats,
   recordPuzzleSolved,
   storeActivePuzzle,
+  peekActivePuzzle,
   consumeActivePuzzle,
 } from '../stats';
 import { logger } from '../logger';
 import crypto from 'crypto';
 import { Mutex } from 'async-mutex';
 import { z } from 'zod';
-import { initBoard } from '../game/Board';
+import { initBoard, checkWin } from '../game/Board';
 import { generatePuzzle } from '../puzzle/generator';
 import { PuzzleDifficulty } from '../puzzle/types';
 import { saveReplayMeta, saveReplayMove, getReplay } from '../replay';
 import { analyzeGame } from '../analysis/analyzer';
 import { getCachedAnalysis, cacheAnalysis } from '../redis';
+import { isValidForColor, canWinNextMove } from '../game/evaluate';
 
 // ============================================================
 // CONSTANTS
@@ -153,6 +155,61 @@ function isPlayer(game: Game, socketId: string): boolean {
   return game.players.red === socketId || game.players.black === socketId;
 }
 
+function finalizeRoom(roomId: string, game: Game): void {
+  const hostId = game.hostPlayerId;
+  if (hostId) {
+    const count = userRoomCount.get(hostId) || 0;
+    if (count > 0) userRoomCount.set(hostId, count - 1);
+    else userRoomCount.delete(hostId);
+  }
+  cleanupRoomTimers(roomId);
+  games.delete(roomId);
+  deleteGame(roomId);
+}
+
+function handleGameFinished(io: Server, roomId: string, game: Game): void {
+  sendPersonalGameState(io, game);
+  sendSpectatorGameState(io, game);
+  sendPersonalGameOver(io, game);
+
+  if (game.seriesWinner || game.maxWins === 1) {
+    const winner: 'host' | 'guest' | 'draw' =
+      game.seriesWinner
+        ? game.seriesWinner
+        : game.winner === 'draw'
+          ? 'draw'
+          : game.winner === 'red'
+            ? 'host'
+            : 'guest';
+
+    saveGameResult({
+      roomId,
+      gameId: game.gameId,
+      winner,
+      players: { host: game.hostPlayerId, guest: game.guestPlayerId },
+      nicks: { host: game.nickRed, guest: game.nickBlack },
+      timestamp: Date.now(),
+      maxWins: game.maxWins,
+    }).catch(err => logger.error('saveGameResult failed', err));
+
+    finalizeRoom(roomId, game);
+  } else {
+    saveGame(roomId, game);
+  }
+}
+
+function onTurnExpired(io: Server, roomId: string, game: Game): void {
+  logger.info(`Timer expired in room ${roomId}`);
+  game.skipTurn();
+  if (game.winner) {
+    handleGameFinished(io, roomId, game);
+  } else {
+    sendPersonalGameState(io, game);
+    sendSpectatorGameState(io, game);
+    saveGame(roomId, game);
+  }
+}
+
 function countSpectators(io: Server, roomId: string): number {
   const room = io.sockets.adapter.rooms.get(roomId);
   if (!room) return 0;
@@ -255,27 +312,18 @@ function notifySpectatorsRoomClosed(io: Server, roomId: string, reason: string):
 }
 
 // ============================================================
-// CHAT SUBSCRIBER (Redis Pub/Sub for cross-instance chat)
-// ============================================================
-chatSubscriber.subscribe('chat');
-chatSubscriber.on('message', (_channel, message) => {
-  try {
-    const { roomId, msg } = JSON.parse(message);
-    const io = (global as any).io;
-    if (io) {
-      io.to(roomId).emit('chat_message', msg);
-    }
-  } catch (e) {
-    // ignore
-  }
-});
-
-// ============================================================
 // SOCKET SETUP
 // ============================================================
 export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
   games = loadedGames;
   (global as any).io = io;
+
+  for (const [roomId, game] of games.entries()) {
+    game.setOnTimerExpired(() => onTurnExpired(io, roomId, game));
+    if (game.status === 'playing') {
+      game.resumeTimer();
+    }
+  }
 
   io.on('connection', (socket: Socket) => {
     logger.info('User connected: ' + socket.id);
@@ -291,6 +339,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       data: { maxWins: number; playerId: string; nick: string; skin?: string; isPrivate?: boolean },
       callback
     ) => {
+      if (!data || typeof data !== 'object' || typeof callback !== 'function') return;
       const nick = sanitize(data.nick || 'Игрок').slice(0, 12);
       const skin = data.skin || 'sakura';
       const isPrivate = data.isPrivate === true;
@@ -322,16 +371,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       game.hostToken = hostToken;
       game.guestToken = null;
 
-      game.setOnTimerExpired(() => {
-        logger.info(`Timer expired in room ${roomId}`);
-        game.skipTurn();
-        sendPersonalGameState(io, game);
-        sendSpectatorGameState(io, game);
-        if (game.winner) {
-          sendPersonalGameOver(io, game);
-        }
-        saveGame(roomId, game);
-      });
+      game.setOnTimerExpired(() => onTurnExpired(io, roomId, game));
 
       games.set(roomId, game);
       socket.join(roomId);
@@ -353,6 +393,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       data: { roomId: string; playerId: string; nick: string; skin?: string },
       callback
     ) => {
+      if (!data || typeof data !== 'object' || typeof callback !== 'function') return;
       const validation = JoinRoomSchema.safeParse(data);
       if (!validation.success) {
         return callback({ error: 'Некорректные данные' });
@@ -396,11 +437,13 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
         game.guestSkin = skin;
       }
 
-      if (game.players.red && game.players.black && game.status === 'waiting') {
-        game.status = 'playing';
-        game.turnStartedAt = Date.now();
-      } else if (game.players.red && game.players.black && game.status !== 'playing') {
-        game.turnStartedAt = Date.now();
+      if (game.players.red && game.players.black) {
+        if (game.status === 'waiting') {
+          game.status = 'playing';
+          game.turnStartedAt = Date.now();
+        }
+        game.setOnTimerExpired(() => onTurnExpired(io, roomId, game));
+        game.resumeTimer();
       }
 
       // Если пользователь был зрителем другой комнаты — выходим оттуда
@@ -461,6 +504,10 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
         disconnectTimers.delete(timerKey);
       }
 
+      game.setOnTimerExpired(() => onTurnExpired(io, roomId, game));
+      if (game.status === 'playing') {
+        game.resumeTimer();
+      }
       socket.emit('game_state', getClientGameState(game, socket.id, io));
       saveGame(roomId, game);
       sendSpectatorGameState(io, game);
@@ -483,7 +530,17 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
 
         if (!game) return callback({ error: 'Комната не найдена' });
         if (game.isPrivate) return callback({ error: 'Приватная комната — вход только по коду' });
-        if (isPlayer(game, socket.id)) return callback({ error: 'Вы уже в этой комнате как игрок' });
+        if (isPlayer(game, socket.id)) {
+          return callback({ error: 'Вы уже в этой комнате как игрок' });
+        }
+        // NEW: защита от второй вкладки с тем же playerId
+        const reqPlayerId = typeof data.playerId === 'string' ? data.playerId : '';
+        if (
+          reqPlayerId &&
+          (game.hostPlayerId === reqPlayerId || game.guestPlayerId === reqPlayerId)
+        ) {
+          return callback({ error: 'Вы уже в этой комнате как игрок' });
+        }
         if (!game.players.red || !game.players.black) {
           return callback({ error: 'Игра ещё не началась — некого смотреть' });
         }
@@ -518,6 +575,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // MOVE
     // --------------------------------------------------------
     socket.on('move', async (roomId: string, row: number, col: number, callback) => {
+      if (typeof callback !== 'function') return;
       if (!checkMoveRate(socket.id)) {
         logger.warn(`Rate limit: move from ${socket.id}`);
         return callback({ error: 'Слишком быстро. Подождите секунду.' });
@@ -568,25 +626,15 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
           });
         }
 
-        await saveGame(roomId, game);
-        sendPersonalGameState(io, game);
-        sendSpectatorGameState(io, game);
-
         if (game.winner) {
-          sendPersonalGameOver(io, game);
-          if (game.seriesWinner || game.maxWins === 1) {
-            await saveGameResult({
-              roomId,
-              gameId: game.gameId,
-              winner: game.seriesWinner || (game.winner === 'draw' ? 'draw' : game.winner === 'red' ? 'host' : 'guest'),
-              players: { host: game.hostPlayerId, guest: game.guestPlayerId },
-              timestamp: Date.now(),
-              maxWins: game.maxWins,
-            });
-            await deleteGame(roomId);
-          }
+          handleGameFinished(io, roomId, game);
+        } else {
+          sendPersonalGameState(io, game);
+          sendSpectatorGameState(io, game);
+          await saveGame(roomId, game);
         }
         callback({ success: true });
+
       } finally {
         release();
       }
@@ -636,6 +684,7 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // FORFEIT
     // --------------------------------------------------------
     socket.on('forfeit', (roomId: string, callback) => {
+      if (typeof callback !== 'function') return;
       logger.info(`forfeit from ${socket.id} in ${roomId}`);
       const game = games.get(roomId);
       if (!game) return callback({ error: 'Игра не найдена' });
@@ -648,23 +697,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       const opponent = playerColor === 'red' ? 'black' : 'red';
       game.winner = opponent;
       game.handleGameOver();
-      saveGame(roomId, game);
-      sendPersonalGameState(io, game);
-      sendSpectatorGameState(io, game);
-      sendPersonalGameOver(io, game);
       logger.info(`Player ${socket.id} forfeited, winner: ${opponent}`);
-
-      if (game.seriesWinner || game.maxWins === 1) {
-        saveGameResult({
-          roomId,
-          gameId: game.gameId,
-          winner: game.seriesWinner || (game.winner === 'red' ? 'host' : 'guest'),
-          players: { host: game.hostPlayerId, guest: game.guestPlayerId },
-          timestamp: Date.now(),
-          maxWins: game.maxWins,
-        });
-        deleteGame(roomId);
-      }
+      handleGameFinished(io, roomId, game);
       callback({ success: true });
     });
 
@@ -706,16 +740,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       }
 
       if (!game.players.red && !game.players.black) {
-        // Оба ушли — удаляем комнату
         notifySpectatorsRoomClosed(io, roomId, 'Игроки покинули комнату');
-        const hostId = game.hostPlayerId;
-        if (hostId) {
-          const count = userRoomCount.get(hostId) || 0;
-          if (count > 0) userRoomCount.set(hostId, count - 1);
-        }
-        cleanupRoomTimers(roomId);
-        games.delete(roomId);
-        deleteGame(roomId);
+        finalizeRoom(roomId, game);
         logger.info(`Room ${roomId} deleted (empty)`);
       } else {
         // Остался один игрок — пересоздаём игру
@@ -798,22 +824,8 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
                 const winner = currentGame.players.red === socket.id ? 'black' : 'red';
                 currentGame.winner = winner;
                 currentGame.handleGameOver();
-                saveGame(roomId, currentGame);
-                sendPersonalGameState(io, currentGame);
-                sendSpectatorGameState(io, currentGame);
-                sendPersonalGameOver(io, currentGame);
                 logger.info(`Room ${roomId}: auto-forfeit, winner: ${winner}`);
-                if (currentGame.seriesWinner || currentGame.maxWins === 1) {
-                  saveGameResult({
-                    roomId,
-                    gameId: currentGame.gameId,
-                    winner: currentGame.seriesWinner || (currentGame.winner === 'red' ? 'host' : 'guest'),
-                    players: { host: currentGame.hostPlayerId, guest: currentGame.guestPlayerId },
-                    timestamp: Date.now(),
-                    maxWins: currentGame.maxWins,
-                  });
-                  deleteGame(roomId);
-                }
+                handleGameFinished(io, roomId, currentGame);
               }
             }
             disconnectTimers.delete(timerKey);
@@ -827,6 +839,18 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // --------------------------------------------------------
     // CHAT MESSAGE
     // --------------------------------------------------------
+    socket.on('typing', (roomId: string, isTyping: boolean) => {
+      if (typeof roomId !== 'string') return;
+      const game = games.get(roomId);
+      if (!game) return;
+      if (!isPlayer(game, socket.id)) return;
+
+      const opponentId = game.players.red === socket.id ? game.players.black : game.players.red;
+      if (!opponentId) return;
+      const oppSocket = io.sockets.sockets.get(opponentId);
+      oppSocket?.emit('opponent_typing', !!isTyping);
+    });
+
     socket.on('chat_message', (roomId: string, text: string) => {
       if (!checkChatRate(socket.id)) {
         logger.warn(`Rate limit: chat from ${socket.id}`);
@@ -853,7 +877,6 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
       if (chatMessages.get(roomId)!.length > 50) {
         chatMessages.set(roomId, chatMessages.get(roomId)!.slice(-50));
       }
-      chatPublisher.publish('chat', JSON.stringify({ roomId, msg }));
       sendPersonalGameState(io, game);
       sendSpectatorGameState(io, game);
     });
@@ -916,14 +939,20 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // --------------------------------------------------------
     // PUZZLE: REQUEST
     // --------------------------------------------------------
-    socket.on('puzzle:request', async (difficulty: PuzzleDifficulty, callback) => {
+    socket.on('puzzle:request', async (data: { difficulty?: number; playerId?: string }, callback) => {
+      if (!data || typeof data !== 'object' || typeof callback !== 'function') return;
       try {
+        const difficulty = data.difficulty;
+        const playerId = typeof data.playerId === 'string' ? data.playerId : '';
         if (difficulty !== 1 && difficulty !== 2) {
           return callback({ error: 'Недопустимая сложность' });
         }
-        const puzzle = generatePuzzle(difficulty);
-        await storeActivePuzzle(puzzle.id, puzzle.difficulty);
-        logger.info(`Puzzle ${puzzle.id} (type=${puzzle.type}) requested by ${socket.id}`);
+        if (!playerId) {
+          return callback({ error: 'Нет playerId' });
+        }
+        const puzzle = generatePuzzle(difficulty as PuzzleDifficulty);
+        await storeActivePuzzle(puzzle.id, puzzle, playerId);
+        logger.info(`Puzzle ${puzzle.id} (type=${puzzle.type}) for ${playerId} via ${socket.id}`);
         callback({ puzzle });
       } catch (err) {
         logger.error('puzzle:request error', err);
@@ -934,17 +963,63 @@ export function setupSocket(io: Server, loadedGames: Map<string, Game>): void {
     // --------------------------------------------------------
     // PUZZLE: SOLVED
     // --------------------------------------------------------
-    socket.on('puzzle:solved', async (puzzleId: string, playerId: string, callback) => {
+    socket.on('puzzle:solved', async (
+      data: { puzzleId?: string; playerId?: string; row?: number; col?: number },
+      callback,
+    ) => {
+      if (!data || typeof data !== 'object' || typeof callback !== 'function') return;
       try {
-        if (!puzzleId || !playerId) {
+        const { puzzleId, playerId } = data;
+        const row = data.row;
+        const col = data.col;
+
+        if (
+          typeof puzzleId !== 'string' ||
+          typeof playerId !== 'string' ||
+          typeof row !== 'number' ||
+          typeof col !== 'number' ||
+          row < 0 || row > 3 || col < 0 || col > 3
+        ) {
           return callback({ error: 'Некорректные данные' });
         }
-        const difficulty = await consumeActivePuzzle(puzzleId);
-        if (difficulty === null) {
+
+        // 1. Прочитать без удаления
+        const puzzle = await peekActivePuzzle(puzzleId, playerId);
+        if (!puzzle) {
           return callback({ error: 'Пазл не найден или уже решён' });
         }
+
+        // 2. Валидировать ход
+        const cell = puzzle.board[row][col];
+        if (!cell || typeof cell === 'string') {
+          return callback({ error: 'Недопустимый ход' });
+        }
+        if (!isValidForColor(puzzle.board, row, col, puzzle.lastPickedTile)) {
+          return callback({ error: 'Недопустимый ход' });
+        }
+
+        const sim = puzzle.board.map((r: any[]) => [...r]);
+        sim[row][col] = 'red';
+
+        let solved = false;
+        if (puzzle.type === 'win') {
+          solved = checkWin(sim, 'red');
+        } else {
+          const pickedTile = puzzle.board[row][col];
+          solved = !canWinNextMove(sim, 'black', pickedTile);
+        }
+        if (!solved) {
+          return callback({ error: 'Ход не решает пазл' });
+        }
+
+        // 3. Атомарно удалить — защита от двойного засчёта
+        const consumed = await consumeActivePuzzle(puzzleId, playerId);
+        if (!consumed) {
+          return callback({ error: 'Пазл уже засчитан' });
+        }
+
         const totalSolved = await recordPuzzleSolved(playerId);
-        logger.info(`Puzzle ${puzzleId} solved by ${playerId}, total=${totalSolved}`);
+        logger.info(`Puzzle ${puzzleId} solved by ${playerId} at (${row},${col}), total=${totalSolved}`);
         callback({ success: true, puzzlesSolved: totalSolved });
       } catch (err) {
         logger.error('puzzle:solved error', err);

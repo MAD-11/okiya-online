@@ -41,7 +41,6 @@ const Game: React.FC = () => {
   const [message, setMessage] = useState('');
   const [personalGameOver, setPersonalGameOver] = useState<string | null>(null);
   const [waitingRestart, setWaitingRestart] = useState(false);
-  const [waitingReset, setWaitingReset] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -145,7 +144,6 @@ const Game: React.FC = () => {
     setMessage('');
     setPersonalGameOver(null);
     setWaitingRestart(false);
-    setWaitingReset(false);
     setReconnecting(false);
   };
 
@@ -158,6 +156,7 @@ const Game: React.FC = () => {
     }
   };
 
+  // 1) Баннер «переподключение» — только UX, никаких emit
   useEffect(() => {
     if (!connected && roomId && !reconnecting) {
       setReconnecting(true);
@@ -169,40 +168,38 @@ const Game: React.FC = () => {
         setReconnecting(false);
       }, 5000);
       return () => clearTimeout(timeout);
-    } else if (connected && reconnecting) {
+    }
+    if (connected && reconnecting) {
       setReconnecting(false);
       setMessage('');
-      const savedRoomId = localStorage.getItem('okiya_roomId');
-      const savedToken = localStorage.getItem('okiya_playerToken');
-      if (savedRoomId && savedToken && socket) {
-        socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
-          if (res.error) {
-            setMessage(res.error);
-            clearSavedRoom();
-            setGameState(null);
-          } else {
-            setRoomId(savedRoomId);
-          }
-        });
-      }
     }
-  }, [connected, roomId, reconnecting, socket]);
+  }, [connected, roomId, reconnecting]);
 
+  // 2) Ровно один reconnect_room на каждое новое соединение (по socket.id).
+  // Это закрывает и «F5», и «временная потеря сети», без двойного emit.
+  const lastSocketIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!socket || !connected) return;
+    const currentId = socket.id;
+    if (!currentId) return;
+    if (lastSocketIdRef.current === currentId) return;
+    lastSocketIdRef.current = currentId;
+
     const savedRoomId = localStorage.getItem('okiya_roomId');
     const savedToken = localStorage.getItem('okiya_playerToken');
-    if (savedRoomId && savedToken) {
-      socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
-        if (res.error) {
-          clearSavedRoom();
-          setMessage(res.error);
-        } else {
-          setRoomId(savedRoomId);
-          setMessage('');
-        }
-      });
-    }
+    if (!savedRoomId || !savedToken) return;
+
+    socket.emit('reconnect_room', savedRoomId, savedToken, (res: any) => {
+      if (res?.error) {
+        clearSavedRoom();
+        setMessage(res.error);
+        setGameState(null);
+        setRoomId(null);
+      } else {
+        setRoomId(savedRoomId);
+        setMessage('');
+      }
+    });
   }, [socket, connected]);
 
   const createRoom = (maxWins: number) => {
@@ -216,7 +213,6 @@ const Game: React.FC = () => {
         setMessage('');
         setPersonalGameOver(null);
         setWaitingRestart(false);
-        setWaitingReset(false);
       }
     });
   };
@@ -240,7 +236,6 @@ const Game: React.FC = () => {
         setMessage('');
         setPersonalGameOver(null);
         setWaitingRestart(false);
-        setWaitingReset(false);
       }
     });
   };
@@ -263,7 +258,6 @@ const Game: React.FC = () => {
       setMessage('');
       setPersonalGameOver(null);
       setWaitingRestart(false);
-      setWaitingReset(false);
     });
   };
 
@@ -329,20 +323,26 @@ const Game: React.FC = () => {
     }
   };
 
+  // Стабильный ref с актуальным gameState — чтобы обработчики не пересоздавались
+  const gameStateRef = useRef<GameState | null>(gameState);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  const roomIdRef = useRef<string | null>(roomId);
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
+
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('game_state', (state: GameState) => {
-      if (state.status === 'playing' && gameState?.status === 'finished') {
+    const onGameState = (state: GameState) => {
+      const prev = gameStateRef.current;
+      if (state.status === 'playing' && prev?.status === 'finished') {
         setPersonalGameOver(null);
         setWaitingRestart(false);
-        setWaitingReset(false);
         setMessage('');
       }
       setGameState(state);
-    });
+    };
 
-    socket.on('game_over', (data: { winner: string; yourResult: string; seriesWinner: string | null }) => {
+    const onGameOver = (data: { winner: string; yourResult: string; seriesWinner: string | null }) => {
       if (data.yourResult === 'win') playWinSound();
       else if (data.yourResult === 'lose') playLoseSound();
       else if (data.yourResult === 'draw') playDrawSound();
@@ -355,56 +355,60 @@ const Game: React.FC = () => {
       else if (data.yourResult === 'lose') text = 'Поражение. Победил соперник';
       else if (data.yourResult === 'draw') text = 'Ничья';
 
+      const gs = gameStateRef.current;
       if (data.seriesWinner) {
-        const iAmHost = gameState?.isHost;
+        const iAmHost = gs?.isHost;
         if ((data.seriesWinner === 'host' && iAmHost) || (data.seriesWinner === 'guest' && !iAmHost)) {
           text += ' 🏆 Вы выиграли серию!';
         } else {
           text += ' Серия проиграна.';
         }
         clearSavedRoom();
-      } else if (gameState?.maxWins === 1) {
+      } else if (gs?.maxWins === 1) {
         clearSavedRoom();
       }
       setPersonalGameOver(text);
-    });
+    };
 
-    socket.on('opponent_joined', (data: { nick1: string; nick2: string }) => {
+    const onOpponentJoined = (data: { nick1: string; nick2: string }) => {
       playJoinSound();
-      if (roomId && socket) {
-        socket.emit('clear_chat', roomId);
-      }
+      const rid = roomIdRef.current;
+      if (rid) socket.emit('clear_chat', rid);
       setVsAnimation(data);
       setTimeout(() => setVsAnimation(null), 2500);
-    });
+    };
 
-    socket.on('chat_cleared', () => {
-      setGameState(prev => prev ? { ...prev, messages: [] } : null);
-    });
+    const onChatCleared = () => {
+      setGameState(prev => (prev ? { ...prev, messages: [] } : null));
+    };
 
-    socket.on('opponent_typing', (isTyping: boolean) => {
-      setOpponentTyping(isTyping);
-    });
+    const onOpponentTyping = (isTyping: boolean) => setOpponentTyping(isTyping);
 
-    socket.on('room_closed', (data: { reason: string }) => {
+    const onRoomClosed = (data: { reason: string }) => {
       setMessage(`Комната закрыта: ${data.reason}`);
       clearSavedRoom();
       setGameState(null);
       setRoomId(null);
       setPersonalGameOver(null);
       setWaitingRestart(false);
-      setWaitingReset(false);
-    });
+    };
+
+    socket.on('game_state', onGameState);
+    socket.on('game_over', onGameOver);
+    socket.on('opponent_joined', onOpponentJoined);
+    socket.on('chat_cleared', onChatCleared);
+    socket.on('opponent_typing', onOpponentTyping);
+    socket.on('room_closed', onRoomClosed);
 
     return () => {
-      socket.off('game_state');
-      socket.off('game_over');
-      socket.off('opponent_joined');
-      socket.off('chat_cleared');
-      socket.off('opponent_typing');
-      socket.off('room_closed');
+      socket.off('game_state', onGameState);
+      socket.off('game_over', onGameOver);
+      socket.off('opponent_joined', onOpponentJoined);
+      socket.off('chat_cleared', onChatCleared);
+      socket.off('opponent_typing', onOpponentTyping);
+      socket.off('room_closed', onRoomClosed);
     };
-  }, [socket, gameState?.isHost, gameState?.status, gameState?.maxWins, roomId]);
+  }, [socket]);
 
   let content = null;
 

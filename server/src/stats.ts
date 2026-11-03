@@ -5,6 +5,7 @@ interface GameResult {
   gameId: string;
   winner: 'host' | 'guest' | 'draw';
   players: { host: string; guest: string };
+  nicks: { host: string; guest: string };
   timestamp: number;
   maxWins: number;
 }
@@ -130,11 +131,16 @@ const PUZZLES_SOLVED_PREFIX = 'okiya:puzzlesSolved:';
 const PUZZLE_PREFIX = 'okiya:puzzle:';
 const PUZZLE_TTL = 30 * 60; // 30 минут
 
+interface StoredPuzzle {
+  puzzle: any;
+  playerId: string;
+  createdAt: number;
+}
+
 export async function recordPuzzleSolved(playerId: string): Promise<number> {
   try {
     const key = PUZZLES_SOLVED_PREFIX + playerId;
-    const newCount = await withTimeout(pubClient.incr(key), REDIS_TIMEOUT);
-    return newCount;
+    return await withTimeout(pubClient.incr(key), REDIS_TIMEOUT);
   } catch (err) {
     console.error('recordPuzzleSolved failed:', err);
     return 0;
@@ -143,8 +149,7 @@ export async function recordPuzzleSolved(playerId: string): Promise<number> {
 
 export async function getPuzzlesSolved(playerId: string): Promise<number> {
   try {
-    const key = PUZZLES_SOLVED_PREFIX + playerId;
-    const val = await withTimeout(pubClient.get(key), REDIS_TIMEOUT);
+    const val = await withTimeout(pubClient.get(PUZZLES_SOLVED_PREFIX + playerId), REDIS_TIMEOUT);
     return val ? parseInt(val, 10) : 0;
   } catch (err) {
     console.error('getPuzzlesSolved failed:', err);
@@ -152,35 +157,54 @@ export async function getPuzzlesSolved(playerId: string): Promise<number> {
   }
 }
 
-/**
- * Сохранить активный пазл в Redis (для валидации при решении).
- */
 export async function storeActivePuzzle(
   puzzleId: string,
-  difficulty: number
+  puzzle: any,
+  playerId: string,
 ): Promise<void> {
   try {
     const key = PUZZLE_PREFIX + puzzleId;
+    const data: StoredPuzzle = { puzzle, playerId, createdAt: Date.now() };
     await withTimeout(
-      pubClient.set(key, String(difficulty), 'EX', PUZZLE_TTL),
-      REDIS_TIMEOUT
+      pubClient.set(key, JSON.stringify(data), 'EX', PUZZLE_TTL),
+      REDIS_TIMEOUT,
     );
   } catch (err) {
     console.error('storeActivePuzzle failed:', err);
   }
 }
 
-/**
- * Атомарно прочитать и удалить пазл (getdel).
- * Возвращает difficulty или null, если пазл не найден / уже использован / истёк.
- */
+/** Только чтение, без удаления. Нужно чтобы отклонить неверный ход, не сжигая пазл. */
+export async function peekActivePuzzle(
+  puzzleId: string,
+  playerId: string,
+): Promise<any | null> {
+  try {
+    const raw = await withTimeout(pubClient.get(PUZZLE_PREFIX + puzzleId), REDIS_TIMEOUT);
+    if (!raw) return null;
+    const stored: StoredPuzzle = JSON.parse(raw);
+    if (stored.playerId !== playerId) return null;
+    return stored.puzzle;
+  } catch (err) {
+    console.error('peekActivePuzzle failed:', err);
+    return null;
+  }
+}
+
+/** Атомарно: прочитать, проверить playerId, удалить. Возвращает пазл или null. */
 export async function consumeActivePuzzle(
-  puzzleId: string
-): Promise<number | null> {
+  puzzleId: string,
+  playerId: string,
+): Promise<any | null> {
   try {
     const key = PUZZLE_PREFIX + puzzleId;
-    const val = await withTimeout(pubClient.getdel(key), REDIS_TIMEOUT);
-    return val ? parseInt(val, 10) : null;
+    const raw = await withTimeout(pubClient.get(key), REDIS_TIMEOUT);
+    if (!raw) return null;
+    const stored: StoredPuzzle = JSON.parse(raw);
+    if (stored.playerId !== playerId) return null;
+    const deleted = await withTimeout(pubClient.del(key), REDIS_TIMEOUT);
+    if (deleted === 0) return null; // параллельный запрос успел раньше
+    return stored.puzzle;
   } catch (err) {
     console.error('consumeActivePuzzle failed:', err);
     return null;

@@ -3,7 +3,6 @@ import { Socket } from 'socket.io-client';
 import Board from './Board';
 import LastPickedTile from './LastPickedTile';
 import { isValidMove } from '../game/gameLogic';
-import { checkWin } from '../game/gameLogic';
 import { Puzzle, PuzzleDifficulty, Tile, Board as BoardType } from '../types/game';
 import { playMoveSound, playWinSound, initAudio } from '../utils/sound';
 import { useTheme } from '../contexts/ThemeContext';
@@ -20,19 +19,6 @@ const difficultyLabel: Record<PuzzleDifficulty, string> = {
   1: '🟢 Выиграй за 1 ход',
   2: '🔴 Заблокируй соперника',
 };
-
-// Может ли `color` выиграть следующим ходом?
-function canWinNext(board: BoardType, color: 'red' | 'black', lastTile: Tile | null): boolean {
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      if (!isValidMove(board, r, c, lastTile)) continue;
-      const sim = board.map(row => [...row]);
-      sim[r][c] = color;
-      if (checkWin(sim, color)) return true;
-    }
-  }
-  return false;
-}
 
 const PuzzleGame: React.FC<PuzzleGameProps> = ({
   difficulty,
@@ -60,7 +46,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
     setMessage('');
     setShowHint(false);
 
-    socket.emit('puzzle:request', difficulty, (res: any) => {
+    socket.emit('puzzle:request', { difficulty, playerId }, (res: any) => {
       setLoading(false);
       if (res?.error) {
         setError(res.error);
@@ -79,7 +65,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
 
   const handleCellClick = useCallback((row: number, col: number) => {
     initAudio();
-    if (!puzzle || !board || solved) return;
+    if (!puzzle || !board || solved || !socket) return;
 
     const cell = board[row][col];
     if (!cell || typeof cell === 'string') {
@@ -87,45 +73,40 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({
       return;
     }
 
+    // Быстрая локальная проверка «фишка вообще подходит» — только для UX
     if (!isValidMove(board, row, col, lastPickedTile)) {
       setMessage('❌ Эта фишка не совпадает с предыдущей');
       return;
     }
 
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = 'red';
-    const pickedTile = cell as Tile;
+    // Решение проверяет сервер — он источник правды
+    socket.emit(
+      'puzzle:solved',
+      { puzzleId: puzzle.id, playerId, row, col },
+      (res: any) => {
+        if (res?.error) {
+          setMessage(`❌ ${res.error}`);
+          return;
+        }
+        if (!res?.success) return;
 
-    // Проверка: решён ли пазл (универсально для win и block)
-    let isSolved = false;
-    if (puzzle.type === 'win') {
-      isSolved = checkWin(newBoard, 'red');
-    } else {
-      // block: после хода чёрные не могут выиграть следующим ходом
-      isSolved = !canWinNext(newBoard, 'black', pickedTile);
-    }
-
-    if (!isSolved) {
-      setMessage(puzzle.type === 'block'
-        ? '❌ Эта фишка не блокирует угрозу'
-        : '❌ Этот ход не ведёт к победе');
-      return;
-    }
-
-    setBoard(newBoard);
-    setLastPickedTile(pickedTile);
-    setSolved(true);
-    playMoveSound();
-    playWinSound();
-    setMessage(puzzle.type === 'block'
-      ? '🎉 Вы заблокировали соперника!'
-      : '🎉 Пазл решён!');
-
-    socket?.emit('puzzle:solved', puzzle.id, playerId, (res: any) => {
-      if (res?.success) {
-        setTotalSolved(res.puzzlesSolved);
-      }
-    });
+        const newBoard = board.map(r => [...r]);
+        newBoard[row][col] = 'red';
+        setBoard(newBoard);
+        setLastPickedTile(cell as Tile);
+        setSolved(true);
+        playMoveSound();
+        playWinSound();
+        setMessage(
+          puzzle.type === 'block'
+            ? '🎉 Вы заблокировали соперника!'
+            : '🎉 Пазл решён!',
+        );
+        if (typeof res.puzzlesSolved === 'number') {
+          setTotalSolved(res.puzzlesSolved);
+        }
+      },
+    );
   }, [puzzle, board, lastPickedTile, solved, socket, playerId]);
 
   const handleReset = () => {

@@ -10,26 +10,11 @@ import rateLimit from 'express-rate-limit';
 const app = express();
 const server = http.createServer(app);
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
-app.use(limiter);
-
-const allowedOrigin = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
-
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigin,
-    methods: ['GET', 'POST'],
-  },
-});
-
-io.adapter(createAdapter(pubClient, subClient));
-
 // ============================================================
 // HEALTH CHECK
 // ============================================================
+// /health ДО лимитера, чтобы Render никогда не получал 429
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -43,6 +28,24 @@ app.get('/health', (req, res) => {
     },
   });
 });
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+app.use(limiter);
+
+
+const allowedOrigin = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigin,
+    methods: ['GET', 'POST'],
+  },
+});
+
+io.adapter(createAdapter(pubClient, subClient));
 
 // ============================================================
 // START
@@ -79,39 +82,33 @@ async function shutdown(signal: string) {
   forceExitTimer.unref();
 
   try {
-    // 1. Останавливаем приём новых HTTP-соединений
+    // 1. Сохраняем активные игры
+    const activeGames = getAllActiveGames();
+    if (activeGames.size > 0) {
+      logger.info(`Saving ${activeGames.size} active games to Redis...`);
+      await Promise.all(
+        Array.from(activeGames.entries()).map(([roomId, game]) =>
+          saveGame(roomId, game).catch(err =>
+            logger.error(`Failed to save game ${roomId}:`, err),
+          ),
+        ),
+      );
+      logger.info('All active games saved');
+    }
+
+    // 2. Закрываем Socket.IO и HTTP одним вызовом
     await new Promise<void>((resolve) => {
-      server.close(() => {
-        logger.info('HTTP server closed');
+      io.close(() => {
+        logger.info('Socket.IO server closed');
         resolve();
       });
     });
 
-    // 2. Сохраняем все активные игры в Redis (чтобы не потерять при рестарте)
-    const activeGames = getAllActiveGames();
-    if (activeGames.size > 0) {
-      logger.info(`Saving ${activeGames.size} active games to Redis...`);
-      const savePromises = Array.from(activeGames.entries()).map(([roomId, game]) =>
-        saveGame(roomId, game).catch(err =>
-          logger.error(`Failed to save game ${roomId}:`, err)
-        )
-      );
-      await Promise.all(savePromises);
-      logger.info('All active games saved');
-    }
-
-    // 3. Закрываем все сокеты
-    const sockets = await io.fetchSockets();
-    logger.info(`Disconnecting ${sockets.length} sockets...`);
-    for (const socket of sockets) {
-      socket.disconnect(true);
-    }
-
-    // 4. Очищаем таймеры отключения
+    // 3. Очищаем таймеры отключения
     clearAllDisconnectTimers();
     logger.info('Disconnect timers cleared');
 
-    // 5. Закрываем Redis-соединения
+    // 4. Закрываем Redis-соединения
     await closeRedisConnections();
     logger.info('Redis connections closed');
 

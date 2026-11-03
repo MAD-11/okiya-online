@@ -28,32 +28,40 @@ const difficultyLabel: Record<'easy' | 'medium' | 'hard', string> = {
   hard: '🔴 Сложный',
 };
 
+// ============================================================
+// countLines — считаем ТОЛЬКО камни цвета и ТОЛЬКО соперника.
+// Раньше "typeof c !== 'string'" считал Tile и null за камень соперника,
+// из-за чего 3-в-линию никогда не детектилось.
+// ============================================================
+const countLineCells = (
+  cells: any[],
+  color: 'red' | 'black',
+  oppColor: 'red' | 'black',
+): { mine: number; opp: number } => {
+  let mine = 0;
+  let opp = 0;
+  for (const c of cells) {
+    if (c === color) mine++;
+    else if (c === oppColor) opp++;
+  }
+  return { mine, opp };
+};
+
 const countLines = (board: BoardType, color: 'red' | 'black', count: number): number => {
+  const oppColor = color === 'red' ? 'black' : 'red';
   let result = 0;
-  for (let i = 0; i < 4; i++) {
-    const row = board[i];
-    if (row.filter(c => c === color).length === count &&
-        row.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
-  }
-  for (let j = 0; j < 4; j++) {
-    let cc = 0, oo = 0;
-    for (let i = 0; i < 4; i++) {
-      if (board[i][j] === color) cc++;
-      else if (board[i][j] !== null && typeof board[i][j] !== 'string') oo++;
-    }
-    if (cc === count && oo === 0) result++;
-  }
-  const d1 = [board[0][0], board[1][1], board[2][2], board[3][3]];
-  if (d1.filter(c => c === color).length === count &&
-      d1.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
-  const d2 = [board[0][3], board[1][2], board[2][1], board[3][0]];
-  if (d2.filter(c => c === color).length === count &&
-      d2.filter(c => c !== color && typeof c !== 'string').length === 0) result++;
+  const check = (cells: any[]) => {
+    const { mine, opp } = countLineCells(cells, color, oppColor);
+    if (mine === count && opp === 0) result++;
+  };
+
+  for (let i = 0; i < 4; i++) check(board[i]);
+  for (let j = 0; j < 4; j++) check([board[0][j], board[1][j], board[2][j], board[3][j]]);
+  check([board[0][0], board[1][1], board[2][2], board[3][3]]);
+  check([board[0][3], board[1][2], board[2][1], board[3][0]]);
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
-      const cells = [board[r][c], board[r][c + 1], board[r + 1][c], board[r + 1][c + 1]];
-      if (cells.filter(c2 => c2 === color).length === count &&
-          cells.filter(c2 => c2 !== color && typeof c2 !== 'string').length === 0) result++;
+      check([board[r][c], board[r][c + 1], board[r + 1][c], board[r + 1][c + 1]]);
     }
   }
   return result;
@@ -78,23 +86,40 @@ const getValidMoves = (board: BoardType, last: Tile | null) => {
   return moves;
 };
 
-const evaluatePosition = (board: BoardType, bot: 'red' | 'black', player: 'red' | 'black', last: Tile | null): number => {
+const evaluatePosition = (
+  board: BoardType,
+  bot: 'red' | 'black',
+  player: 'red' | 'black',
+  last: Tile | null,
+): number => {
   let score = 0;
   if (checkWin(board, bot)) return WIN_SCORE;
   if (canWinNextMove(board, player, last)) score -= BLOCK_WIN_SCORE;
+
   score += countLines(board, bot, 3) * CREATE_THREE_SCORE;
   score += countLines(board, bot, 2) * CREATE_TWO_SCORE;
   score -= countLines(board, player, 3) * BLOCK_THREE_SCORE;
   score -= countLines(board, player, 2) * BLOCK_TWO_SCORE;
-  for (const [r, c] of [[1, 1], [1, 2], [2, 1], [2, 2]]) {
+
+  for (const [r, c] of [[1, 1], [1, 2], [2, 1], [2, 2]] as const) {
     if (board[r][c] === bot) score += CENTER_BONUS;
     else if (board[r][c] === player) score -= CENTER_BONUS / 2;
   }
-  score += getValidMoves(board, last).length * FLEXIBILITY_BONUS;
+
+  // Больше ходов у оппонента = хуже для нас
+  score -= getValidMoves(board, last).length * FLEXIBILITY_BONUS;
+
   return score;
 };
 
-const minimax = (board: BoardType, depth: number, isBot: boolean, bot: 'red' | 'black', player: 'red' | 'black', last: Tile | null): number => {
+const minimax = (
+  board: BoardType,
+  depth: number,
+  isBot: boolean,
+  bot: 'red' | 'black',
+  player: 'red' | 'black',
+  last: Tile | null,
+): number => {
   if (depth === 0) return evaluatePosition(board, bot, player, last);
   const moves = getValidMoves(board, last);
   if (moves.length === 0) return isBot ? -WIN_SCORE : WIN_SCORE;
@@ -106,15 +131,14 @@ const minimax = (board: BoardType, depth: number, isBot: boolean, bot: 'red' | '
       best = Math.max(best, minimax(nb, depth - 1, false, bot, player, m.tile));
     }
     return best;
-  } else {
-    let worst = Infinity;
-    for (const m of moves) {
-      const nb = board.map(row => [...row]);
-      nb[m.row][m.col] = player;
-      worst = Math.min(worst, minimax(nb, depth - 1, true, bot, player, m.tile));
-    }
-    return worst;
   }
+  let worst = Infinity;
+  for (const m of moves) {
+    const nb = board.map(row => [...row]);
+    nb[m.row][m.col] = player;
+    worst = Math.min(worst, minimax(nb, depth - 1, true, bot, player, m.tile));
+  }
+  return worst;
 };
 
 const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
@@ -155,15 +179,14 @@ const BotGame: React.FC<BotGameProps> = ({ onClose, difficulty }) => {
       if (difficulty === 'easy') {
         chosenMove = moves[Math.floor(Math.random() * moves.length)];
       } else {
-        const depth = difficulty === 'hard' ? 1 : 0;
+        // medium = смотрю на 1 свой ход; hard = на 1 свой + ответ соперника
+        const depth = difficulty === 'hard' ? 2 : 1;
         let bestMoves = [moves[0]];
         let bestScore = -Infinity;
         for (const m of moves) {
           const tb = cb.map(r => [...r]);
           tb[m.row][m.col] = botColor;
-          const sc = depth === 0
-            ? evaluatePosition(tb, botColor, playerColor, m.tile)
-            : minimax(tb, depth, false, botColor, playerColor, m.tile);
+          const sc = minimax(tb, depth - 1, false, botColor, playerColor, m.tile);
           if (sc > bestScore) { bestScore = sc; bestMoves = [m]; }
           else if (Math.abs(sc - bestScore) < 0.1) bestMoves.push(m);
         }
