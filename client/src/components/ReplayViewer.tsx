@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Socket } from 'socket.io-client';
 import Board from './Board';
@@ -153,35 +153,22 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
   }, [analysis, step]);
 
   // Управление
-  // Refs для keyboard handler — чтобы не переподписываться на каждом рендере
-  const stepRef = useRef(step);
-  const replayRef = useRef(replay);
-  const playingRef = useRef(playing);
-  useEffect(() => { stepRef.current = step; }, [step]);
-  useEffect(() => { replayRef.current = replay; }, [replay]);
-  useEffect(() => { playingRef.current = playing; }, [playing]);
-
   const goTo = useCallback((target: number) => {
-    const r = replayRef.current;
-    if (!r) return;
-    setStep(Math.max(0, Math.min(target, r.moves.length)));
+    if (!replay) return;
+    setStep(Math.max(0, Math.min(target, replay.moves.length)));
     setPlaying(false);
-  }, []);
+  }, [replay]);
 
-  const stepBack = useCallback(() => goTo(stepRef.current - 1), [goTo]);
-  const stepForward = useCallback(() => goTo(stepRef.current + 1), [goTo]);
-  const toStart = useCallback(() => goTo(0), [goTo]);
-  const toEnd = useCallback(() => {
-    const r = replayRef.current;
-    if (r) goTo(r.moves.length);
-  }, [goTo]);
+  const stepBack = () => goTo(step - 1);
+  const stepForward = () => goTo(step + 1);
+  const toStart = () => goTo(0);
+  const toEnd = () => replay && goTo(replay.moves.length);
 
-  const togglePlay = useCallback(() => {
-    const r = replayRef.current;
-    if (!r || r.moves.length === 0) return;
-    if (stepRef.current >= r.moves.length) { setStep(0); setPlaying(true); return; }
+  const togglePlay = () => {
+    if (!replay || replay.moves.length === 0) return;
+    if (step >= replay.moves.length) { setStep(0); setPlaying(true); return; }
     setPlaying(p => !p);
-  }, []);
+  };
 
   const handleAnalyze = useCallback(() => {
     if (!socket || !gameId) return;
@@ -200,10 +187,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     });
   }, [socket, gameId]);
 
-  const handleExit = useCallback(() => {
-    if (playingRef.current) setConfirmExitOpen(true);
-    else onClose();
-  }, [onClose]);
+  const handleExit = () => { if (playing) setConfirmExitOpen(true); else onClose(); };
   const confirmExit = () => { setConfirmExitOpen(false); onClose(); };
 
   // Клавиатура
@@ -218,7 +202,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ gameId, socket, onClose }) 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [stepBack, stepForward, togglePlay, toStart, toEnd, handleExit]);
+  });
 
   const progressPct = totalMoves > 0 ? (step / totalMoves) * 100 : 0;
 
